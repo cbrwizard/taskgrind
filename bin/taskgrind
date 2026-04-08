@@ -557,6 +557,7 @@ else
 fi
 consecutive_fast=0
 consecutive_zero_ship=0
+_sweep_done=0
 
 wait_for_network() {
   local wait_start waited
@@ -607,11 +608,80 @@ while [[ $(date +%s) -lt $deadline ]]; do
     break
   fi
 
-  # Exit early when queue is empty — don't waste sessions on nothing
+  # ── Empty queue handling ──────────────────────────────────────────
+  # When the queue is empty, launch a sweep session to audit the repo
+  # and populate TASKS.md. If the sweep finds nothing, exit.
+  # Only one sweep per grind — prevents infinite sweep loops.
   if [[ "$tasks_before" -eq 0 ]]; then
-    echo "   ✓ Queue empty — exiting."
-    log_write "[$(date '+%H:%M')] queue_empty tasks=0 — exiting"
-    break
+    if [[ "$_sweep_done" -eq 1 ]]; then
+      echo "   ✓ Queue empty after sweep — exiting."
+      log_write "[$(date '+%H:%M')] queue_empty tasks=0 sweep=done — exiting"
+      break
+    fi
+    _sweep_done=1
+    echo "🔍 Queue empty — running sweep to find work..."
+    log_write "[$(date '+%H:%M')] queue_empty tasks=0 — launching sweep session"
+
+    sweep_prompt="TASKS.md is empty. Audit this repository and populate TASKS.md with actionable tasks."
+    sweep_prompt+=" Look at: open TODOs/FIXMEs in code, test coverage gaps, lint warnings, outdated dependencies, missing docs, README gaps."
+    sweep_prompt+=" Write tasks following the tasks.md spec: checkbox format under P0-P3 priority headings, with **ID**, **Tags**, **Details**, **Files**, **Acceptance** metadata."
+    sweep_prompt+=" Focus on concrete improvements, not busywork. Commit the updated TASKS.md before timeout."
+    if [[ -n "$extra_prompt" ]]; then
+      sweep_prompt+=" FOCUS: $extra_prompt"
+    fi
+
+    session_start=$(date +%s)
+    session_exit=0
+    if [[ -n "${DVB_GRIND_CMD:-}" ]]; then
+      script -q "$session_output" \
+        "${devin_cmd[@]}" \
+        --model "$model" \
+        --permission-mode dangerous \
+        -p "$sweep_prompt" \
+        || session_exit=$?
+    else
+      "${devin_cmd[@]}" \
+        --model "$model" \
+        --permission-mode dangerous \
+        -p "$sweep_prompt" \
+        > >(tee -a "$session_output") \
+        2>> "$log_file" &
+      _dvb_pid=$!
+      (
+        trap 'exit 0' TERM
+        remaining=$max_session
+        while (( remaining > 0 )); do
+          s=$(( remaining > 10 ? 10 : remaining ))
+          sleep "$s" &
+          wait $! 2>/dev/null || exit 0
+          remaining=$((remaining - s))
+          kill -0 "$_dvb_pid" 2>/dev/null || exit 0
+        done
+        kill -INT "$_dvb_pid" 2>/dev/null || true
+        sleep 15 &
+        wait $! 2>/dev/null || exit 0
+        kill -0 "$_dvb_pid" 2>/dev/null && kill "$_dvb_pid" 2>/dev/null || true
+      ) &
+      _dvb_timeout=$!
+      wait "$_dvb_pid" 2>/dev/null || session_exit=$?
+      kill "$_dvb_timeout" 2>/dev/null || true
+      wait "$_dvb_timeout" 2>/dev/null || true
+    fi
+    session_elapsed=$(( $(date +%s) - session_start ))
+    log_write "[$(date '+%H:%M')] sweep_done exit=$session_exit elapsed=${session_elapsed}s"
+
+    tasks_found=$(count_tasks "$repo/TASKS.md")
+    if [[ "$tasks_found" -gt 0 ]]; then
+      echo "   ✓ Sweep found $tasks_found tasks — continuing grind."
+      log_write "[$(date '+%H:%M')] sweep_found tasks=$tasks_found"
+    else
+      echo "   ✓ Sweep found no tasks — exiting."
+      log_write "[$(date '+%H:%M')] sweep_empty tasks=0 — exiting"
+      break
+    fi
+    # Re-enter loop — next iteration will pick up the new tasks
+    session=$((session + 1))
+    continue
   fi
 
   echo "🔄 Session $session — ${remaining_h}h${remaining_m}m remaining — $tasks_before tasks queued"

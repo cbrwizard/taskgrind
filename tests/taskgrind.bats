@@ -482,13 +482,13 @@ TASKS
   echo "# Tasks" > "$TEST_REPO/TASKS.md"
   export DVB_DEADLINE=$(( $(date +%s) + 2 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
-  # With empty queue exit, grind exits cleanly without arithmetic errors
+  # With empty queue, sweep runs then exits cleanly without arithmetic errors
   [ "$status" -eq 0 ]
-  grep -q 'queue_empty' "$TEST_LOG"
+  grep -q 'sweep_empty\|sweep_done' "$TEST_LOG"
 }
 
-@test "empty queue exits immediately without launching a session" {
-  # When TASKS.md has zero tasks, the grind should exit rather than spin
+@test "empty queue launches sweep session to find work" {
+  # When TASKS.md has zero tasks, the grind should sweep for work
   cat > "$TEST_REPO/TASKS.md" <<'TASKS'
 # Tasks
 ## P0
@@ -497,17 +497,73 @@ TASKS
   export DVB_DEADLINE=$(( $(date +%s) + 3 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
-  # No sessions should have been launched
-  [ ! -s "$DVB_GRIND_INVOKE_LOG" ] || [ "$(wc -l < "$DVB_GRIND_INVOKE_LOG" | tr -d ' ')" -eq 0 ]
-  grep -q 'queue_empty' "$TEST_LOG"
+  # Sweep session should have been launched (fake devin records invocation)
+  [ -s "$DVB_GRIND_INVOKE_LOG" ]
+  grep -q 'TASKS.md is empty' "$DVB_GRIND_INVOKE_LOG"
+  # Sweep found nothing, so exits
+  grep -q 'sweep_empty' "$TEST_LOG"
 }
 
-@test "missing TASKS.md exits on empty queue" {
+@test "missing TASKS.md launches sweep then exits" {
   rm -f "$TEST_REPO/TASKS.md"
   export DVB_DEADLINE=$(( $(date +%s) + 2 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
-  grep -q 'queue_empty' "$TEST_LOG"
+  grep -q 'sweep_empty' "$TEST_LOG"
+}
+
+@test "sweep that finds tasks continues grind with normal sessions" {
+  # Fake devin that populates TASKS.md when it sees the sweep prompt
+  local sweep_devin="$TEST_DIR/sweep-devin"
+  cat > "$sweep_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+# If this is a sweep (prompt mentions "TASKS.md is empty"), add tasks
+if echo "\$@" | grep -q "TASKS.md is empty"; then
+  printf '# Tasks\n## P0\n- [ ] Found task\n' > "$TEST_REPO/TASKS.md"
+fi
+SCRIPT
+  chmod +x "$sweep_devin"
+  export DVB_GRIND_CMD="$sweep_devin"
+  # Start with empty queue
+  printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # Should have sweep session + at least 1 normal session
+  local count
+  count=$(wc -l < "$DVB_GRIND_INVOKE_LOG" | tr -d ' ')
+  [ "$count" -ge 2 ]
+  grep -q 'sweep_found' "$TEST_LOG"
+  # Normal session prompt should reference the skill
+  grep -q 'Run the next-task skill' "$DVB_GRIND_INVOKE_LOG"
+}
+
+@test "sweep runs at most once per grind" {
+  # Fake devin that always clears tasks (simulates sweep that finds nothing useful)
+  local clear_devin="$TEST_DIR/clear-devin"
+  cat > "$clear_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+# Always clear tasks
+printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
+SCRIPT
+  chmod +x "$clear_devin"
+  export DVB_GRIND_CMD="$clear_devin"
+  # Start with a task so the first session runs, then it clears, sweep runs, sweep clears
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Will be cleared
+TASKS
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export DVB_SYNC_INTERVAL=0
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # Should have 1 normal session + 1 sweep = 2 invocations (not infinite)
+  local count
+  count=$(wc -l < "$DVB_GRIND_INVOKE_LOG" | tr -d ' ')
+  [ "$count" -eq 2 ]
 }
 
 @test "non-empty queue launches a session" {
@@ -532,7 +588,7 @@ TASKS
   grep -q 'timeout.*s' "$DVB_GRIND_INVOKE_LOG"
 }
 
-@test "queue cleared mid-run exits on next iteration" {
+@test "queue cleared mid-run triggers sweep on next iteration" {
   # Fake devin that clears TASKS.md on first call
   local clear_devin="$TEST_DIR/clear-devin"
   cat > "$clear_devin" <<SCRIPT
@@ -552,11 +608,11 @@ TASKS
   export DVB_SYNC_INTERVAL=0
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
-  # Should run exactly 1 session, then exit on empty queue
+  # Should run 1 real session + 1 sweep session = 2 invocations
   local count
   count=$(wc -l < "$DVB_GRIND_INVOKE_LOG" | tr -d ' ')
-  [ "$count" -eq 1 ]
-  grep -q 'queue_empty' "$TEST_LOG"
+  [ "$count" -eq 2 ]
+  grep -q 'sweep_empty' "$TEST_LOG"
 }
 
 @test "second session prompt includes previous session context" {
