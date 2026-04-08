@@ -75,13 +75,19 @@ Completed tasks are removed (not checked off). History lives in git log. See the
 | `DVB_PROMPT` | (none) | Focus prompt for every session |
 | `DVB_COOL` | `5` | Seconds between sessions |
 | `DVB_MAX_SESSION` | `3600` | Max seconds per session |
+| `DVB_MIN_SESSION` | `30` | Fast-failure threshold in seconds |
+| `DVB_MAX_FAST` | `5` | Max consecutive fast failures before bail |
 | `DVB_MAX_ZERO_SHIP` | `3` | Consecutive zero-ship sessions before bail |
+| `DVB_BACKOFF_BASE` | `15` | Base seconds for fast-failure backoff |
+| `DVB_BACKOFF_MAX` | `120` | Cap for fast-failure backoff in seconds |
+| `DVB_NET_WAIT` | `30` | Network polling interval in seconds |
+| `DVB_NET_MAX_WAIT` | `14400` | Max time to wait for network recovery (4h) |
+| `DVB_GIT_SYNC_TIMEOUT` | `30` | Max seconds for between-session git sync |
 | `DVB_SYNC_INTERVAL` | `5` | Git sync every N sessions (0=every) |
 | `DVB_EARLY_EXIT_ON_STALL` | `0` | Exit on low throughput (1=enabled) |
+| `DVB_DEVIN_PATH` | auto | Override devin binary path |
 | `DVB_LOG` | auto | Override log file path |
 | `DVB_NOTIFY` | `1` | macOS notification on completion |
-
-See `taskgrind --help` for the full list.
 
 ## Monitoring
 

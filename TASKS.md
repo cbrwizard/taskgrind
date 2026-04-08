@@ -4,13 +4,6 @@
 
 ## P1
 
-- [ ] README env var table is incomplete — 10 of 21 documented
-  **ID**: readme-env-var-table
-  **Tags**: docs
-  **Details**: README shows 10 env vars but `--help` documents 21 and the code uses 27. Missing from README: DVB_BACKOFF_BASE, DVB_BACKOFF_MAX, DVB_DEVIN_PATH, DVB_GIT_SYNC_TIMEOUT, DVB_MAX_FAST, DVB_MIN_SESSION, DVB_NET_WAIT, DVB_NET_MAX_WAIT, DVB_DEADLINE, DVB_GRIND_CMD. The first 8 are user-facing; the last 2 are test-only and belong in AGENTS.md (already there). Add the 8 user-facing vars to the README table.
-  **Files**: README.md
-  **Acceptance**: README env var table lists all user-facing DVB_ variables; test-only vars stay in AGENTS.md only
-
 - [ ] Flaky test 106: network recovery timing
   **ID**: fix-flaky-network-test
   **Tags**: tests, reliability
