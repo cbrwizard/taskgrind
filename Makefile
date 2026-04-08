@@ -2,7 +2,7 @@
 
 lint:
 	@echo "═══ Shellcheck ═══"
-	@shellcheck bin/taskgrind lib/constants.sh lib/fullpower.sh && echo "✓ All scripts pass shellcheck"
+	@cd bin && shellcheck -x taskgrind && cd ../lib && shellcheck constants.sh fullpower.sh && echo "✓ All scripts pass shellcheck"
 
 test:
 	@echo "═══ Tests ═══"
