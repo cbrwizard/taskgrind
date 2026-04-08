@@ -4,13 +4,6 @@
 
 ## P1
 
-- [ ] Flaky test 106: network recovery timing
-  **ID**: fix-flaky-network-test
-  **Tags**: tests, reliability
-  **Details**: Test "network recovery extends deadline and logs network_restored" fails intermittently (~30% of runs). The test creates a background job (`sleep 1; touch sentinel`) and expects the grind's `wait_for_network()` to detect it. The `sleep 1` + `DVB_NET_WAIT=0` busy loop is a race condition. Fix: use a longer sleep, or create the sentinel synchronously before the grind starts (with a devin stub that removes it on first call, so the second fast-failure triggers network check after recovery).
-  **Files**: tests/taskgrind.bats (test at ~line 990)
-  **Acceptance**: Test 106 passes reliably on 10 consecutive runs
-
 ## P2
 
 - [ ] Add docs/user-stories.md — real usage patterns

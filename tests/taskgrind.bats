@@ -977,8 +977,9 @@ SCRIPT
 }
 
 @test "network recovery extends deadline and logs network_restored" {
-  # Schedule network recovery from the test (not fake devin) so pipe subshell can't kill it
-  (sleep 1; touch "$TEST_DIR/net-up") &
+  # Sentinel file created after 2s — long enough for the grind to start,
+  # run the first session, hit fast-failure, and enter wait_for_network.
+  nohup bash -c "sleep 2; touch '$TEST_DIR/net-up'" &>/dev/null &
 
   local restore_devin="$TEST_DIR/restore-devin"
   cat > "$restore_devin" <<'SCRIPT'
@@ -991,17 +992,17 @@ SCRIPT
   export DVB_MIN_SESSION=999
   export DVB_BACKOFF_BASE=0
   export DVB_MAX_FAST=999
+  export DVB_MAX_ZERO_SHIP=999
   export DVB_NET_WAIT=0
   export DVB_NET_MAX_WAIT=30
-  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 20 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
   grep -q 'network_restored' "$TEST_LOG"
 }
 
 @test "session number rolls back after network recovery" {
-  # Schedule network recovery from the test (not fake devin) so pipe subshell can't kill it
-  (sleep 1; touch "$TEST_DIR/net-up") &
+  nohup bash -c "sleep 2; touch '$TEST_DIR/net-up'" &>/dev/null &
 
   local restore_devin="$TEST_DIR/restore-devin"
   cat > "$restore_devin" <<'SCRIPT'
@@ -1014,9 +1015,10 @@ SCRIPT
   export DVB_MIN_SESSION=999
   export DVB_BACKOFF_BASE=0
   export DVB_MAX_FAST=999
+  export DVB_MAX_ZERO_SHIP=999
   export DVB_NET_WAIT=0
   export DVB_NET_MAX_WAIT=30
-  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 20 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
   # First session=1 fails fast → network down → network back → session counter rolled back
