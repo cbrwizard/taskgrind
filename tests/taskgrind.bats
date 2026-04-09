@@ -3477,7 +3477,7 @@ SCRIPT
   [[ "$output" == *"Productive session hit timeout"* ]]
 }
 
-@test "productive timeout suggests increasing DVB_MAX_SESSION" {
+@test "productive timeout auto-increases max_session" {
   local ship_devin="$TEST_DIR/ship-devin"
   local counter_file="$TEST_DIR/ship-counter"
   echo "0" > "$counter_file"
@@ -3513,7 +3513,18 @@ SCRIPT
   export DVB_MAX_SESSION=0
   export DVB_DEADLINE=$(( $(date +%s) + 5 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
-  [[ "$output" == *"Consider DVB_MAX_SESSION="* ]]
+  [[ "$output" == *"Auto-increasing to"* ]]
+  grep -q 'new_timeout=' "$TEST_LOG"
+}
+
+@test "productive timeout caps at 7200s (structural)" {
+  # Behavioral: fast stubs can't reach the cap (session_elapsed ≈ 0 < 1800 after
+  # first increase), so we verify the cap logic structurally.
+  grep -q 'max_session.*7200' "$DVB_GRIND"
+  grep -q 'at cap' "$DVB_GRIND"
+  # Verify the clamp: if max_session + 1800 > 7200, it's set to exactly 7200
+  grep -Fq 'max_session" -gt 7200' "$DVB_GRIND"
+  grep -Fq '&& max_session=7200' "$DVB_GRIND"
 }
 
 @test "no productive timeout when session does not ship" {

@@ -1088,10 +1088,19 @@ while [[ $(date +%s) -lt $deadline ]]; do
     log_write "[$(date '+%H:%M')] tasks_added=$_tasks_added (external injection: $tasks_before→$tasks_after)"
   fi
 
-  # Warn if timeout killed a productive session — suggest increasing DVB_MAX_SESSION
+  # Auto-increase timeout after productive sessions that were killed by the watchdog.
+  # Gives the next session more runway. Capped at 7200s (2h).
   if [[ "$session_elapsed" -ge "$max_session" && "$session_shipped" -gt 0 ]]; then
-    echo "   ⚠ Productive session hit timeout (shipped $session_shipped, timeout ${max_session}s). Consider DVB_MAX_SESSION=$((max_session + 1800))."
-    log_write "[$(date '+%H:%M')] productive_timeout session=$session shipped=$session_shipped timeout=${max_session}s"
+    _old_max=$max_session
+    if [[ "$max_session" -lt 7200 ]]; then
+      max_session=$((max_session + 1800))
+      [[ "$max_session" -gt 7200 ]] && max_session=7200
+      echo "   ⚠ Productive session hit timeout (shipped $session_shipped, timeout ${_old_max}s). Auto-increasing to ${max_session}s."
+      log_write "[$(date '+%H:%M')] productive_timeout session=$session shipped=$session_shipped timeout=${_old_max}s new_timeout=${max_session}s"
+    else
+      echo "   ⚠ Productive session hit timeout (shipped $session_shipped, timeout ${_old_max}s). Already at max ${max_session}s."
+      log_write "[$(date '+%H:%M')] productive_timeout session=$session shipped=$session_shipped timeout=${_old_max}s (at cap)"
+    fi
   fi
 
   # ── Per-task attempt tracking ──────────────────────────────────────
