@@ -15,13 +15,6 @@
 
 ## P3
 
-- [ ] Linux portability: replace macOS-only commands
-  **ID**: linux-portability
-  **Tags**: portability
-  **Details**: Several commands are macOS-only: `caffeinate` (sleep prevention), `lockf` (file locking), `osascript` (notifications), `stat -f %m` (file mtime). Add Linux fallbacks: `systemd-inhibit` or no-op for caffeinate, `flock` for lockf, `notify-send` for osascript, `stat -c %Y` for mtime. Guard with `[[ "$(uname)" == "Darwin" ]]` checks.
-  **Files**: bin/taskgrind
-  **Acceptance**: `taskgrind --preflight` passes on Ubuntu; full grind loop works on Linux
-
 - [ ] Add man page
   **ID**: add-man-page
   **Tags**: docs, distribution
