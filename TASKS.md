@@ -6,13 +6,6 @@
 
 ## P2
 
-- [ ] Add docs/user-stories.md — real usage patterns
-  **ID**: add-user-stories
-  **Tags**: docs
-  **Details**: Document the 5 core user stories: (1) overnight grind on a repo with tasks, (2) focused grind with --prompt, (3) multi-repo grind (run taskgrind on repo A, then repo B), (4) fleet-grind for pipeline management, (5) dry-run/preflight to check before committing to 8 hours. Each story: one sentence context, the command, what happens, sample log output.
-  **Files**: docs/user-stories.md, README.md (link to it)
-  **Acceptance**: Each story is copy-pasteable and matches actual tool behavior
-
 - [ ] Add docs/architecture.md — design decisions
   **ID**: add-architecture-doc
   **Tags**: docs
