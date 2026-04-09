@@ -11,8 +11,13 @@ taskgrind/
 ├── bin/taskgrind           Main script (runs AI sessions in a loop)
 ├── lib/constants.sh        Shared constants (model, backend path, caffeinate flags)
 ├── lib/fullpower.sh        Priority boosting (taskpolicy for macOS)
-├── tests/taskgrind.bats    Test suite (330 tests)
+├── tests/taskgrind.bats    Test suite (342 tests)
 ├── tests/test_helper.bash  Shared test helpers
+├── docs/user-stories.md    Core usage patterns
+├── docs/architecture.md    Design decision rationales
+├── man/taskgrind.1         Man page
+├── install.sh              One-liner install script
+├── .github/workflows/      CI (shellcheck + bats on macOS + Linux)
 ├── Makefile                lint + test targets
 ├── README.md               Usage, install, env vars
 ├── TASKS.md                Task queue (present when tasks exist)
@@ -23,7 +28,7 @@ taskgrind/
 
 ```bash
 make lint       # shellcheck (run from bin/ with -x for source resolution)
-make test       # bats test suite (330 tests)
+make test       # bats test suite (342 tests)
 make check      # lint + test (run before committing)
 ```
 
