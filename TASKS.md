@@ -4,6 +4,48 @@
 
 ## P1
 
+- [ ] Track shipped tasks by ID diff, not just count delta
+  **ID**: track-shipped-by-id
+  **Tags**: grind-analysis, throughput, metrics
+  **Details**: Taskgrind's core metric — tasks shipped — uses `tasks_before - tasks_after`. This undercounts work when the agent adds AND removes tasks in the same session. Confirmed in the 2026-04-08 taskgrind-on-taskgrind grind: session 6 added 2 security tasks (commit `35ad61a`) then removed those same 2 tasks after fixing them (commit `72ec411`). The count stayed at 8, so shipped=0 — despite doing real work. The `next-task` skill's "scout while you work" pattern encourages exactly this behavior. Fix: use `extract_task_ids` (already exists, line 717) to diff task IDs before/after each session. `shipped = IDs_removed - IDs_that_were_just_added_this_session`. At minimum, count IDs that were present BEFORE the session and are now gone. Also update the summary metrics and the stall detection to use the ID-based count. Evidence: git log shows `35ad61a` (+14 lines to TASKS.md) followed by `72ec411` (-14 lines) in the same session window, net delta = 0.
+  **Files**: `bin/taskgrind`
+  **Acceptance**: When the agent removes a task that existed before the session started, it counts as shipped even if the agent also added new tasks. Stall detection and grind_done metrics reflect the ID-based count. Test: bats test where TASKS.md has task A, session adds task B and removes task A, verify shipped=1 not 0.
+
+- [ ] Detect "productive zero-ship" sessions and escalate the completion protocol
+  **ID**: escalate-completion-protocol
+  **Tags**: grind-analysis, prompt-engineering, throughput
+  **Details**: In the 2026-04-08 oncall-hub-app grind, 19 of 26 sessions were zero-ship despite the agent committing real code in most of them. The agent consistently forgot to remove completed task blocks from TASKS.md. The existing stall warning (at 3 consecutive zero-ship) wasn't enough — it fires but the agent ignores it. Evidence: session 2 committed "5 production hardening fixes" but shipped=0; session 5 committed a bug fix but shipped=0; session 18 fixed "7 production-blocking issues across 14 files" but shipped=0. The prompt needs a stronger escalation: after 2 consecutive zero-ship sessions, detect if git log shows commits since last session and add a "YOU COMMITTED CODE BUT DIDN'T REMOVE THE TASK — do that NOW before any other work" directive. This is a prompt change in the session prompt builder (lines 865-901).
+  **Files**: `bin/taskgrind`
+  **Acceptance**: When `git log` shows commits but task count didn't decrease, the next session prompt includes a forced "remove completed tasks first" directive. Test: bats test that checks prompt content when commits exist but shipped=0.
+
+- [ ] Detect when all remaining tasks are blocked and exit early
+  **ID**: blocked-queue-exit
+  **Tags**: grind-analysis, efficiency, stall-detection
+  **Details**: In the oncall-hub-app grind, sessions 14-19 and 21-25 (~3h) kept running against a queue where all remaining tasks were blocked by external infrastructure (Jenkins, K8s, DNS, OIDC — all waiting on Intuit platform teams). The agent did useful tangential work (security hardening, test coverage) but couldn't decrease the task count. Taskgrind should detect this: if TASKS.md has tasks but ALL contain `**Blocked by**:` metadata with unresolved blockers, treat it like an empty queue after sweep — exit cleanly. This saves hours of compute on genuinely blocked repos. Parse TASKS.md between sessions to check for this condition.
+  **Files**: `bin/taskgrind`
+  **Acceptance**: When every remaining task has `**Blocked by**:` and the blocker ID is still present in TASKS.md, taskgrind logs `all_tasks_blocked` and exits. Test: bats test with a TASKS.md where all tasks are blocked.
+
+- [ ] Default DVB_EARLY_EXIT_ON_STALL to 1
+  **ID**: default-early-exit-stall
+  **Tags**: grind-analysis, efficiency
+  **Details**: The oncall-hub-app grind hit `diminishing_returns window=5 shipped=0` at session 18 (03:27) but continued for 8 more sessions (~2h) producing only 1 more shipped task. With `DVB_EARLY_EXIT_ON_STALL=1`, it would have saved ~2h of compute. The default should be 1 (exit early) since running at <0.4 tasks/5-sessions throughput is almost always a stall. Users who want to force-continue can set `DVB_EARLY_EXIT_ON_STALL=0`. Evidence: `[03:27] diminishing_returns window=5 shipped=0` followed by 8 more sessions, only 1 additional ship at session 20.
+  **Files**: `bin/taskgrind`
+  **Acceptance**: `taskgrind --dry-run` shows early-exit-on-stall is enabled by default. `DVB_EARLY_EXIT_ON_STALL=0 taskgrind --dry-run` shows it disabled. Bats tests updated for new default.
+
+- [ ] Auto-increase DVB_MAX_SESSION after repeated productive timeouts
+  **ID**: auto-increase-max-session
+  **Tags**: grind-analysis, efficiency, throughput
+  **Details**: In the 2026-04-08 bosun grind, sessions 3, 4, 11, and 13 all hit the 3600s timeout. Sessions 3 and 4 shipped 25 and 12 tasks respectively before being killed — extremely productive work cut short. The `productive_timeout` warning fires (`productive_timeout session=3 shipped=25 timeout=3600s`) and suggests `DVB_MAX_SESSION=5400` in terminal output, but nothing acts on it. Taskgrind should auto-increase `max_session` by 30min (up to a cap of 7200s) after a productive timeout, so the next session gets more runway. This is especially important for fleet-grind skill where sessions manage multiple PRs. Evidence: 4 productive timeouts in one grind, 40 tasks shipped in those timeout sessions alone.
+  **Files**: `bin/taskgrind`
+  **Acceptance**: After a productive timeout (shipped>0 && duration>=max_session), the next session's max_session is increased by 1800s (capped at 7200s). A log line records the increase. Test: bats test with a stub that simulates productive timeout, verify next session gets increased timeout.
+
+- [ ] Clean up stale branches left by grind sessions
+  **ID**: cleanup-stale-grind-branches
+  **Tags**: grind-analysis, hygiene
+  **Details**: The bosun repo has 8 stale branches from grind sessions: `fix/batch-bugs-session14`, `fix/batch-bug-fixes-session-10`, `fix/session9-bug-fixes-aifn-720`, `refactor/reduce-cognitive-complexity-session-7`, and 4 `orchestrator/audit-*` branches. These accumulate because (a) the agent creates feature branches but doesn't always merge/delete them, and (b) `branch_cleanup` only deletes branches merged into the default branch. The between-session git sync should also delete remote-tracking branches that no longer exist on the remote (`git remote prune origin`) and local branches whose tracking branch is gone. Evidence: `git branch` on bosun shows 8+ stale branches after a grind.
+  **Files**: `bin/taskgrind`
+  **Acceptance**: After branch cleanup, `git branch | wc -l` shows only the default branch and any unmerged active branches. Pruned branches are logged. Test: bats test with mock branches.
+
 ## P2
 
 - [ ] Add docs/user-stories.md — real usage patterns
