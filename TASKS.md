@@ -29,13 +29,6 @@
 
 ## P3
 
-- [ ] Add install script (curl | sh)
-  **ID**: add-install-script
-  **Tags**: distribution, ux
-  **Details**: One-liner install: `curl -fsSL https://raw.githubusercontent.com/cbrwizard/taskgrind/main/install.sh | sh`. Script clones to `~/apps/taskgrind` and prints PATH instructions. Check if already installed first.
-  **Files**: install.sh
-  **Acceptance**: Fresh machine install works with one curl command
-
 - [ ] Linux portability: replace macOS-only commands
   **ID**: linux-portability
   **Tags**: portability
