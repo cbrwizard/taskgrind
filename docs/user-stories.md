@@ -18,11 +18,11 @@ What happens:
 
 Sample log:
 ```
-[09:00] session_start session=1 remaining=480m tasks=12
-[09:45] session_end session=1 exit=0 duration=2700s shipped=1 tasks_after=11
-[09:45] session_start session=2 remaining=435m tasks=11
+[pid=38291] [09:00] session=1 remaining=480m tasks=12
+[pid=38291] [09:45] session=1 ended exit=0 duration=2700s tasks_after=11 shipped=1
+[pid=38291] [09:45] session=2 remaining=435m tasks=11
 ...
-[17:00] grind_done sessions=10 shipped=8 remaining_tasks=4 rate=0.80 elapsed=28800s
+[pid=38291] [17:00] grind_done sessions=10 shipped=8 remaining=4 ship_rate=67% avg_session=48m duration=8h rate=1.0/h sessions_zero_ship=2
 ```
 
 ## 2. Focused grind with --prompt
@@ -40,10 +40,10 @@ What happens:
 
 Sample banner:
 ```
-   taskgrind: 4.0h, opus, devin
-   repo:  ~/apps/myproject (12 tasks)
-   focus: focus on test coverage
-   log:   /tmp/taskgrind-myproject-12345.log
+☕ taskgrind: 4h (until 13:00) — backend=devin, skill=next-task, model=claude-opus-4-6-thinking, repo=/Users/you/apps/myproject
+   Each session runs next-task. Git sync every 5 sessions.
+   Focus: focus on test coverage
+   Log: /tmp/taskgrind-2025-01-15-0900-myproject-38291.log
 ```
 
 ## 3. Multi-repo grind
@@ -90,25 +90,37 @@ taskgrind --preflight ~/apps/myproject
 
 Dry-run output:
 ```
-   taskgrind: 8.0h, opus, devin
-   repo:  ~/apps/myproject
-   skill: next-task
-   early_exit_on_stall: enabled
+taskgrind --dry-run
+  hours:    8
+  repo:     /Users/you/apps/myproject
+  backend:  devin
+  skill:    next-task
+  model:    claude-opus-4-6-thinking
+  cooldown: 5s
+  log:      /tmp/taskgrind-$(date)-$$.log
+  notify:   1
+  max_ses: 3600s
+  early_exit_on_stall: 1
 ```
 
 Preflight output:
 ```
-   ── Preflight ──────────────────────────────
-   taskgrind: 8.0h, opus, devin
-   repo:  ~/apps/myproject
+taskgrind --preflight
+  repo:     /Users/you/apps/myproject
+  backend:  devin
+  skill:    next-task
+  model:    claude-opus-4-6-thinking
 
-   [PASS] devin binary found
-   [PASS] network connectivity
-   [PASS] git repo clean
-   [PASS] git remote configured
-   [PASS] disk space sufficient
-   [PASS] TASKS.md found (12 tasks)
-   [PASS] network-watchdog available
+Preflight checks for: /Users/you/apps/myproject
 
-   ── Summary: 7 pass, 0 warn, 0 fail ───────
+  ✓ Backend binary (devin): /usr/local/bin/devin
+  ✓ Network connectivity
+  ✓ Git state clean
+  ✓ Git remote reachable
+  ✓ Disk space: 42GB free
+  ✓ TASKS.md found (12 open tasks)
+  ✓ network-watchdog available
+
+  Results: 7 passed, 0 warnings, 0 failed
+  ✓ Preflight passed — ready to grind.
 ```

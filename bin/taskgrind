@@ -443,7 +443,7 @@ fi
 # Uses lockf(1) on macOS or flock(1) on Linux — lock auto-releases on exit/crash.
 # Skip locking in test mode (DVB_GRIND_CMD set) to avoid fd conflicts with bats.
 if [[ -z "${DVB_GRIND_CMD:-}" ]]; then
-  _lock_hash=$(echo "$repo" | shasum | cut -d' ' -f1)
+  _lock_hash=$(echo "$repo" | { shasum 2>/dev/null || sha1sum; } | cut -d' ' -f1)
   _lock_file="$_dvb_tmp/taskgrind-lock-${_lock_hash}"
   # Open fd 9 on the lockfile (creates if needed)
   exec 9>"$_lock_file"

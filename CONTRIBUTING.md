@@ -13,6 +13,12 @@ Requires [bats-core](https://github.com/bats-core/bats-core) and [shellcheck](ht
 ```bash
 # macOS
 brew install bats-core shellcheck
+
+# Ubuntu / Debian
+sudo apt-get install -y bats shellcheck
+
+# Fedora / RHEL
+sudo dnf install -y bats ShellCheck
 ```
 
 ## Adding a Feature
@@ -38,12 +44,13 @@ chore: update test count in AGENTS.md
 
 ## Env Var Naming
 
-All environment variables use the `DVB_` prefix for backward compatibility with the original `dvb-grind` name. Do **not** rename existing vars to `TG_` — the `DVB_` prefix works and changing it would break existing users.
+User-facing documentation and error messages use the `TG_` prefix (canonical). Internally, the script uses `DVB_` variable names for backward compatibility with the original `dvb-grind`. The `TG_` → `DVB_` mapping happens automatically at startup, so both prefixes work for users.
 
 When adding a new env var:
-- Prefix with `DVB_`
+- Use `DVB_` as the internal variable name in the script
+- Use `TG_` in all user-facing output (error messages, `--help`, docs)
 - Add validation (numeric check, allowed values, etc.)
-- Document in `--help` header comment, README, and AGENTS.md
+- Document in `--help` header comment, README, man page, and AGENTS.md
 - Add tests for both valid and invalid values
 
 ## Test Conventions
@@ -57,6 +64,7 @@ When adding a new env var:
 ## Known Issues
 
 - **Flaky tests** — a handful of timing-dependent tests (network recovery, branch cleanup) may fail intermittently on slow CI. These are pre-existing and not regressions.
+- **`network-watchdog`** — preflight checks for a `network-watchdog` binary (optional). If missing, taskgrind falls back to `curl` for connectivity checks. You can safely ignore the preflight warning.
 
 ## Project Structure
 
@@ -66,5 +74,7 @@ lib/constants.sh        Shared constants (model, binary path, caffeinate flags)
 lib/fullpower.sh        Priority boosting (taskpolicy on macOS)
 tests/taskgrind.bats    Test suite
 tests/test_helper.bash  Shared test helpers
+man/taskgrind.1         Man page
+docs/                   Architecture docs and user stories
 Makefile                lint + test targets
 ```
