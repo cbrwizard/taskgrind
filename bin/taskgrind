@@ -13,6 +13,7 @@
 #        taskgrind --prompt "focus on test coverage" 8
 #        taskgrind --dry-run 8 ~/apps/myrepo  → print config without running
 #        taskgrind --preflight ~/apps/myrepo  → run health checks only
+#        taskgrind --help                     → show this help and exit
 #        taskgrind --version                   → print version (commit hash + date)
 #        TG_MODEL=sonnet taskgrind 8           → 8h grind, sonnet model
 #        TG_BACKEND=codex taskgrind 8          → 8h grind with Codex
@@ -41,8 +42,6 @@
 #        TG_SYNC_INTERVAL — git sync every N sessions (default: 5, 0=every session)
 #        TG_SHUTDOWN_GRACE — seconds to wait for current session on exit (default: 120)
 #        TG_EARLY_EXIT_ON_STALL — exit early on low throughput (default: 1)
-#        DVB_GRIND_CMD  — override the devin command (for testing)
-#        DVB_DEADLINE   — override deadline epoch (for testing)
 #
 #        DVB_ prefix is supported as a backward-compatible alias for all TG_ vars.
 #
@@ -113,6 +112,8 @@ dry_run=0
 preflight_only=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --help|-h) sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0 ;;
+    --version|-V) echo "taskgrind $(git -C "$TASKGRIND_DIR" log -1 --format='%h %ci' 2>/dev/null || echo 'unknown')"; exit 0 ;;
     --dry-run) dry_run=1; shift ;;
     --preflight) preflight_only=1; shift ;;
     --skill=*) skill="${1#--skill=}"; shift ;;
@@ -201,7 +202,7 @@ if [[ -n "${DVB_GIT_SYNC_TIMEOUT:-}" ]] && ! [[ "${DVB_GIT_SYNC_TIMEOUT}" =~ ^[0
   echo "Error: TG_GIT_SYNC_TIMEOUT must be numeric, got '${DVB_GIT_SYNC_TIMEOUT}'" >&2; exit 1
 fi
 if [[ -n "${DVB_DEADLINE:-}" ]] && ! [[ "${DVB_DEADLINE}" =~ ^[0-9]+$ ]]; then
-  echo "Error: TG_DEADLINE must be a Unix epoch integer, got '${DVB_DEADLINE}'" >&2; exit 1
+  echo "Error: DVB_DEADLINE must be a Unix epoch integer, got '${DVB_DEADLINE}'" >&2; exit 1
 fi
 
 # Validate backend

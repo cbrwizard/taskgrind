@@ -129,6 +129,24 @@ teardown() {
   [[ $(echo "$output" | wc -l) -le 1 ]]
 }
 
+@test "--help works in any arg position" {
+  run "$DVB_GRIND" 8 --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage"* ]]
+}
+
+@test "--version works in any arg position" {
+  run "$DVB_GRIND" 8 --version
+  [ "$status" -eq 0 ]
+  [[ "$output" == "taskgrind "* ]]
+}
+
+@test "-h works in any arg position" {
+  run "$DVB_GRIND" 8 -h
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage"* ]]
+}
+
 @test "rejects hours over 24" {
   run "$DVB_GRIND" 25 "$TEST_REPO"
   [ "$status" -eq 1 ]
@@ -1869,7 +1887,7 @@ SCRIPT
   export DVB_DEADLINE=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"TG_DEADLINE must be a Unix epoch integer"* ]]
+  [[ "$output" == *"DVB_DEADLINE must be a Unix epoch integer"* ]]
 }
 
 @test "numeric directory name treated as repo path not hours" {
