@@ -136,6 +136,10 @@ brew install bats-core shellcheck
 
 Extracted from [dotfiles](https://github.com/cbrwizard/dotfiles) where it lived as `dvb-grind`. The `dvb-grind` name still works as a shell alias in dotfiles for backward compatibility.
 
+## Docs
+
+- [User Stories](docs/user-stories.md) — real usage patterns with commands and sample output
+
 ## License
 
 MIT
