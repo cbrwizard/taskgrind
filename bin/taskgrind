@@ -212,19 +212,20 @@ preflight_check() {
   fi
 
   # 2. Network connectivity — required for API calls
+  dvb_spinner_start "Checking network..."
   if [[ -n "${DVB_GRIND_CMD:-}" ]]; then
     # Test mode — use sentinel file
     if [[ -n "${DVB_NET_FILE:-}" ]] && [[ -f "$DVB_NET_FILE" ]]; then
-      preflight_pass "Network connectivity (test mode)"
+      dvb_spinner_stop; preflight_pass "Network connectivity (test mode)"
     elif [[ -z "${DVB_NET_FILE:-}" ]]; then
-      preflight_pass "Network connectivity (test mode: no DVB_NET_FILE)"
+      dvb_spinner_stop; preflight_pass "Network connectivity (test mode: no DVB_NET_FILE)"
     else
-      preflight_warn "Network down (test mode: DVB_NET_FILE missing)"
+      dvb_spinner_stop; preflight_warn "Network down (test mode: DVB_NET_FILE missing)"
     fi
   elif check_network; then
-    preflight_pass "Network connectivity"
+    dvb_spinner_stop; preflight_pass "Network connectivity"
   else
-    preflight_fail "Network unreachable (api.anthropic.com)"
+    dvb_spinner_stop; preflight_fail "Network unreachable (api.anthropic.com)"
   fi
 
   # 3. Git state clean — not mid-rebase, not detached HEAD, not mid-merge
@@ -253,6 +254,7 @@ preflight_check() {
 
   # 4. Git remote reachable — required for between-session sync
   if [[ -n "$git_dir" ]] && [[ -n "$(git -C "$repo" remote 2>/dev/null)" ]]; then
+    dvb_spinner_start "Checking git remote..."
     # Use background + sleep pattern since timeout/gtimeout may not exist on macOS
     if (git -C "$repo" ls-remote origin HEAD >/dev/null 2>&1 &
         _ls_pid=$!
@@ -264,9 +266,9 @@ preflight_check() {
         _rc=$?
         kill "$_timer" "$_sleep_pid" 2>/dev/null; wait "$_timer" 2>/dev/null
         exit "$_rc"); then
-      preflight_pass "Git remote reachable"
+      dvb_spinner_stop; preflight_pass "Git remote reachable"
     else
-      preflight_warn "Git remote unreachable (may affect between-session sync)"
+      dvb_spinner_stop; preflight_warn "Git remote unreachable (may affect between-session sync)"
     fi
   else
     preflight_warn "No git remote configured"
@@ -524,6 +526,7 @@ cleanup() {
   [[ $_dvb_cleaned -eq 1 ]] && return
   _dvb_cleaned=1
   _dvb_finalizing=1
+  dvb_spinner_stop
   local elapsed=$(( $(date +%s) - start_epoch ))
   local duration
   duration=$(format_duration "$elapsed")
@@ -653,7 +656,7 @@ wait_for_network() {
       return 1
     fi
     echo "   Waiting for network... $(format_duration "$waited") elapsed"
-    sleep "$interval"
+    dvb_countdown_sleep "$interval" "Network check"
   done
 
   waited=$(( $(date +%s) - wait_start ))
@@ -851,7 +854,26 @@ while [[ $(date +%s) -lt $deadline ]]; do
       fi
     ) &
     _dvb_timeout_pid=$!
+    # Background elapsed timer — updates the terminal with session duration
+    _dvb_timer_pid=0
+    if [[ $_dvb_is_tty -eq 1 ]]; then
+      (
+        trap 'exit 0' TERM INT
+        while kill -0 "$_dvb_pid" 2>/dev/null; do
+          dvb_print_elapsed "$session_start" "Session $session"
+          sleep 5 &
+          wait $! 2>/dev/null || exit 0
+        done
+      ) &
+      _dvb_timer_pid=$!
+    fi
     wait "$_dvb_pid" 2>/dev/null || session_exit=$?
+    # Stop elapsed timer and timeout watchdog
+    if [[ $_dvb_timer_pid -gt 0 ]]; then
+      kill "$_dvb_timer_pid" 2>/dev/null || true
+      wait "$_dvb_timer_pid" 2>/dev/null || true
+    fi
+    [[ $_dvb_is_tty -eq 1 ]] && printf '\r\033[K' || true
     kill "$_dvb_timeout_pid" 2>/dev/null || true
     wait "$_dvb_timeout_pid" 2>/dev/null || true
     _dvb_timeout_pid=0
@@ -900,7 +922,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
       [[ $backoff -gt $backoff_max ]] && backoff=$backoff_max
       echo "   ⚠ ${consecutive_fast} fast failures (exit=$session_exit, network OK). Backing off ${backoff}s..."
       log_write "[$(date '+%H:%M')] fast_fail consecutive=$consecutive_fast backoff=${backoff}s exit=$session_exit"
-      sleep "$backoff"
+      dvb_countdown_sleep "$backoff" "Backoff"
       # Extend deadline by backoff duration — dead time should not count
       # against the marathon, same pattern as wait_for_network()
       deadline=$((deadline + backoff))
@@ -1023,13 +1045,14 @@ while [[ $(date +%s) -lt $deadline ]]; do
   fi
 
   echo "   Session $session ended (exit=$session_exit, $(format_duration "$session_elapsed")). Cooling down ${cooldown}s..."
-  sleep "$cooldown"
+  dvb_countdown_sleep "$cooldown" "Cooldown"
 
   # Sync to default branch between sessions — but only every N sessions to reduce overhead.
   # sync_interval=0 means every session (backward compat). Default: every 5 sessions.
   if [[ "$sync_interval" -eq 0 ]] || [[ $((session % sync_interval)) -eq 0 ]]; then
   if git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 \
      && [[ -n "$(git -C "$repo" remote 2>/dev/null)" ]]; then
+    dvb_spinner_start "Syncing git..."
     _git_out="$_dvb_tmp/taskgrind-$$.git-sync"
     _git_sync_timeout="${DVB_GIT_SYNC_TIMEOUT:-30}"
     # Detect default branch — don't hardcode "main"; repos may use master/develop/etc.
@@ -1069,6 +1092,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
     ) &
     _git_timer=$!
     if wait "$_git_pid" 2>/dev/null; then
+      dvb_spinner_stop
       if grep -q 'stash_pop_failed' "$_git_out" 2>/dev/null; then
         echo "   ⚠ git stash pop failed — stash preserved for manual recovery"
         log_write "[$(date '+%H:%M')] git_sync stash_pop_failed (stash preserved)"
@@ -1080,6 +1104,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
         log_write "[$(date '+%H:%M')] git_sync ok"
       fi
     else
+      dvb_spinner_stop
       # Timeout or failure — repo may be in unknown state (mid-rebase, mid-stash).
       # Recover: abort any in-progress rebase/merge so the next session starts clean.
       _git_dir="$(git -C "$repo" rev-parse --absolute-git-dir 2>/dev/null)" || _git_dir=""

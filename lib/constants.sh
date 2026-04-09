@@ -36,3 +36,74 @@ dvb_format_duration() {
     echo "${secs}s"
   fi
 }
+
+# ── Progress / spinner helpers ────────────────────────────────────────
+# All helpers are TTY-aware: they show animated output only when stdout
+# is a terminal. When piped or redirected they degrade to plain text.
+
+# Detect TTY once at source time. Tests (DVB_GRIND_CMD set) force off.
+if [[ -t 1 && -z "${DVB_GRIND_CMD:-}" ]]; then
+  _dvb_is_tty=1
+else
+  _dvb_is_tty=0
+fi
+
+_dvb_spinner_pid=0
+
+# Start a background spinner with an optional label.
+# Usage: dvb_spinner_start "Checking network..."
+dvb_spinner_start() {
+  local label="${1:-}"
+  [[ $_dvb_is_tty -eq 0 ]] && return 0
+  dvb_spinner_stop  # kill any leftover spinner
+  (
+    trap 'exit 0' TERM INT
+    local chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local i=0
+    while true; do
+      printf '\r   %s %s ' "${chars:i%${#chars}:1}" "$label"
+      i=$((i + 1))
+      sleep 0.1 2>/dev/null || sleep 1
+    done
+  ) &
+  _dvb_spinner_pid=$!
+}
+
+# Stop the spinner and clear the line.
+dvb_spinner_stop() {
+  if [[ $_dvb_spinner_pid -gt 0 ]] && kill -0 "$_dvb_spinner_pid" 2>/dev/null; then
+    kill "$_dvb_spinner_pid" 2>/dev/null || true
+    wait "$_dvb_spinner_pid" 2>/dev/null || true
+  fi
+  _dvb_spinner_pid=0
+  [[ $_dvb_is_tty -eq 1 ]] && printf '\r\033[K' || true
+}
+
+# Sleep with a visible countdown.  Falls back to plain sleep when not a TTY.
+# Usage: dvb_countdown_sleep 30 "Cooldown"
+dvb_countdown_sleep() {
+  local total="$1" label="${2:-Waiting}"
+  if [[ $total -le 0 ]]; then return 0; fi
+  if [[ $_dvb_is_tty -eq 0 ]]; then
+    sleep "$total"
+    return 0
+  fi
+  local remaining=$total
+  while [[ $remaining -gt 0 ]]; do
+    printf '\r   %s: %ss  ' "$label" "$remaining"
+    sleep 1 2>/dev/null || sleep 1
+    remaining=$((remaining - 1))
+  done
+  printf '\r\033[K'
+}
+
+# Print an elapsed timer line (overwrites in place).  Call in a loop.
+# Usage: dvb_print_elapsed $start_epoch "Session 3"
+dvb_print_elapsed() {
+  local start="$1" label="${2:-}"
+  [[ $_dvb_is_tty -eq 0 ]] && return 0
+  local now elapsed
+  now=$(date +%s)
+  elapsed=$((now - start))
+  printf '\r   ⏳ %s — %s  ' "$label" "$(dvb_format_duration "$elapsed")"
+}
