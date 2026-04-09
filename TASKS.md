@@ -4,13 +4,6 @@
 
 ## P1
 
-- [ ] Detect when all remaining tasks are blocked and exit early
-  **ID**: blocked-queue-exit
-  **Tags**: grind-analysis, efficiency, stall-detection
-  **Details**: In the oncall-hub-app grind, sessions 14-19 and 21-25 (~3h) kept running against a queue where all remaining tasks were blocked by external infrastructure (Jenkins, K8s, DNS, OIDC — all waiting on Intuit platform teams). The agent did useful tangential work (security hardening, test coverage) but couldn't decrease the task count. Taskgrind should detect this: if TASKS.md has tasks but ALL contain `**Blocked by**:` metadata with unresolved blockers, treat it like an empty queue after sweep — exit cleanly. This saves hours of compute on genuinely blocked repos. Parse TASKS.md between sessions to check for this condition.
-  **Files**: `bin/taskgrind`
-  **Acceptance**: When every remaining task has `**Blocked by**:` and the blocker ID is still present in TASKS.md, taskgrind logs `all_tasks_blocked` and exits. Test: bats test with a TASKS.md where all tasks are blocked.
-
 - [ ] Auto-increase DVB_MAX_SESSION after repeated productive timeouts
   **ID**: auto-increase-max-session
   **Tags**: grind-analysis, efficiency, throughput

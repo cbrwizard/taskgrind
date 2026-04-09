@@ -723,6 +723,22 @@ extract_task_ids() {
   fi
 }
 
+# Check if all tasks in TASKS.md are blocked.
+# Returns 0 (true) if every task has **Blocked by**: metadata, 1 otherwise.
+# A task with **Blocked by**: is considered blocked regardless of whether
+# the blocker ID still exists — external blockers (Jira, infra) are common.
+all_tasks_blocked() {
+  local tasks_file="$1"
+  [[ -f "$tasks_file" ]] || return 1
+  local total_tasks blocked_tasks
+  total_tasks=$(grep -c '^[[:space:]]*- \[ \]' "$tasks_file" 2>/dev/null) || true
+  total_tasks="${total_tasks:-0}"
+  [[ "$total_tasks" -eq 0 ]] && return 1  # empty queue is not "all blocked"
+  blocked_tasks=$(grep -c '^\s*\*\*Blocked by\*\*:' "$tasks_file" 2>/dev/null) || true
+  blocked_tasks="${blocked_tasks:-0}"
+  [[ "$blocked_tasks" -ge "$total_tasks" ]]
+}
+
 # ── Network resilience ─────────────────────────────────────────────
 # Fast-failure threshold: sessions shorter than this trigger a network check.
 # Defaults to 0 in test mode (disabled) so existing tests aren't affected.
@@ -861,6 +877,15 @@ while [[ $(date +%s) -lt $deadline ]]; do
     # Re-enter loop — next iteration will pick up the new tasks.
     # session already incremented at top of loop; sweep counts as session $session.
     continue
+  fi
+
+  # ── Blocked queue detection ─────────────────────────────────────────
+  # When all remaining tasks have **Blocked by**: metadata, running more
+  # sessions won't decrease the task count. Exit to save compute.
+  if all_tasks_blocked "$repo/TASKS.md"; then
+    echo "   ✓ All $tasks_before remaining tasks are blocked — exiting."
+    log_write "[$(date '+%H:%M')] all_tasks_blocked tasks=$tasks_before — exiting"
+    break
   fi
 
   echo "🔄 Session $session — ${remaining_h}h${remaining_m}m remaining — $tasks_before tasks queued"

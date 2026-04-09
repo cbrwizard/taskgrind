@@ -685,6 +685,59 @@ TASKS
   grep -q 'sweep_empty' "$TEST_LOG"
 }
 
+@test "all-blocked queue exits without running sessions" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P1
+- [ ] Deploy to K8s
+  **ID**: deploy-k8s
+  **Blocked by**: jenkins-setup
+- [ ] Configure DNS
+  **ID**: config-dns
+  **Blocked by**: k8s-namespace
+TASKS
+
+  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'all_tasks_blocked' "$TEST_LOG"
+  [[ "$output" == *"All 2 remaining tasks are blocked"* ]]
+  # No sessions should have been launched
+  [ ! -f "$DVB_GRIND_INVOKE_LOG" ]
+}
+
+@test "partially blocked queue does NOT exit early" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P1
+- [ ] Deploy to K8s
+  **ID**: deploy-k8s
+  **Blocked by**: jenkins-setup
+- [ ] Write docs
+  **ID**: write-docs
+TASKS
+
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  ! grep -q 'all_tasks_blocked' "$TEST_LOG"
+  # Should have launched at least 1 session
+  [ -f "$DVB_GRIND_INVOKE_LOG" ]
+}
+
+@test "all-blocked with single task exits" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Waiting for OIDC credentials
+  **ID**: oidc-creds
+  **Blocked by**: eiam-team
+TASKS
+
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  grep -q 'all_tasks_blocked' "$TEST_LOG"
+}
+
 @test "second session prompt includes previous session context" {
   export DVB_DEADLINE=$(( $(date +%s) + 8 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
