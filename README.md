@@ -67,12 +67,12 @@ Completed tasks are removed (not checked off). History lives in git log. See the
 - **Multi-backend support** — works with Devin, Claude Code, and Codex via `--backend`
 - **Preflight checks** — 7 health checks (binary, network, git state, remote, disk, TASKS.md, network-watchdog) before launch
 - **Self-copy protection** — copies itself to `$TMPDIR` before running, survives script edits mid-grind
-- **Per-repo locking** — `lockf` prevents duplicate grinds on the same repo
+- **Per-repo locking** — `lockf` (macOS) / `flock` (Linux) prevents duplicate grinds on the same repo
 - **Caffeinate integration** — prevents system sleep for the duration of the grind
 - **Git sync with stash/rebase** — between-session sync stashes dirty work, rebases on default branch, cleans merged branches
 - **Empty-queue sweep** — when `TASKS.md` is empty, launches a sweep session to find work before exiting
 - **Network resilience** — pauses on network loss, extends deadline on recovery
-- **Stall detection** — bails after consecutive zero-ship sessions (configurable via `DVB_MAX_ZERO_SHIP`)
+- **Stall detection** — bails after consecutive zero-ship sessions (configurable via `TG_MAX_ZERO_SHIP`)
 - **Per-task retry cap** — skips tasks attempted 3+ times without shipping
 - **Fast-failure backoff** — linear backoff with cap when sessions crash quickly
 - **Ship-rate tracking** — logs cumulative effectiveness in `grind_done` summary

@@ -12,7 +12,7 @@ The `-ms` flags prevent system sleep (`-s`) and disk sleep (`-m`) while allowing
 
 ## Why git sync every N not every 1
 
-Git sync (fetch, rebase, branch cleanup) introduces overhead and can create rebase conflicts that need recovery. Running it after every session wastes time, especially when sessions are short. The default of every 5 sessions (`DVB_SYNC_INTERVAL=5`) balances staying current with origin against minimizing disruption. For fast-moving repos where freshness matters, set `DVB_SYNC_INTERVAL=0` to sync every session. The sync includes stash/restore for dirty trees, automatic rebase abort on conflicts, and a configurable timeout (`DVB_GIT_SYNC_TIMEOUT`) to prevent hanging on slow remotes.
+Git sync (fetch, rebase, branch cleanup) introduces overhead and can create rebase conflicts that need recovery. Running it after every session wastes time, especially when sessions are short. The default of every 5 sessions (`TG_SYNC_INTERVAL=5`) balances staying current with origin against minimizing disruption. For fast-moving repos where freshness matters, set `TG_SYNC_INTERVAL=0` to sync every session. The sync includes stash/restore for dirty trees, automatic rebase abort on conflicts, and a configurable timeout (`TG_GIT_SYNC_TIMEOUT`) to prevent hanging on slow remotes.
 
 ## Why per-task retry cap uses ID tracking
 
