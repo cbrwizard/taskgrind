@@ -6,7 +6,7 @@ taskgrind \- autonomous multi-session grind tool
 [\fIhours\fR] [\fIrepo\fR] [\fB\-\-skill\fR \fIname\fR] [\fB\-\-backend\fR \fIname\fR] [\fB\-\-prompt\fR \fItext\fR] [\fB\-\-dry\-run\fR] [\fB\-\-preflight\fR] [\fB\-\-help\fR] [\fB\-\-version\fR]
 .SH DESCRIPTION
 Runs sequential AI coding sessions against a TASKS.md repo until a deadline.
-Each session starts with fresh context, picks a task from TASKS.md, implements
+Each session starts with full context, picks a task from TASKS.md, implements
 it, commits, removes it from TASKS.md, and exits. Between sessions: cooldown,
 optional git sync. Exits when the queue empties, the deadline is reached, or
 stall is detected.
@@ -128,6 +128,12 @@ Normal completion (deadline reached or queue empty).
 .TP
 .B 1
 Error (invalid args, missing binary, stall bail).
+.TP
+.B 130
+Interrupted by SIGINT (Ctrl\-C). Waits for running session, pushes commits.
+.TP
+.B 143
+Terminated by SIGTERM. Waits for running session, pushes commits.
 .SH SEE ALSO
 .BR devin (1),
 .BR bats (1),
