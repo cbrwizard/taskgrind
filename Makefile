@@ -1,4 +1,10 @@
-.PHONY: lint test test-all check
+.PHONY: lint test test-all check help
+
+help:
+	@echo "Available targets:"
+	@echo "  make lint    — run shellcheck on all scripts"
+	@echo "  make test    — run bats test suite (294 tests)"
+	@echo "  make check   — lint + test (run before committing)"
 
 lint:
 	@echo "═══ Shellcheck ═══"
