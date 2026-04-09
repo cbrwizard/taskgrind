@@ -6,13 +6,6 @@
 
 ## P2
 
-- [ ] Add docs/architecture.md — design decisions
-  **ID**: add-architecture-doc
-  **Tags**: docs
-  **Details**: Document why taskgrind works the way it does: (1) why self-copy (bash lazy reading), (2) why caffeinate -ms not -dims, (3) why git sync every N not every 1, (4) why per-task retry cap uses ID tracking, (5) why empty-queue exit instead of sweep, (6) why next-task over custom grind skill. One paragraph each. Not a tutorial — a "why" doc for contributors.
-  **Files**: docs/architecture.md
-  **Acceptance**: Each design decision has a one-paragraph rationale
-
 - [ ] Rename DVB_ env vars to TG_ with backward compat aliases
   **ID**: rename-env-vars
   **Tags**: api, breaking-change
