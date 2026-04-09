@@ -3003,3 +3003,162 @@ EOF
   [ "$status" -ne 0 ]
   [[ "$output" == *"unknown backend"* ]]
 }
+
+# ── Diminishing returns / DVB_EARLY_EXIT_ON_STALL ─────────────────────
+
+@test "diminishing returns warning after 5 low-throughput sessions" {
+  # Persistent task never removed → 0 shipped per session
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Stubborn task
+TASKS
+  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_MAX_ZERO_SHIP=10
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  grep -q 'diminishing_returns' "$TEST_LOG"
+  [[ "$output" == *"Low throughput"* ]]
+}
+
+@test "DVB_EARLY_EXIT_ON_STALL=1 exits early on low throughput" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Stubborn task
+TASKS
+  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_MAX_ZERO_SHIP=10
+  export DVB_EARLY_EXIT_ON_STALL=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'early_exit_stall' "$TEST_LOG"
+  [[ "$output" == *"DVB_EARLY_EXIT_ON_STALL=1"* ]]
+}
+
+@test "DVB_EARLY_EXIT_ON_STALL=0 does not exit early" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Stubborn task
+TASKS
+  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_MAX_ZERO_SHIP=6
+  export DVB_EARLY_EXIT_ON_STALL=0
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  # Should bail due to zero-ship stall, NOT early_exit_stall
+  ! grep -q 'early_exit_stall' "$TEST_LOG"
+  grep -q 'stall_bail' "$TEST_LOG"
+}
+
+@test "early exit stops the grind loop (no more sessions)" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Stubborn task
+TASKS
+  export DVB_DEADLINE=$(( $(date +%s) + 30 ))
+  export DVB_MAX_ZERO_SHIP=20
+  export DVB_EARLY_EXIT_ON_STALL=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  # Should exit after ~5 sessions (when diminishing returns fires)
+  local count
+  count=$(wc -l < "$DVB_GRIND_INVOKE_LOG" | tr -d ' ')
+  # Exactly 5 sessions (diminishing returns fires at session 5)
+  [ "$count" -le 6 ]
+}
+
+@test "productive timeout warning when shipped session hits timeout" {
+  # Fake devin that removes one task per invocation
+  local ship_devin="$TEST_DIR/ship-devin"
+  local counter_file="$TEST_DIR/ship-counter"
+  echo "0" > "$counter_file"
+  cat > "$ship_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+n=\$(cat "$counter_file")
+n=\$((n + 1))
+echo "\$n" > "$counter_file"
+remaining=\$((5 - n))
+[ \$remaining -lt 0 ] && remaining=0
+{
+  echo "# Tasks"
+  echo "## P0"
+  i=1
+  while [ \$i -le \$remaining ]; do
+    echo "- [ ] Task \$i"
+    i=\$((i + 1))
+  done
+} > "$TEST_REPO/TASKS.md"
+SCRIPT
+  chmod +x "$ship_devin"
+  export DVB_GRIND_CMD="$ship_devin"
+
+  {
+    echo "# Tasks"
+    echo "## P0"
+    for i in $(seq 1 5); do
+      echo "- [ ] Task $i"
+    done
+  } > "$TEST_REPO/TASKS.md"
+
+  # DVB_MAX_SESSION=0 means any elapsed time >= 0 triggers productive_timeout
+  export DVB_MAX_SESSION=0
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'productive_timeout' "$TEST_LOG"
+  [[ "$output" == *"Productive session hit timeout"* ]]
+}
+
+@test "productive timeout suggests increasing DVB_MAX_SESSION" {
+  local ship_devin="$TEST_DIR/ship-devin"
+  local counter_file="$TEST_DIR/ship-counter"
+  echo "0" > "$counter_file"
+  cat > "$ship_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+n=\$(cat "$counter_file")
+n=\$((n + 1))
+echo "\$n" > "$counter_file"
+remaining=\$((3 - n))
+[ \$remaining -lt 0 ] && remaining=0
+{
+  echo "# Tasks"
+  echo "## P0"
+  i=1
+  while [ \$i -le \$remaining ]; do
+    echo "- [ ] Task \$i"
+    i=\$((i + 1))
+  done
+} > "$TEST_REPO/TASKS.md"
+SCRIPT
+  chmod +x "$ship_devin"
+  export DVB_GRIND_CMD="$ship_devin"
+
+  {
+    echo "# Tasks"
+    echo "## P0"
+    for i in $(seq 1 3); do
+      echo "- [ ] Task $i"
+    done
+  } > "$TEST_REPO/TASKS.md"
+
+  export DVB_MAX_SESSION=0
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [[ "$output" == *"Consider DVB_MAX_SESSION="* ]]
+}
+
+@test "no productive timeout when session does not ship" {
+  # Tasks never removed → 0 shipped → no productive_timeout
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Stubborn task
+TASKS
+  export DVB_MAX_SESSION=0
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export DVB_MAX_ZERO_SHIP=3
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  ! grep -q 'productive_timeout' "$TEST_LOG"
+}
