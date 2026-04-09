@@ -774,6 +774,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
   remaining_m=$(( remaining_min % 60 ))
 
   tasks_before=$(count_tasks "$repo/TASKS.md")
+  _ids_before=$(extract_task_ids "$repo/TASKS.md")
 
   # Capture starting task count on first iteration (for ship rate)
   [[ $tasks_starting -eq 0 && $tasks_before -gt 0 ]] && tasks_starting=$tasks_before
@@ -1020,14 +1021,34 @@ while [[ $(date +%s) -lt $deadline ]]; do
 
   tasks_after=$(count_tasks "$repo/TASKS.md")
   tasks_remaining=$tasks_after
+  _ids_after=$(extract_task_ids "$repo/TASKS.md")
 
-  # Tasks shipped ≈ tasks that disappeared (completed = removed from TASKS.md)
+  # Tasks shipped = IDs that existed BEFORE the session and are now gone.
+  # This is more accurate than count_tasks diff because it correctly handles
+  # sessions that add new tasks AND remove old ones (e.g., scout-while-you-work).
+  # Fallback: when TASKS.md has no **ID**: metadata, use the old count-based approach.
   session_shipped=0
-  if [[ "$tasks_before" -gt "$tasks_after" ]]; then
+  if [[ -n "$_ids_before" ]]; then
+    # ID-based: IDs removed = present in _ids_before but absent from _ids_after
+    _ids_removed=$(comm -23 <(echo "$_ids_before") <(echo "$_ids_after") | wc -l)
+    _ids_removed=$(( _ids_removed + 0 ))  # trim whitespace from wc
+    session_shipped=$_ids_removed
+    tasks_shipped=$((tasks_shipped + session_shipped))
+  elif [[ "$tasks_before" -gt "$tasks_after" ]]; then
+    # Count-based fallback (no IDs in TASKS.md)
     session_shipped=$((tasks_before - tasks_after))
     tasks_shipped=$((tasks_shipped + session_shipped))
+  fi
+
+  # Log when new tasks were injected during the session (ID-based detection)
+  if [[ -n "$_ids_after" && -n "${_ids_before:-}" ]]; then
+    _ids_added=$(comm -13 <(echo "$_ids_before") <(echo "$_ids_after") | wc -l)
+    _ids_added=$(( _ids_added + 0 ))
+    if [[ $_ids_added -gt 0 ]]; then
+      log_write "[$(date '+%H:%M')] tasks_added=$_ids_added (ids added during session)"
+    fi
   elif [[ "$tasks_after" -gt "$tasks_before" ]]; then
-    # External processes added tasks during this session
+    # Count-based fallback for task addition detection
     _tasks_added=$(( tasks_after - tasks_before ))
     log_write "[$(date '+%H:%M')] tasks_added=$_tasks_added (external injection: $tasks_before→$tasks_after)"
   fi
@@ -1041,7 +1062,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
   # ── Per-task attempt tracking ──────────────────────────────────────
   # Track how many sessions each task ID has survived without being shipped.
   # Tasks with 3+ attempts get added to the skip list in the next prompt.
-  _ids_after=$(extract_task_ids "$repo/TASKS.md")
+  # _ids_after was already computed above for shipped tracking.
   if [[ -n "$_ids_after" ]]; then
     _new_attempts="$_dvb_tmp/taskgrind-$$.task-attempts.new"
     while IFS= read -r _tid; do

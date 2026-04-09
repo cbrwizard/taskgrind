@@ -4,13 +4,6 @@
 
 ## P1
 
-- [ ] Track shipped tasks by ID diff, not just count delta
-  **ID**: track-shipped-by-id
-  **Tags**: grind-analysis, throughput, metrics
-  **Details**: Taskgrind's core metric — tasks shipped — uses `tasks_before - tasks_after`. This undercounts work when the agent adds AND removes tasks in the same session. Confirmed in the 2026-04-08 taskgrind-on-taskgrind grind: session 6 added 2 security tasks (commit `35ad61a`) then removed those same 2 tasks after fixing them (commit `72ec411`). The count stayed at 8, so shipped=0 — despite doing real work. The `next-task` skill's "scout while you work" pattern encourages exactly this behavior. Fix: use `extract_task_ids` (already exists, line 717) to diff task IDs before/after each session. `shipped = IDs_removed - IDs_that_were_just_added_this_session`. At minimum, count IDs that were present BEFORE the session and are now gone. Also update the summary metrics and the stall detection to use the ID-based count. Evidence: git log shows `35ad61a` (+14 lines to TASKS.md) followed by `72ec411` (-14 lines) in the same session window, net delta = 0.
-  **Files**: `bin/taskgrind`
-  **Acceptance**: When the agent removes a task that existed before the session started, it counts as shipped even if the agent also added new tasks. Stall detection and grind_done metrics reflect the ID-based count. Test: bats test where TASKS.md has task A, session adds task B and removes task A, verify shipped=1 not 0.
-
 - [ ] Detect "productive zero-ship" sessions and escalate the completion protocol
   **ID**: escalate-completion-protocol
   **Tags**: grind-analysis, prompt-engineering, throughput

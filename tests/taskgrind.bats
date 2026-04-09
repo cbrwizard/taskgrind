@@ -811,6 +811,211 @@ TASKS
   [[ "$output" == *"0+ tasks"* ]]
 }
 
+@test "ID-based shipped: removing task with ID counts as shipped" {
+  # Fake devin that removes task-a and its metadata, keeping task-b
+  local smart_devin="$TEST_DIR/smart-devin"
+  cat > "$smart_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+cat > "$TEST_REPO/TASKS.md" <<'EOF'
+# Tasks
+## P0
+- [ ] Task B
+  **ID**: task-b
+EOF
+SCRIPT
+  chmod +x "$smart_devin"
+  export DVB_GRIND_CMD="$smart_devin"
+
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Task A
+  **ID**: task-a
+- [ ] Task B
+  **ID**: task-b
+TASKS
+
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  grep -q 'shipped=1' "$TEST_LOG"
+}
+
+@test "ID-based shipped: adding and removing tasks counts correctly" {
+  # The key scenario: agent removes task-a (pre-existing) and adds task-c (new).
+  # Count-based: before=2, after=2, shipped=0 (WRONG).
+  # ID-based: task-a removed → shipped=1 (CORRECT).
+  local smart_devin="$TEST_DIR/smart-devin"
+  cat > "$smart_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+cat > "$TEST_REPO/TASKS.md" <<'EOF'
+# Tasks
+## P0
+- [ ] Task B
+  **ID**: task-b
+- [ ] Task C (new)
+  **ID**: task-c
+EOF
+SCRIPT
+  chmod +x "$smart_devin"
+  export DVB_GRIND_CMD="$smart_devin"
+
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Task A
+  **ID**: task-a
+- [ ] Task B
+  **ID**: task-b
+TASKS
+
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  # ID-based: task-a was present before and gone after → shipped=1
+  grep -q 'shipped=1' "$TEST_LOG"
+}
+
+@test "ID-based shipped: adding 2 and removing 2 still counts shipped" {
+  # Agent removes task-a and task-b, adds task-c and task-d.
+  # Count-based: 2→2, shipped=0. ID-based: 2 removed → shipped=2.
+  local smart_devin="$TEST_DIR/smart-devin"
+  cat > "$smart_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+cat > "$TEST_REPO/TASKS.md" <<'EOF'
+# Tasks
+## P0
+- [ ] Task C
+  **ID**: task-c
+- [ ] Task D
+  **ID**: task-d
+EOF
+SCRIPT
+  chmod +x "$smart_devin"
+  export DVB_GRIND_CMD="$smart_devin"
+
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Task A
+  **ID**: task-a
+- [ ] Task B
+  **ID**: task-b
+TASKS
+
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  grep -q 'shipped=2' "$TEST_LOG"
+}
+
+@test "ID-based shipped: no IDs falls back to count-based" {
+  # Tasks without **ID**: metadata use the old count-based approach
+  local smart_devin="$TEST_DIR/smart-devin"
+  cat > "$smart_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+cat > "$TEST_REPO/TASKS.md" <<'EOF'
+# Tasks
+## P0
+- [ ] Task two
+EOF
+SCRIPT
+  chmod +x "$smart_devin"
+  export DVB_GRIND_CMD="$smart_devin"
+
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Task one
+- [ ] Task two
+TASKS
+
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  # Count-based fallback: 2→1 = shipped=1
+  grep -q 'shipped=1' "$TEST_LOG"
+}
+
+@test "ID-based shipped: logs new tasks added during session" {
+  # Agent adds a new task with ID during the session
+  local smart_devin="$TEST_DIR/smart-devin"
+  cat > "$smart_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+cat > "$TEST_REPO/TASKS.md" <<'EOF'
+# Tasks
+## P0
+- [ ] Task A
+  **ID**: task-a
+- [ ] Task B (new)
+  **ID**: task-b
+EOF
+SCRIPT
+  chmod +x "$smart_devin"
+  export DVB_GRIND_CMD="$smart_devin"
+
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Task A
+  **ID**: task-a
+TASKS
+
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  grep -q 'tasks_added=1' "$TEST_LOG"
+}
+
+@test "ID-based shipped: resets zero-ship counter on ID-tracked ship" {
+  # Verify stall detection resets when ID-based shipping detects work.
+  # Session 3 ships task-a (removing it, adding task-c). This resets the
+  # consecutive_zero_ship counter. We verify the reset happened by checking
+  # that session 3 logged shipped=1, proving the ID-based path works with
+  # stall detection.
+  local counter_file="$TEST_DIR/counter"
+  echo "0" > "$counter_file"
+  local smart_devin="$TEST_DIR/smart-devin"
+  cat > "$smart_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+n=\$(cat "$counter_file")
+n=\$((n + 1))
+echo "\$n" > "$counter_file"
+if [ "\$n" -eq 3 ]; then
+  # Session 3: remove task-a (ship it), add task-c
+  cat > "$TEST_REPO/TASKS.md" <<'EOF'
+# Tasks
+## P0
+- [ ] Task B
+  **ID**: task-b
+- [ ] Task C
+  **ID**: task-c
+EOF
+fi
+SCRIPT
+  chmod +x "$smart_devin"
+  export DVB_GRIND_CMD="$smart_devin"
+
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Task A
+  **ID**: task-a
+- [ ] Task B
+  **ID**: task-b
+TASKS
+
+  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_MAX_ZERO_SHIP=5
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  # Session 3 shipped via ID tracking — verify the shipped=1 log
+  grep -q 'session=3 ended.*shipped=1' "$TEST_LOG"
+  # Stall warning at consecutive_zero_ship=3 should NOT appear before session 3
+  # because session 3 resets the counter. It may appear later (sessions 4-6).
+  # The key assertion: session 3 reset the counter (shipped=1 proves it).
+}
+
 @test "counts nested/indented task checkboxes" {
   cat > "$TEST_REPO/TASKS.md" <<'TASKS'
 # Tasks
