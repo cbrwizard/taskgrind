@@ -451,7 +451,7 @@ if [[ -z "${DVB_GRIND_CMD:-}" ]]; then
   else
     find "$_dvb_tmp" -maxdepth 1 -name 'taskgrind-exec.*' -mtime +1 -delete 2>/dev/null || true
     find "$_dvb_tmp" -maxdepth 1 -name 'taskgrind-lock-*' -mtime +1 -delete 2>/dev/null || true
-    find "$_dvb_tmp" -maxdepth 1 \( -name '*.session.out' -o -name '*.git-sync' -o -name '*.task-attempts*' \) -mtime +1 -delete 2>/dev/null || true
+    find "$_dvb_tmp" -maxdepth 1 \( -name 'taskgrind-*.session.out' -o -name 'taskgrind-*.git-sync' -o -name 'taskgrind-*.task-attempts*' \) -mtime +1 -delete 2>/dev/null || true
   fi
 fi
 

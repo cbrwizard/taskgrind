@@ -116,7 +116,7 @@ Each session logs: start time, remaining minutes, task count, exit code, duratio
 
 ```bash
 make lint       # shellcheck
-make test       # bats test suite (314 tests)
+make test       # bats test suite (316 tests)
 make check      # lint + test
 ```
 

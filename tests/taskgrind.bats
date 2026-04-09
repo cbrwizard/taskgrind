@@ -2546,6 +2546,25 @@ TASKS
   [ "$hash1" = "$hash2" ]
 }
 
+# ── Temp file cleanup patterns ─────────────────────────────────────────
+
+@test "find cleanup patterns only match taskgrind-prefixed files" {
+  # The find fallback must use 'taskgrind-*' prefix on all patterns to avoid
+  # deleting files from other tools in TMPDIR.
+  # Extract the find lines from the cleanup block
+  local find_lines
+  find_lines=$(grep 'find.*_dvb_tmp.*-delete' "$DVB_GRIND")
+  # Every -name pattern must start with 'taskgrind-'
+  local bad_patterns
+  bad_patterns=$(echo "$find_lines" | grep -oE "'-name' '[^']*'|-name '[^']*'" | grep -v 'taskgrind-' || true)
+  [ -z "$bad_patterns" ]
+}
+
+@test "fd cleanup regex is scoped to taskgrind files" {
+  # The fd regex should only match files starting with 'taskgrind-'
+  grep -q "taskgrind-(exec" "$DVB_GRIND"
+}
+
 # ── grind_done log ordering on Ctrl-C ──────────────────────────────────
 
 @test "grind_done is last log entry on Ctrl-C interrupt" {
