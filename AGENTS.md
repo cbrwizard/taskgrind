@@ -31,7 +31,7 @@ make check      # lint + test (run before committing)
 
 1. **Run `make check` before committing** — shellcheck + bats must pass
 2. **Commit on `main`** — this repo doesn't use feature branches for small changes
-3. **Keep env vars prefixed `DVB_`** — backward compat with dotfiles; don't rename to `TG_`
+3. **Env vars use `TG_` prefix (primary)** — `DVB_` is supported as a backward-compatible alias. Internal/test-only vars keep the `DVB_` prefix.
 4. **Source paths are relative** — `$TASKGRIND_DIR/lib/constants.sh`, derived from script location
 5. **Test with `DVB_GRIND_CMD`** — all tests use a fake devin stub, never the real binary
 6. **Timing-sensitive tests** — a handful of network recovery and branch cleanup tests may fail intermittently under load; pre-existing, not a regression

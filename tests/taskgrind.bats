@@ -252,6 +252,43 @@ teardown() {
   grep -q -- '--model claude-sonnet-4.5' "$DVB_GRIND_INVOKE_LOG"
 }
 
+# ── TG_ prefix support ─────────────────────────────────────────────────
+
+@test "TG_MODEL overrides default" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export TG_MODEL=sonnet
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  grep -q -- '--model sonnet' "$DVB_GRIND_INVOKE_LOG"
+}
+
+@test "TG_MODEL takes precedence over DVB_MODEL" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export DVB_MODEL=old-model
+  export TG_MODEL=new-model
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  grep -q -- '--model new-model' "$DVB_GRIND_INVOKE_LOG"
+  ! grep -q -- '--model old-model' "$DVB_GRIND_INVOKE_LOG"
+}
+
+@test "TG_SKILL overrides default skill" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export TG_SKILL=custom-skill
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [[ "$output" == *"custom-skill"* ]]
+}
+
+@test "TG_ prefix resolution block exists (structural)" {
+  grep -q 'TG_ prefix resolution' "$DVB_GRIND"
+  grep -q 'TG_.*takes precedence' "$DVB_GRIND"
+}
+
+@test "--help shows TG_ as primary prefix" {
+  run "$DVB_GRIND" --help
+  [[ "$output" == *"TG_BACKEND"* ]]
+  [[ "$output" == *"TG_MODEL"* ]]
+  [[ "$output" == *"DVB_ prefix is supported"* ]]
+}
+
 @test "model shows in startup banner" {
   export DVB_DEADLINE=$(( $(date +%s) + 5 ))
   unset DVB_MODEL 2>/dev/null || true

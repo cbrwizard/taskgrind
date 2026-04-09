@@ -83,30 +83,32 @@ Completed tasks are removed (not checked off). History lives in git log. See the
 
 ## Environment Variables
 
+`TG_` is the canonical prefix. `DVB_` is supported as a backward-compatible alias for all variables.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DVB_BACKEND` | `devin` | AI backend: `devin`, `claude-code`, `codex` |
-| `DVB_MODEL` | `claude-opus-4-6-thinking` | AI model |
-| `DVB_SKILL` | `next-task` | Skill to run each session |
-| `DVB_PROMPT` | (none) | Focus prompt for every session |
-| `DVB_COOL` | `5` | Seconds between sessions |
-| `DVB_MAX_SESSION` | `3600` | Max seconds per session |
-| `DVB_MIN_SESSION` | `30` | Fast-failure threshold in seconds |
-| `DVB_MAX_FAST` | `5` | Max consecutive fast failures before bail |
-| `DVB_MAX_ZERO_SHIP` | `8` | Consecutive zero-ship sessions before bail |
-| `DVB_BACKOFF_BASE` | `15` | Base seconds for fast-failure backoff |
-| `DVB_BACKOFF_MAX` | `120` | Cap for fast-failure backoff in seconds |
-| `DVB_NET_WAIT` | `30` | Network polling interval in seconds |
-| `DVB_NET_MAX_WAIT` | `14400` | Max time to wait for network recovery (4h) |
-| `DVB_NET_RETRIES` | `3` | Network check retry attempts before declaring down |
-| `DVB_NET_RETRY_DELAY` | `2` | Seconds between network check retries |
-| `DVB_GIT_SYNC_TIMEOUT` | `30` | Max seconds for between-session git sync |
-| `DVB_SYNC_INTERVAL` | `5` | Git sync every N sessions (0=every) |
-| `DVB_EARLY_EXIT_ON_STALL` | `1` | Exit on low throughput (0=disabled) |
-| `DVB_DEVIN_PATH` | auto | Override devin binary path |
-| `DVB_LOG` | auto | Override log file path |
-| `DVB_NOTIFY` | `1` | macOS notification on completion |
-| `DVB_SHUTDOWN_GRACE` | `120` | Seconds to wait for current session on exit |
+| `TG_BACKEND` | `devin` | AI backend: `devin`, `claude-code`, `codex` |
+| `TG_MODEL` | `claude-opus-4-6-thinking` | AI model |
+| `TG_SKILL` | `next-task` | Skill to run each session |
+| `TG_PROMPT` | (none) | Focus prompt for every session |
+| `TG_COOL` | `5` | Seconds between sessions |
+| `TG_MAX_SESSION` | `3600` | Max seconds per session |
+| `TG_MIN_SESSION` | `30` | Fast-failure threshold in seconds |
+| `TG_MAX_FAST` | `5` | Max consecutive fast failures before bail |
+| `TG_MAX_ZERO_SHIP` | `8` | Consecutive zero-ship sessions before bail |
+| `TG_BACKOFF_BASE` | `15` | Base seconds for fast-failure backoff |
+| `TG_BACKOFF_MAX` | `120` | Cap for fast-failure backoff in seconds |
+| `TG_NET_WAIT` | `30` | Network polling interval in seconds |
+| `TG_NET_MAX_WAIT` | `14400` | Max time to wait for network recovery (4h) |
+| `TG_NET_RETRIES` | `3` | Network check retry attempts before declaring down |
+| `TG_NET_RETRY_DELAY` | `2` | Seconds between network check retries |
+| `TG_GIT_SYNC_TIMEOUT` | `30` | Max seconds for between-session git sync |
+| `TG_SYNC_INTERVAL` | `5` | Git sync every N sessions (0=every) |
+| `TG_EARLY_EXIT_ON_STALL` | `1` | Exit on low throughput (0=disabled) |
+| `TG_DEVIN_PATH` | auto | Override devin binary path |
+| `TG_LOG` | auto | Override log file path |
+| `TG_NOTIFY` | `1` | Desktop notification on completion |
+| `TG_SHUTDOWN_GRACE` | `120` | Seconds to wait for current session on exit |
 
 ## Monitoring
 
