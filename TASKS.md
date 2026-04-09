@@ -4,13 +4,6 @@
 
 ## P1
 
-- [ ] Clean up stale branches left by grind sessions
-  **ID**: cleanup-stale-grind-branches
-  **Tags**: grind-analysis, hygiene
-  **Details**: The bosun repo has 8 stale branches from grind sessions: `fix/batch-bugs-session14`, `fix/batch-bug-fixes-session-10`, `fix/session9-bug-fixes-aifn-720`, `refactor/reduce-cognitive-complexity-session-7`, and 4 `orchestrator/audit-*` branches. These accumulate because (a) the agent creates feature branches but doesn't always merge/delete them, and (b) `branch_cleanup` only deletes branches merged into the default branch. The between-session git sync should also delete remote-tracking branches that no longer exist on the remote (`git remote prune origin`) and local branches whose tracking branch is gone. Evidence: `git branch` on bosun shows 8+ stale branches after a grind.
-  **Files**: `bin/taskgrind`
-  **Acceptance**: After branch cleanup, `git branch | wc -l` shows only the default branch and any unmerged active branches. Pruned branches are logged. Test: bats test with mock branches.
-
 ## P2
 
 - [ ] Add docs/user-stories.md — real usage patterns
