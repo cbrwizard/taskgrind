@@ -616,7 +616,8 @@ cleanup() {
   echo "$_done_line" >> "$log_file" 2>/dev/null || true
   # macOS notification — on by default, DVB_NOTIFY=0 to disable
   if [[ "${DVB_NOTIFY:-1}" != "0" ]]; then
-    osascript -e "display notification \"$session sessions, ${tasks_shipped}+ tasks shipped in $duration\" with title \"taskgrind complete\"" 2>/dev/null || true
+    _notify_msg="$session sessions, ${tasks_shipped}+ tasks shipped in $duration"
+    osascript -e 'on run argv' -e 'display notification (item 1 of argv) with title "taskgrind complete"' -e 'end run' -- "$_notify_msg" 2>/dev/null || true
   fi
   # Remove temp files
   [[ -n "${_DVB_SELF_COPY:-}" && -f "${_DVB_SELF_COPY}" ]] && rm -f "$_DVB_SELF_COPY"
@@ -1162,7 +1163,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
         git -C "$repo" merge --abort 2>/dev/null || true
         log_write "[$(date '+%H:%M')] git_sync timeout_merge_aborted"
       fi
-      sync_output=$(tail -10 "$_git_out" 2>/dev/null)
+      sync_output=$(tail -10 "$_git_out" 2>/dev/null | tr -cd '[:print:]\n' | head -c 500)
       echo "   ⚠ git sync failed: $sync_output"
       log_write "[$(date '+%H:%M')] git_sync failed: $sync_output"
     fi

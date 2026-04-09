@@ -1619,6 +1619,17 @@ SCRIPT
   grep -q 'tasks shipped' "$DVB_GRIND"
 }
 
+@test "notification uses argv passing to avoid osascript injection" {
+  # osascript should receive the message as an argument, not interpolated in the script
+  grep -q 'on run argv' "$DVB_GRIND"
+  grep -q 'item 1 of argv' "$DVB_GRIND"
+}
+
+@test "git sync output is sanitized before logging" {
+  # Control characters should be stripped from git sync output
+  grep -q "tr -cd '\[:print:\]" "$DVB_GRIND"
+}
+
 # ── Dry Run ───────────────────────────────────────────────────────────
 
 @test "--dry-run prints config and exits 0" {
