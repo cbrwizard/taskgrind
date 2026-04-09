@@ -27,13 +27,6 @@
   **Files**: bin/taskgrind, lib/constants.sh, README.md, AGENTS.md
   **Acceptance**: `TG_MODEL=sonnet taskgrind --dry-run` works; `DVB_MODEL=sonnet taskgrind --dry-run` still works; --help shows TG_ as primary
 
-- [ ] Add --version flag
-  **ID**: add-version-flag
-  **Tags**: cli, ux
-  **Details**: `taskgrind --version` should print the git commit hash and date (same pattern as `dotfiles --version`). Use `git -C "$TASKGRIND_DIR" log -1 --format='%h %ci'` or embed version at release time.
-  **Files**: bin/taskgrind
-  **Acceptance**: `taskgrind --version` prints a commit hash + date; exits 0
-
 - [ ] Add CONTRIBUTING.md
   **ID**: add-contributing
   **Tags**: docs

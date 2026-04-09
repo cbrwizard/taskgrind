@@ -108,6 +108,27 @@ teardown() {
   [[ "$output" == *"Usage"* ]]
 }
 
+@test "--version prints commit hash and exits 0" {
+  run "$DVB_GRIND" --version
+  [ "$status" -eq 0 ]
+  [[ "$output" == "taskgrind "* ]]
+  # Should contain a short git hash (7+ hex chars)
+  [[ "$output" =~ [0-9a-f]{7} ]]
+}
+
+@test "-V is alias for --version" {
+  run "$DVB_GRIND" -V
+  [ "$status" -eq 0 ]
+  [[ "$output" == "taskgrind "* ]]
+}
+
+@test "--version does not launch any sessions" {
+  run "$DVB_GRIND" --version
+  [ "$status" -eq 0 ]
+  # Output should be a single line with version info, no session output
+  [[ $(echo "$output" | wc -l) -le 1 ]]
+}
+
 @test "rejects hours over 24" {
   run "$DVB_GRIND" 25 "$TEST_REPO"
   [ "$status" -eq 1 ]

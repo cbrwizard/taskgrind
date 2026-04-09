@@ -13,6 +13,7 @@
 #        taskgrind --prompt "focus on test coverage" 8
 #        taskgrind --dry-run 8 ~/apps/myrepo  → print config without running
 #        taskgrind --preflight ~/apps/myrepo  → run health checks only
+#        taskgrind --version                   → print version (commit hash + date)
 #        DVB_MODEL=sonnet taskgrind 8          → 8h grind, sonnet model
 #        DVB_BACKEND=codex taskgrind 8         → 8h grind with Codex
 #
@@ -47,6 +48,7 @@
 # extends the deadline by the wait duration. No sessions are wasted.
 set -euo pipefail
 [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
+[[ "${1:-}" == "--version" || "${1:-}" == "-V" ]] && { echo "taskgrind $(git -C "$(cd "$(dirname "$0")/.." && pwd)" log -1 --format='%h %ci' 2>/dev/null || echo 'unknown')"; exit 0; }
 
 # Respect TMPDIR for all temp files (macOS default: /tmp)
 _dvb_tmp="${TMPDIR:-/tmp}"
