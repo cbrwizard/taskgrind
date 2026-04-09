@@ -11,7 +11,7 @@ taskgrind/
 ├── bin/taskgrind           Main script (runs Devin sessions in a loop)
 ├── lib/constants.sh        Shared constants (model, devin path, caffeinate flags)
 ├── lib/fullpower.sh        Priority boosting (taskpolicy for macOS)
-├── tests/taskgrind.bats    Test suite (294 tests)
+├── tests/taskgrind.bats    Test suite (296 tests)
 ├── tests/test_helper.bash  Shared test helpers
 ├── Makefile                lint + test targets
 ├── README.md               Usage, install, env vars
