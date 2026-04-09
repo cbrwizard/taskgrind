@@ -1785,91 +1785,91 @@ SCRIPT
   export DVB_MAX_FAST=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_MAX_FAST must be numeric"* ]]
+  [[ "$output" == *"TG_MAX_FAST must be numeric"* ]]
 }
 
 @test "DVB_MAX_SESSION=abc exits with must be numeric error" {
   export DVB_MAX_SESSION=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_MAX_SESSION must be numeric"* ]]
+  [[ "$output" == *"TG_MAX_SESSION must be numeric"* ]]
 }
 
 @test "DVB_SHUTDOWN_GRACE=abc exits with must be numeric error" {
   export DVB_SHUTDOWN_GRACE=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_SHUTDOWN_GRACE must be numeric"* ]]
+  [[ "$output" == *"TG_SHUTDOWN_GRACE must be numeric"* ]]
 }
 
 @test "DVB_MIN_SESSION=abc exits with must be numeric error" {
   export DVB_MIN_SESSION=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_MIN_SESSION must be numeric"* ]]
+  [[ "$output" == *"TG_MIN_SESSION must be numeric"* ]]
 }
 
 @test "DVB_NET_WAIT=abc exits with must be numeric error" {
   export DVB_NET_WAIT=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_NET_WAIT must be numeric"* ]]
+  [[ "$output" == *"TG_NET_WAIT must be numeric"* ]]
 }
 
 @test "DVB_NET_MAX_WAIT=abc exits with must be numeric error" {
   export DVB_NET_MAX_WAIT=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_NET_MAX_WAIT must be numeric"* ]]
+  [[ "$output" == *"TG_NET_MAX_WAIT must be numeric"* ]]
 }
 
 @test "DVB_NET_RETRIES=abc exits with must be numeric error" {
   export DVB_NET_RETRIES=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_NET_RETRIES must be numeric"* ]]
+  [[ "$output" == *"TG_NET_RETRIES must be numeric"* ]]
 }
 
 @test "DVB_NET_RETRY_DELAY=abc exits with must be numeric error" {
   export DVB_NET_RETRY_DELAY=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_NET_RETRY_DELAY must be numeric"* ]]
+  [[ "$output" == *"TG_NET_RETRY_DELAY must be numeric"* ]]
 }
 
 @test "DVB_BACKOFF_BASE=abc exits with must be numeric error" {
   export DVB_BACKOFF_BASE=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_BACKOFF_BASE must be numeric"* ]]
+  [[ "$output" == *"TG_BACKOFF_BASE must be numeric"* ]]
 }
 
 @test "DVB_BACKOFF_MAX=abc exits with must be numeric error" {
   export DVB_BACKOFF_MAX=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_BACKOFF_MAX must be numeric"* ]]
+  [[ "$output" == *"TG_BACKOFF_MAX must be numeric"* ]]
 }
 
 @test "DVB_SYNC_INTERVAL=abc exits with must be numeric error" {
   export DVB_SYNC_INTERVAL=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_SYNC_INTERVAL must be numeric"* ]]
+  [[ "$output" == *"TG_SYNC_INTERVAL must be numeric"* ]]
 }
 
 @test "DVB_GIT_SYNC_TIMEOUT=abc exits with must be numeric error" {
   export DVB_GIT_SYNC_TIMEOUT=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_GIT_SYNC_TIMEOUT must be numeric"* ]]
+  [[ "$output" == *"TG_GIT_SYNC_TIMEOUT must be numeric"* ]]
 }
 
 @test "DVB_DEADLINE=abc exits with must be epoch error" {
   export DVB_DEADLINE=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_DEADLINE must be a Unix epoch integer"* ]]
+  [[ "$output" == *"TG_DEADLINE must be a Unix epoch integer"* ]]
 }
 
 @test "numeric directory name treated as repo path not hours" {
@@ -2555,7 +2555,7 @@ SCRIPT
   export DVB_MAX_ZERO_SHIP=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"DVB_MAX_ZERO_SHIP must be numeric"* ]]
+  [[ "$output" == *"TG_MAX_ZERO_SHIP must be numeric"* ]]
 }
 
 # ── Branch cleanup between sessions ───────────────────────────────────
@@ -3547,7 +3547,7 @@ TASKS
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
   grep -q 'early_exit_stall' "$TEST_LOG"
-  [[ "$output" == *"DVB_EARLY_EXIT_ON_STALL=1"* ]]
+  [[ "$output" == *"TG_EARLY_EXIT_ON_STALL=1"* ]]
 }
 
 @test "DVB_EARLY_EXIT_ON_STALL=0 does not exit early" {

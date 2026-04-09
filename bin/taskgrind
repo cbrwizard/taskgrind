@@ -157,51 +157,51 @@ sync_interval="${DVB_SYNC_INTERVAL:-5}"
 
 # Validate numeric env vars
 if ! [[ "$cooldown" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_COOL must be numeric, got '$cooldown'" >&2; exit 1
+  echo "Error: TG_COOL must be numeric, got '$cooldown'" >&2; exit 1
 fi
 if ! [[ "$max_fast" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_MAX_FAST must be numeric, got '$max_fast'" >&2; exit 1
+  echo "Error: TG_MAX_FAST must be numeric, got '$max_fast'" >&2; exit 1
 fi
 if ! [[ "$max_session" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_MAX_SESSION must be numeric, got '$max_session'" >&2; exit 1
+  echo "Error: TG_MAX_SESSION must be numeric, got '$max_session'" >&2; exit 1
 fi
 if ! [[ "$max_zero_ship" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_MAX_ZERO_SHIP must be numeric, got '$max_zero_ship'" >&2; exit 1
+  echo "Error: TG_MAX_ZERO_SHIP must be numeric, got '$max_zero_ship'" >&2; exit 1
 fi
 if ! [[ "$sync_interval" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_SYNC_INTERVAL must be numeric, got '$sync_interval'" >&2; exit 1
+  echo "Error: TG_SYNC_INTERVAL must be numeric, got '$sync_interval'" >&2; exit 1
 fi
 # Validate optional numeric env vars — these are used in arithmetic/sleep mid-loop
 # and would crash with set -euo pipefail if non-numeric.
 if [[ -n "${DVB_SHUTDOWN_GRACE:-}" ]] && ! [[ "${DVB_SHUTDOWN_GRACE}" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_SHUTDOWN_GRACE must be numeric, got '${DVB_SHUTDOWN_GRACE}'" >&2; exit 1
+  echo "Error: TG_SHUTDOWN_GRACE must be numeric, got '${DVB_SHUTDOWN_GRACE}'" >&2; exit 1
 fi
 if [[ -n "${DVB_MIN_SESSION:-}" ]] && ! [[ "${DVB_MIN_SESSION}" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_MIN_SESSION must be numeric, got '${DVB_MIN_SESSION}'" >&2; exit 1
+  echo "Error: TG_MIN_SESSION must be numeric, got '${DVB_MIN_SESSION}'" >&2; exit 1
 fi
 if [[ -n "${DVB_NET_WAIT:-}" ]] && ! [[ "${DVB_NET_WAIT}" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_NET_WAIT must be numeric, got '${DVB_NET_WAIT}'" >&2; exit 1
+  echo "Error: TG_NET_WAIT must be numeric, got '${DVB_NET_WAIT}'" >&2; exit 1
 fi
 if [[ -n "${DVB_NET_MAX_WAIT:-}" ]] && ! [[ "${DVB_NET_MAX_WAIT}" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_NET_MAX_WAIT must be numeric, got '${DVB_NET_MAX_WAIT}'" >&2; exit 1
+  echo "Error: TG_NET_MAX_WAIT must be numeric, got '${DVB_NET_MAX_WAIT}'" >&2; exit 1
 fi
 if [[ -n "${DVB_NET_RETRIES:-}" ]] && ! [[ "${DVB_NET_RETRIES}" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_NET_RETRIES must be numeric, got '${DVB_NET_RETRIES}'" >&2; exit 1
+  echo "Error: TG_NET_RETRIES must be numeric, got '${DVB_NET_RETRIES}'" >&2; exit 1
 fi
 if [[ -n "${DVB_NET_RETRY_DELAY:-}" ]] && ! [[ "${DVB_NET_RETRY_DELAY}" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_NET_RETRY_DELAY must be numeric, got '${DVB_NET_RETRY_DELAY}'" >&2; exit 1
+  echo "Error: TG_NET_RETRY_DELAY must be numeric, got '${DVB_NET_RETRY_DELAY}'" >&2; exit 1
 fi
 if [[ -n "${DVB_BACKOFF_BASE:-}" ]] && ! [[ "${DVB_BACKOFF_BASE}" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_BACKOFF_BASE must be numeric, got '${DVB_BACKOFF_BASE}'" >&2; exit 1
+  echo "Error: TG_BACKOFF_BASE must be numeric, got '${DVB_BACKOFF_BASE}'" >&2; exit 1
 fi
 if [[ -n "${DVB_BACKOFF_MAX:-}" ]] && ! [[ "${DVB_BACKOFF_MAX}" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_BACKOFF_MAX must be numeric, got '${DVB_BACKOFF_MAX}'" >&2; exit 1
+  echo "Error: TG_BACKOFF_MAX must be numeric, got '${DVB_BACKOFF_MAX}'" >&2; exit 1
 fi
 if [[ -n "${DVB_GIT_SYNC_TIMEOUT:-}" ]] && ! [[ "${DVB_GIT_SYNC_TIMEOUT}" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_GIT_SYNC_TIMEOUT must be numeric, got '${DVB_GIT_SYNC_TIMEOUT}'" >&2; exit 1
+  echo "Error: TG_GIT_SYNC_TIMEOUT must be numeric, got '${DVB_GIT_SYNC_TIMEOUT}'" >&2; exit 1
 fi
 if [[ -n "${DVB_DEADLINE:-}" ]] && ! [[ "${DVB_DEADLINE}" =~ ^[0-9]+$ ]]; then
-  echo "Error: DVB_DEADLINE must be a Unix epoch integer, got '${DVB_DEADLINE}'" >&2; exit 1
+  echo "Error: TG_DEADLINE must be a Unix epoch integer, got '${DVB_DEADLINE}'" >&2; exit 1
 fi
 
 # Validate backend
@@ -1225,7 +1225,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
       echo "   ⚠ Low throughput: ${_window_total} tasks shipped in last ${_window} sessions."
       log_write "[$(date '+%H:%M')] diminishing_returns window=$_window shipped=$_window_total"
       if [[ "${DVB_EARLY_EXIT_ON_STALL:-1}" == "1" ]]; then
-        echo "   ⚠ DVB_EARLY_EXIT_ON_STALL=1 — exiting early to save time budget."
+        echo "   ⚠ TG_EARLY_EXIT_ON_STALL=1 — exiting early to save time budget."
         log_write "[$(date '+%H:%M')] early_exit_stall"
         break
       fi
