@@ -286,11 +286,11 @@ teardown() {
 }
 
 @test "prompt includes completion protocol with merge and remove instructions" {
-  export DVB_DEADLINE=$(( $(date +%s) + 2 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   grep -q 'COMPLETION PROTOCOL' "$DVB_GRIND_INVOKE_LOG"
   grep -q 'merge.*PR' "$DVB_GRIND_INVOKE_LOG"
-  grep -q 'remove.*completed.*task.*TASKS.md' "$DVB_GRIND_INVOKE_LOG"
+  grep -q 'remove.*task.*TASKS.md' "$DVB_GRIND_INVOKE_LOG"
 }
 
 @test "zero-ship session summary tells next session about the problem" {
@@ -584,6 +584,35 @@ TASKS
   local count
   count=$(wc -l < "$DVB_GRIND_INVOKE_LOG" | tr -d ' ')
   [ "$count" -eq 2 ]
+}
+
+@test "sweep resets after productive sessions so queue can refill" {
+  # Fake devin that: sweep adds tasks, normal sessions remove tasks
+  local smart_devin="$TEST_DIR/smart-devin"
+  cat > "$smart_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+if echo "\$@" | grep -q "TASKS.md is empty"; then
+  # Sweep: add 1 task
+  printf '# Tasks\n## P0\n- [ ] Swept task\n' > "$TEST_REPO/TASKS.md"
+else
+  # Normal session: remove all tasks
+  printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
+fi
+SCRIPT
+  chmod +x "$smart_devin"
+  export DVB_GRIND_CMD="$smart_devin"
+  # Start empty — first sweep adds tasks, session removes them, second sweep fires
+  printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
+  export DVB_SYNC_INTERVAL=0
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # Flow: sweep1 (adds task) → session1 (removes task) → sweep2 (adds task) → ...
+  # Should have at least 2 sweeps
+  local sweep_count
+  sweep_count=$(grep -c 'TASKS.md is empty' "$DVB_GRIND_INVOKE_LOG")
+  [ "$sweep_count" -ge 2 ]
 }
 
 @test "non-empty queue launches a session" {

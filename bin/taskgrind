@@ -688,7 +688,8 @@ while [[ $(date +%s) -lt $deadline ]]; do
   # ── Empty queue handling ──────────────────────────────────────────
   # When the queue is empty, launch a sweep session to audit the repo
   # and populate TASKS.md. If the sweep finds nothing, exit.
-  # Only one sweep per grind — prevents infinite sweep loops.
+  # _sweep_done resets when tasks are shipped, so a grind that clears
+  # all tasks can sweep again for more work.
   if [[ "$tasks_before" -eq 0 ]]; then
     if [[ "$_sweep_done" -eq 1 ]]; then
       echo "   ✓ Queue empty after sweep — exiting."
@@ -773,6 +774,9 @@ while [[ $(date +%s) -lt $deadline ]]; do
 
   # Task completion protocol — the agent MUST close the loop
   prompt+=" COMPLETION PROTOCOL: When you finish a task, you MUST remove its entire block (checkbox + all metadata lines) from TASKS.md and commit. This is how taskgrind tracks progress — if the task line stays in TASKS.md, it counts as zero work done, even if you committed code. If you created a PR, merge it first (use 'gh pr merge --squash' or merge directly). If you committed directly to main, just remove the task. A session that commits code but doesn't remove the task from TASKS.md is a failed session."
+
+  # Autonomy — the agent must not defer to humans
+  prompt+=" AUTONOMY: You are fully autonomous. Never skip a task claiming it requires manual steps, human intervention, or external service access. You have browser automation, MCP tools, CLI access, and can interact with any web service. If a task involves a UI portal, use your browser skills. If it needs an API, call it. If it needs Jira, use MCP. Do not leave tasks saying 'requires manual work' — figure it out and do it."
 
   # Extra focus prompt — user-provided priority for every session
   if [[ -n "$extra_prompt" ]]; then
@@ -979,6 +983,9 @@ while [[ $(date +%s) -lt $deadline ]]; do
     fi
   else
     consecutive_zero_ship=0
+    # Allow another sweep if the queue empties after productive sessions.
+    # Without this, a grind that clears all tasks can never find new work.
+    _sweep_done=0
   fi
 
   # ── Diminishing returns detection ──────────────────────────────────
