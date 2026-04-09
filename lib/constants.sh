@@ -1,12 +1,12 @@
 #!/bin/bash
-# Shared constants for taskgrind and zshrc dvb functions.
-# Single source of truth for Devin session configuration.
+# Shared constants for taskgrind.
+# Single source of truth for AI session configuration.
 # Usage: source "$(cd "$(dirname "$0")/.." && pwd)/lib/constants.sh"
 
-# Variables below are sourced by bin/taskgrind and home/zshrc.
+# Variables below are sourced by bin/taskgrind.
 # shellcheck disable=SC2034  # used by sourcing scripts
 
-# Default AI model — must match ANTHROPIC_MODEL in home/zshrc
+# Default AI model for all backends
 DVB_DEFAULT_MODEL="claude-opus-4-6-thinking"
 
 # Devin CLI binary location — resolved at source-time with fallback chain:

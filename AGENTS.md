@@ -8,14 +8,14 @@ Autonomous multi-session grind tool. Runs sequential AI coding sessions against 
 
 ```
 taskgrind/
-├── bin/taskgrind           Main script (runs Devin sessions in a loop)
-├── lib/constants.sh        Shared constants (model, devin path, caffeinate flags)
+├── bin/taskgrind           Main script (runs AI sessions in a loop)
+├── lib/constants.sh        Shared constants (model, backend path, caffeinate flags)
 ├── lib/fullpower.sh        Priority boosting (taskpolicy for macOS)
-├── tests/taskgrind.bats    Test suite (296 tests)
+├── tests/taskgrind.bats    Test suite (306 tests)
 ├── tests/test_helper.bash  Shared test helpers
 ├── Makefile                lint + test targets
 ├── README.md               Usage, install, env vars
-├── TASKS.md                Task queue
+├── TASKS.md                Task queue (present when tasks exist)
 └── Agentfile.yaml          Agent config (MCP servers, skills)
 ```
 
@@ -23,7 +23,7 @@ taskgrind/
 
 ```bash
 make lint       # shellcheck (run from bin/ with -x for source resolution)
-make test       # bats test suite (294 tests)
+make test       # bats test suite (306 tests)
 make check      # lint + test (run before committing)
 ```
 
@@ -34,14 +34,14 @@ make check      # lint + test (run before committing)
 3. **Keep env vars prefixed `DVB_`** — backward compat with dotfiles; don't rename to `TG_`
 4. **Source paths are relative** — `$TASKGRIND_DIR/lib/constants.sh`, derived from script location
 5. **Test with `DVB_GRIND_CMD`** — all tests use a fake devin stub, never the real binary
-6. **One flaky test** — test 106 (network recovery timing) fails intermittently; pre-existing, not a regression
+6. **Timing-sensitive tests** — a handful of network recovery and branch cleanup tests may fail intermittently under load; pre-existing, not a regression
 
 ## Architecture
 
 The script runs a `while` loop until deadline:
 
 ```
-preflight → [session: launch devin -p → wait → count shipped] → cooldown → git sync → repeat
+preflight → [session: launch backend → wait → count shipped] → cooldown → git sync → repeat
 ```
 
 Key subsystems:

@@ -21,7 +21,7 @@ taskgrind                              # 8h grind (default), current dir
 taskgrind 10                           # 10h grind
 taskgrind ~/apps/myrepo 10             # 10h grind in specific repo
 taskgrind --skill fleet-grind 10       # custom skill
-taskgrind --prompt "focus on tests" 8  # focus prompt
+taskgrind --prompt "focus on test coverage" 8  # focus prompt
 taskgrind --backend claude-code 8       # use Claude Code backend
 taskgrind --dry-run 8 ~/apps/myrepo    # print config without running
 taskgrind --preflight ~/apps/myrepo    # run health checks only
@@ -69,7 +69,7 @@ Completed tasks are removed (not checked off). History lives in git log. See the
 - **Network resilience** — pauses on network loss, extends deadline on recovery
 - **Stall detection** — bails after consecutive zero-ship sessions (configurable via `DVB_MAX_ZERO_SHIP`)
 - **Per-task retry cap** — skips tasks attempted 3+ times without shipping
-- **Fast-failure backoff** — exponential backoff when sessions crash quickly
+- **Fast-failure backoff** — linear backoff with cap when sessions crash quickly
 - **Ship-rate tracking** — logs cumulative effectiveness in `grind_done` summary
 - **Productive timeout warning** — detects when timeout kills sessions that were shipping
 - **Unique log names** — includes repo basename + PID to prevent collisions
@@ -93,6 +93,8 @@ Completed tasks are removed (not checked off). History lives in git log. See the
 | `DVB_BACKOFF_MAX` | `120` | Cap for fast-failure backoff in seconds |
 | `DVB_NET_WAIT` | `30` | Network polling interval in seconds |
 | `DVB_NET_MAX_WAIT` | `14400` | Max time to wait for network recovery (4h) |
+| `DVB_NET_RETRIES` | `3` | Network check retry attempts before declaring down |
+| `DVB_NET_RETRY_DELAY` | `2` | Seconds between network check retries |
 | `DVB_GIT_SYNC_TIMEOUT` | `30` | Max seconds for between-session git sync |
 | `DVB_SYNC_INTERVAL` | `5` | Git sync every N sessions (0=every) |
 | `DVB_EARLY_EXIT_ON_STALL` | `0` | Exit on low throughput (1=enabled) |
@@ -114,7 +116,7 @@ Each session logs: start time, remaining minutes, task count, exit code, duratio
 
 ```bash
 make lint       # shellcheck
-make test       # bats test suite (296 tests)
+make test       # bats test suite (306 tests)
 make check      # lint + test
 ```
 

@@ -33,6 +33,8 @@
 #        DVB_BACKOFF_MAX — cap for fast-failure backoff (default: 120)
 #        DVB_NET_WAIT   — network polling interval in seconds (default: 30)
 #        DVB_NET_MAX_WAIT — max time to wait for network in seconds (default: 14400)
+#        DVB_NET_RETRIES — network check retry attempts before declaring down (default: 3)
+#        DVB_NET_RETRY_DELAY — seconds between network check retries (default: 2)
 #        DVB_MIN_SESSION — fast-failure threshold in seconds (default: 30)
 #        DVB_DEVIN_PATH — override devin binary path (default: auto-detect from PATH)
 #        DVB_GIT_SYNC_TIMEOUT — max seconds for between-session git sync (default: 30)
@@ -150,6 +152,38 @@ if ! [[ "$max_zero_ship" =~ ^[0-9]+$ ]]; then
 fi
 if ! [[ "$sync_interval" =~ ^[0-9]+$ ]]; then
   echo "Error: DVB_SYNC_INTERVAL must be numeric, got '$sync_interval'" >&2; exit 1
+fi
+# Validate optional numeric env vars — these are used in arithmetic/sleep mid-loop
+# and would crash with set -euo pipefail if non-numeric.
+if [[ -n "${DVB_SHUTDOWN_GRACE:-}" ]] && ! [[ "${DVB_SHUTDOWN_GRACE}" =~ ^[0-9]+$ ]]; then
+  echo "Error: DVB_SHUTDOWN_GRACE must be numeric, got '${DVB_SHUTDOWN_GRACE}'" >&2; exit 1
+fi
+if [[ -n "${DVB_MIN_SESSION:-}" ]] && ! [[ "${DVB_MIN_SESSION}" =~ ^[0-9]+$ ]]; then
+  echo "Error: DVB_MIN_SESSION must be numeric, got '${DVB_MIN_SESSION}'" >&2; exit 1
+fi
+if [[ -n "${DVB_NET_WAIT:-}" ]] && ! [[ "${DVB_NET_WAIT}" =~ ^[0-9]+$ ]]; then
+  echo "Error: DVB_NET_WAIT must be numeric, got '${DVB_NET_WAIT}'" >&2; exit 1
+fi
+if [[ -n "${DVB_NET_MAX_WAIT:-}" ]] && ! [[ "${DVB_NET_MAX_WAIT}" =~ ^[0-9]+$ ]]; then
+  echo "Error: DVB_NET_MAX_WAIT must be numeric, got '${DVB_NET_MAX_WAIT}'" >&2; exit 1
+fi
+if [[ -n "${DVB_NET_RETRIES:-}" ]] && ! [[ "${DVB_NET_RETRIES}" =~ ^[0-9]+$ ]]; then
+  echo "Error: DVB_NET_RETRIES must be numeric, got '${DVB_NET_RETRIES}'" >&2; exit 1
+fi
+if [[ -n "${DVB_NET_RETRY_DELAY:-}" ]] && ! [[ "${DVB_NET_RETRY_DELAY}" =~ ^[0-9]+$ ]]; then
+  echo "Error: DVB_NET_RETRY_DELAY must be numeric, got '${DVB_NET_RETRY_DELAY}'" >&2; exit 1
+fi
+if [[ -n "${DVB_BACKOFF_BASE:-}" ]] && ! [[ "${DVB_BACKOFF_BASE}" =~ ^[0-9]+$ ]]; then
+  echo "Error: DVB_BACKOFF_BASE must be numeric, got '${DVB_BACKOFF_BASE}'" >&2; exit 1
+fi
+if [[ -n "${DVB_BACKOFF_MAX:-}" ]] && ! [[ "${DVB_BACKOFF_MAX}" =~ ^[0-9]+$ ]]; then
+  echo "Error: DVB_BACKOFF_MAX must be numeric, got '${DVB_BACKOFF_MAX}'" >&2; exit 1
+fi
+if [[ -n "${DVB_GIT_SYNC_TIMEOUT:-}" ]] && ! [[ "${DVB_GIT_SYNC_TIMEOUT}" =~ ^[0-9]+$ ]]; then
+  echo "Error: DVB_GIT_SYNC_TIMEOUT must be numeric, got '${DVB_GIT_SYNC_TIMEOUT}'" >&2; exit 1
+fi
+if [[ -n "${DVB_DEADLINE:-}" ]] && ! [[ "${DVB_DEADLINE}" =~ ^[0-9]+$ ]]; then
+  echo "Error: DVB_DEADLINE must be a Unix epoch integer, got '${DVB_DEADLINE}'" >&2; exit 1
 fi
 
 # Validate backend
@@ -410,9 +444,15 @@ if [[ -z "${DVB_GRIND_CMD:-}" ]]; then
 
   # Clean up orphaned temp files from previous runs (older than 1 day).
   # Only runs in production mode (test mode skips locking entirely).
-  fd --no-ignore --changed-before 1d \
-    'taskgrind-(exec\.|.*\.(session\.out|git-sync))' "$_dvb_tmp" \
-    --exec rm -f {} 2>/dev/null || true
+  if command -v fd >/dev/null 2>&1; then
+    fd --no-ignore --changed-before 1d \
+      'taskgrind-(exec\.|lock-|.*\.(session\.out|git-sync|task-attempts))' "$_dvb_tmp" \
+      --exec rm -f {} 2>/dev/null || true
+  else
+    find "$_dvb_tmp" -maxdepth 1 -name 'taskgrind-exec.*' -mtime +1 -delete 2>/dev/null || true
+    find "$_dvb_tmp" -maxdepth 1 -name 'taskgrind-lock-*' -mtime +1 -delete 2>/dev/null || true
+    find "$_dvb_tmp" -maxdepth 1 \( -name '*.session.out' -o -name '*.git-sync' -o -name '*.task-attempts*' \) -mtime +1 -delete 2>/dev/null || true
+  fi
 fi
 
 # --dry-run: print config and exit without running sessions
@@ -814,8 +854,8 @@ while [[ $(date +%s) -lt $deadline ]]; do
       log_write "[$(date '+%H:%M')] sweep_empty tasks=0 — exiting"
       break
     fi
-    # Re-enter loop — next iteration will pick up the new tasks
-    session=$((session + 1))
+    # Re-enter loop — next iteration will pick up the new tasks.
+    # session already incremented at top of loop; sweep counts as session $session.
     continue
   fi
 
@@ -1175,7 +1215,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
       | grep -v '^\*' | grep -vx "[[:space:]]*$_default_branch" \
       | xargs -I{} git -C "$repo" branch -d {} 2>/dev/null || true
     log_write "[$(date '+%H:%M')] branch_cleanup done"
-  fi
+    fi  # end: if git remote exists
   else
     log_write "[$(date '+%H:%M')] git_sync skipped (interval=$sync_interval, session=$session)"
   fi # sync_interval

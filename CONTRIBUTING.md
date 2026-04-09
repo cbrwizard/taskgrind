@@ -50,7 +50,7 @@ When adding a new env var:
 
 - Tests live in `tests/taskgrind.bats` with helpers in `tests/test_helper.bash`
 - Each test gets a fresh `$TEST_DIR` via `setup()` — no shared state between tests
-- Use `DVB_DEADLINE` to control loop duration (set a few seconds in the future)
+- Use `DVB_DEADLINE` to control loop duration — set in the past for immediate exit (tests that validate args), or a few seconds ahead to run 1-2 sessions
 - Use `DVB_GRIND_CMD` to point at a stub script (never the real binary)
 - Structural tests (`grep -q` on the script) are fine for verifying code patterns
 

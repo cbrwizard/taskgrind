@@ -1500,6 +1500,76 @@ SCRIPT
   [[ "$output" == *"DVB_MAX_SESSION must be numeric"* ]]
 }
 
+@test "DVB_SHUTDOWN_GRACE=abc exits with must be numeric error" {
+  export DVB_SHUTDOWN_GRACE=abc
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"DVB_SHUTDOWN_GRACE must be numeric"* ]]
+}
+
+@test "DVB_MIN_SESSION=abc exits with must be numeric error" {
+  export DVB_MIN_SESSION=abc
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"DVB_MIN_SESSION must be numeric"* ]]
+}
+
+@test "DVB_NET_WAIT=abc exits with must be numeric error" {
+  export DVB_NET_WAIT=abc
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"DVB_NET_WAIT must be numeric"* ]]
+}
+
+@test "DVB_NET_MAX_WAIT=abc exits with must be numeric error" {
+  export DVB_NET_MAX_WAIT=abc
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"DVB_NET_MAX_WAIT must be numeric"* ]]
+}
+
+@test "DVB_NET_RETRIES=abc exits with must be numeric error" {
+  export DVB_NET_RETRIES=abc
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"DVB_NET_RETRIES must be numeric"* ]]
+}
+
+@test "DVB_NET_RETRY_DELAY=abc exits with must be numeric error" {
+  export DVB_NET_RETRY_DELAY=abc
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"DVB_NET_RETRY_DELAY must be numeric"* ]]
+}
+
+@test "DVB_BACKOFF_BASE=abc exits with must be numeric error" {
+  export DVB_BACKOFF_BASE=abc
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"DVB_BACKOFF_BASE must be numeric"* ]]
+}
+
+@test "DVB_BACKOFF_MAX=abc exits with must be numeric error" {
+  export DVB_BACKOFF_MAX=abc
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"DVB_BACKOFF_MAX must be numeric"* ]]
+}
+
+@test "DVB_GIT_SYNC_TIMEOUT=abc exits with must be numeric error" {
+  export DVB_GIT_SYNC_TIMEOUT=abc
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"DVB_GIT_SYNC_TIMEOUT must be numeric"* ]]
+}
+
+@test "DVB_DEADLINE=abc exits with must be epoch error" {
+  export DVB_DEADLINE=abc
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"DVB_DEADLINE must be a Unix epoch integer"* ]]
+}
+
 @test "numeric directory name treated as repo path not hours" {
   local num_dir="$TEST_DIR/42"
   mkdir -p "$num_dir"
@@ -2321,13 +2391,13 @@ SCRIPT
 # ── Devin binary PATH fallback ────────────────────────────────────────
 
 @test "devin path resolution checks PATH before default" {
-  # Structural: dvb-constants.sh has command -v devin fallback
+  # Structural: lib/constants.sh has command -v devin fallback
   local constants="$BATS_TEST_DIRNAME/../lib/constants.sh"
   grep -q 'command -v devin' "$constants"
 }
 
 @test "DVB_DEVIN_PATH env override is respected" {
-  # Structural: dvb-constants.sh checks DVB_DEVIN_PATH first
+  # Structural: lib/constants.sh checks DVB_DEVIN_PATH first
   local constants="$BATS_TEST_DIRNAME/../lib/constants.sh"
   grep -q 'DVB_DEVIN_PATH:-' "$constants" || grep -q 'DVB_DEVIN_PATH' "$constants"
 }
