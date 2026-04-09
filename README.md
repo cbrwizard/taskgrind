@@ -57,15 +57,22 @@ Completed tasks are removed (not checked off). History lives in git log. See the
 
 ## Features
 
-- **Empty-queue exit** — exits immediately when `TASKS.md` has no tasks
+- **Multi-backend support** — works with Devin, Claude Code, and Codex via `--backend`
+- **Preflight checks** — 7 health checks (binary, network, git state, remote, disk, TASKS.md, permissions) before launch
+- **Self-copy protection** — copies itself to `$TMPDIR` before running, survives script edits mid-grind
+- **Per-repo locking** — `lockf` prevents duplicate grinds on the same repo
+- **Caffeinate integration** — prevents system sleep for the duration of the grind
+- **Git sync with stash/rebase** — between-session sync stashes dirty work, rebases on default branch, cleans merged branches
+- **Empty-queue sweep** — when `TASKS.md` is empty, launches a sweep session to find work before exiting
 - **Network resilience** — pauses on network loss, extends deadline on recovery
-- **Stall detection** — bails after 3 consecutive zero-ship sessions (configurable)
+- **Stall detection** — bails after consecutive zero-ship sessions (configurable via `DVB_MAX_ZERO_SHIP`)
 - **Per-task retry cap** — skips tasks attempted 3+ times without shipping
-- **Diminishing returns** — warns when throughput drops below threshold
+- **Fast-failure backoff** — exponential backoff when sessions crash quickly
 - **Ship-rate tracking** — logs cumulative effectiveness in `grind_done` summary
 - **Productive timeout warning** — detects when timeout kills sessions that were shipping
 - **Unique log names** — includes repo basename + PID to prevent collisions
 - **External injection detection** — logs when other processes add tasks mid-run
+- **Graceful shutdown** — SIGINT/SIGTERM waits for running session, pushes commits, then exits
 
 ## Environment Variables
 

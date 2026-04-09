@@ -34,13 +34,6 @@
   **Files**: CONTRIBUTING.md
   **Acceptance**: New contributor can run tests and submit a PR by following CONTRIBUTING.md
 
-- [ ] README missing features: preflight, self-copy, locking, caffeinate
-  **ID**: readme-missing-features
-  **Tags**: docs
-  **Details**: README Features section lists 9 features. Missing from the list: preflight checks (7 health checks before launch), per-repo locking (lockf prevents duplicate grinds), self-copy protection (survives script edits mid-grind), caffeinate integration (prevents sleep), git sync with stash/rebase/branch-cleanup. Add 1-line bullets for each.
-  **Files**: README.md
-  **Acceptance**: All major features visible in README Features section
-
 ## P3
 
 - [ ] Add GitHub Actions CI
