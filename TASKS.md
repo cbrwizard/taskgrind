@@ -48,13 +48,6 @@
   **Files**: README.md
   **Acceptance**: All major features visible in README Features section
 
-- [ ] Support multiple agent backends (not just Devin)
-  **ID**: multi-backend-support
-  **Tags**: feature, architecture
-  **Details**: Taskgrind hardcodes `devin` as the session runner (`"${devin_cmd[@]}" --model "$model" --permission-mode dangerous -p "$prompt"`). Should support other backends: Claude Code (`claude -p "$prompt"`), Cursor (background agent), Codex (`codex -q "$prompt"`). Add `DVB_BACKEND` env var (default: `devin`). Each backend needs: launch command template, timeout behavior, output capture method.
-  **Files**: bin/taskgrind
-  **Acceptance**: `DVB_BACKEND=claude-code taskgrind 1` launches Claude Code sessions; default behavior unchanged
-
 ## P3
 
 - [ ] Add GitHub Actions CI

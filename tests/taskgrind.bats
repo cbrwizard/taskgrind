@@ -2484,11 +2484,11 @@ SCRIPT
   export _DVB_SELF_COPY="/dev/null"
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -ne 0 ]
-  [[ "$output" == *"devin binary not found"* ]]
+  [[ "$output" == *"binary not found"* ]]
 }
 
 @test "devin binary validation uses -x check (executable)" {
-  grep -q '\-x "$real_devin"' "$DVB_GRIND"
+  grep -q '\-x "$_backend_binary"' "$DVB_GRIND"
 }
 
 # ── Network watchdog fallback ──────────────────────────────────────────
@@ -2550,7 +2550,7 @@ _preflight_git_init() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"taskgrind --preflight"* ]]
   [[ "$output" == *"Preflight checks for:"* ]]
-  [[ "$output" == *"Devin binary"* ]]
+  [[ "$output" == *"Backend binary"* ]]
 }
 
 @test "--preflight shows config header" {
@@ -2676,7 +2676,7 @@ EOF
 
 @test "preflight has all 7 checks" {
   # Structural: verify all 7 check categories exist
-  grep -q 'Devin binary' "$DVB_GRIND"
+  grep -q 'Backend binary' "$DVB_GRIND"
   grep -q 'Network connectivity' "$DVB_GRIND"
   grep -q 'Git state clean' "$DVB_GRIND"
   grep -q 'Git remote reachable' "$DVB_GRIND"
@@ -2774,4 +2774,123 @@ EOF
   run "$DVB_GRIND" --dry-run --prompt "test coverage" 8 "$TEST_REPO"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Pick tasks from TASKS.md that relate to this focus"* ]]
+}
+
+# ── Multi-backend support ─────────────────────────────────────────────
+
+@test "default backend is devin" {
+  export DVB_DEADLINE=$(( $(date +%s) + 2 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [[ "$output" == *"backend=devin"* ]]
+}
+
+@test "--backend flag sets backend" {
+  run "$DVB_GRIND" --dry-run --backend claude-code 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"backend:  claude-code"* ]]
+}
+
+@test "--backend=codex equals syntax works" {
+  run "$DVB_GRIND" --dry-run --backend=codex 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"backend:  codex"* ]]
+}
+
+@test "DVB_BACKEND env sets backend" {
+  export DVB_BACKEND=claude-code
+  run "$DVB_GRIND" --dry-run 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"backend:  claude-code"* ]]
+}
+
+@test "--backend flag overrides DVB_BACKEND env" {
+  export DVB_BACKEND=codex
+  run "$DVB_GRIND" --dry-run --backend claude-code 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"backend:  claude-code"* ]]
+}
+
+@test "unknown backend exits with error" {
+  run "$DVB_GRIND" --dry-run --backend unknown-backend 1 "$TEST_REPO"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unknown backend"* ]]
+  [[ "$output" == *"Supported: devin, claude-code, codex"* ]]
+}
+
+@test "--backend without value exits with clear error" {
+  run "$DVB_GRIND" --backend
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"--backend requires a name"* ]]
+}
+
+@test "backend shows in startup banner" {
+  export DVB_DEADLINE=$(( $(date +%s) + 2 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [[ "$output" == *"backend=devin"* ]]
+}
+
+@test "backend shows in log file header" {
+  export DVB_DEADLINE=$(( $(date +%s) + 2 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  grep -q 'backend=devin' "$TEST_LOG"
+}
+
+@test "--preflight shows backend in config header" {
+  _preflight_git_init
+  echo "# Tasks" > "$TEST_REPO/TASKS.md"
+  run "$DVB_GRIND" --preflight "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"backend:  devin"* ]]
+}
+
+@test "--dry-run shows backend in config" {
+  run "$DVB_GRIND" --dry-run --backend codex 8 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"backend:  codex"* ]]
+}
+
+@test "build_session_args produces --permission-mode dangerous for devin backend" {
+  grep -q "permission-mode dangerous" "$DVB_GRIND"
+}
+
+@test "build_session_args produces --dangerously-skip-permissions for claude-code backend" {
+  grep -q "dangerously-skip-permissions" "$DVB_GRIND"
+}
+
+@test "build_session_args produces -q for codex backend" {
+  # codex backend uses -q for quiet/non-interactive mode
+  grep -q '"-q"' "$DVB_GRIND" || grep -q "\\-q" "$DVB_GRIND"
+}
+
+@test "devin backend invokes with --permission-mode dangerous" {
+  export DVB_DEADLINE=$(( $(date +%s) + 2 ))
+  run "$DVB_GRIND" --backend devin 1 "$TEST_REPO"
+  [ -f "$DVB_GRIND_INVOKE_LOG" ] && grep -q -- '--permission-mode dangerous' "$DVB_GRIND_INVOKE_LOG"
+}
+
+@test "claude-code backend invokes with --dangerously-skip-permissions" {
+  export DVB_DEADLINE=$(( $(date +%s) + 2 ))
+  run "$DVB_GRIND" --backend claude-code 1 "$TEST_REPO"
+  [ -f "$DVB_GRIND_INVOKE_LOG" ] && grep -q -- '--dangerously-skip-permissions' "$DVB_GRIND_INVOKE_LOG"
+}
+
+@test "codex backend invokes with -q flag" {
+  export DVB_DEADLINE=$(( $(date +%s) + 2 ))
+  run "$DVB_GRIND" --backend codex 1 "$TEST_REPO"
+  [ -f "$DVB_GRIND_INVOKE_LOG" ] && grep -q -- '-q' "$DVB_GRIND_INVOKE_LOG"
+}
+
+@test "resolve_backend_binary function exists" {
+  grep -q 'resolve_backend_binary()' "$DVB_GRIND"
+}
+
+@test "build_session_args function exists" {
+  grep -q 'build_session_args()' "$DVB_GRIND"
+}
+
+@test "DVB_BACKEND=abc exits with unknown backend error" {
+  export DVB_BACKEND=abc
+  run "$DVB_GRIND" --dry-run 1 "$TEST_REPO"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unknown backend"* ]]
 }

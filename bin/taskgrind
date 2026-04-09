@@ -1,5 +1,5 @@
 #!/bin/bash
-# Autonomous multi-session grind — runs sequential Devin sessions until deadline.
+# Autonomous multi-session grind — runs sequential AI coding sessions until deadline.
 # Each session starts with full context. State lives in TASKS.md + git, so the
 # next session picks up seamlessly. Sessions should exit BEFORE context fills —
 # context exhaustion crashes the process and loses any uncommitted work.
@@ -9,14 +9,17 @@
 #        taskgrind ~/apps/myrepo 10            → 10h grind in specific repo
 #        taskgrind --skill fleet-grind 10      → 10h fleet-grind
 #        taskgrind ~/apps/bosun --skill fleet-grind 10
+#        taskgrind --backend claude-code 8     → 8h grind with Claude Code
 #        taskgrind --prompt "focus on test coverage" 8
 #        taskgrind --dry-run 8 ~/apps/myrepo  → print config without running
 #        taskgrind --preflight ~/apps/myrepo  → run health checks only
 #        DVB_MODEL=sonnet taskgrind 8          → 8h grind, sonnet model
+#        DVB_BACKEND=codex taskgrind 8         → 8h grind with Codex
 #
 #        Args can appear in any order. Hours is any bare integer (1-24).
 #
-# Env:   DVB_MODEL      — Devin model (default: claude-opus-4-6-thinking)
+# Env:   DVB_BACKEND    — AI backend: devin, claude-code, codex (default: devin)
+#        DVB_MODEL      — AI model (default: claude-opus-4-6-thinking)
 #        DVB_COOL       — seconds between sessions (default: 5)
 #        DVB_SKILL      — skill to run (default: next-task)
 #        DVB_PROMPT     — extra focus prompt prepended to every session
@@ -78,11 +81,12 @@ source "$TASKGRIND_DIR/lib/constants.sh"
 # Save original args before parsing — caffeinate re-exec needs them intact
 _orig_args=("$@")
 
-# Parse all args in any order: hours (integer), --skill NAME, --prompt TEXT, --dry-run, --preflight, repo path
+# Parse all args in any order: hours (integer), --skill NAME, --backend NAME, --prompt TEXT, --dry-run, --preflight, repo path
 hours="8"
 repo="."
 skill="${DVB_SKILL:-next-task}"
 extra_prompt="${DVB_PROMPT:-}"
+_cli_backend=""
 dry_run=0
 preflight_only=0
 while [[ $# -gt 0 ]]; do
@@ -95,6 +99,13 @@ while [[ $# -gt 0 ]]; do
         echo "Error: --skill requires a name" >&2; exit 1
       fi
       skill="$2"; shift 2
+      ;;
+    --backend=*) _cli_backend="${1#--backend=}"; shift ;;
+    --backend)
+      if [[ $# -lt 2 ]]; then
+        echo "Error: --backend requires a name (devin, claude-code, codex)" >&2; exit 1
+      fi
+      _cli_backend="$2"; shift 2
       ;;
     --prompt=*) extra_prompt="${1#--prompt=}"; shift ;;
     --prompt)
@@ -114,6 +125,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 model="${DVB_MODEL:-$DVB_DEFAULT_MODEL}"
+backend="${_cli_backend:-${DVB_BACKEND:-devin}}"
 cooldown="${DVB_COOL:-5}"
 max_hours=24
 max_fast="${DVB_MAX_FAST:-5}"
@@ -137,6 +149,12 @@ fi
 if ! [[ "$sync_interval" =~ ^[0-9]+$ ]]; then
   echo "Error: DVB_SYNC_INTERVAL must be numeric, got '$sync_interval'" >&2; exit 1
 fi
+
+# Validate backend
+case "$backend" in
+  devin|claude-code|codex) ;;
+  *) echo "Error: unknown backend '$backend'. Supported: devin, claude-code, codex" >&2; exit 1 ;;
+esac
 
 # Validate hours is a positive integer within range
 if ! [[ "$hours" =~ ^[0-9]+$ ]] || [[ "$hours" -eq 0 ]]; then
@@ -185,6 +203,37 @@ check_network() {
   return 1
 }
 
+# ── Backend session args builder ──────────────────────────────────────
+# Builds the CLI argument array for the configured backend.
+# Sets the global _session_args array.
+# Usage: build_session_args "$prompt"; "${devin_cmd[@]}" "${_session_args[@]}"
+_session_args=()
+build_session_args() {
+  local prompt="$1"
+  case "$backend" in
+    devin)
+      _session_args=(--model "$model" --permission-mode dangerous -p "$prompt")
+      ;;
+    claude-code)
+      _session_args=(--model "$model" --dangerously-skip-permissions -p "$prompt")
+      ;;
+    codex)
+      _session_args=(--model "$model" -q "$prompt")
+      ;;
+  esac
+}
+
+# Resolve the backend binary path for the configured backend.
+# Returns the path in _backend_binary. Used by preflight and binary resolution.
+_backend_binary=""
+resolve_backend_binary() {
+  case "$backend" in
+    devin) _backend_binary="$DVB_DEVIN_PATH" ;;
+    claude-code) _backend_binary=$(command -v claude 2>/dev/null || echo "") ;;
+    codex) _backend_binary=$(command -v codex 2>/dev/null || echo "") ;;
+  esac
+}
+
 # ── Preflight health checks ──────────────────────────────────────────
 # Validates the runtime environment before entering the main loop.
 # Returns 0 if all checks pass (or only warns), 1 if any check fails.
@@ -201,14 +250,17 @@ preflight_check() {
   echo "Preflight checks for: $repo"
   echo ""
 
-  # 1. Devin binary — required to run sessions
+  # 1. Backend binary — required to run sessions
   if [[ -n "${DVB_GRIND_CMD:-}" ]]; then
-    # Test mode — skip devin binary check
-    preflight_pass "Devin binary (test mode: DVB_GRIND_CMD set)"
-  elif [[ -x "$DVB_DEVIN_PATH" ]]; then
-    preflight_pass "Devin binary: $DVB_DEVIN_PATH"
+    # Test mode — skip binary check
+    preflight_pass "Backend binary (test mode: DVB_GRIND_CMD set)"
   else
-    preflight_fail "Devin binary not found: $DVB_DEVIN_PATH"
+    resolve_backend_binary
+    if [[ -x "$_backend_binary" ]]; then
+      preflight_pass "Backend binary ($backend): $_backend_binary"
+    else
+      preflight_fail "Backend binary not found ($backend): ${_backend_binary:-not in PATH}"
+    fi
   fi
 
   # 2. Network connectivity — required for API calls
@@ -321,6 +373,7 @@ preflight_check() {
 if [[ "$preflight_only" -eq 1 ]]; then
   echo "taskgrind --preflight"
   echo "  repo:     $repo"
+  echo "  backend:  $backend"
   echo "  skill:    $skill"
   echo "  model:    $model"
   if [[ -n "$extra_prompt" ]]; then
@@ -365,6 +418,7 @@ if [[ "$dry_run" -eq 1 ]]; then
   echo "taskgrind --dry-run"
   echo "  hours:    $hours"
   echo "  repo:     $repo"
+  echo "  backend:  $backend"
   echo "  skill:    $skill"
   echo "  model:    $model"
   echo "  cooldown: ${cooldown}s"
@@ -422,16 +476,16 @@ format_duration() { dvb_format_duration "$@"; }
 # Every line is PID-prefixed for defense-in-depth against interleaving.
 log_write() { echo "[pid=$$] $*" >> "$log_file" 2>/dev/null || true; }
 
-# Resolve the devin command — injectable for testing
+# Resolve the session runner command — injectable for testing
 if [[ -n "${DVB_GRIND_CMD:-}" ]]; then
   devin_cmd=("$DVB_GRIND_CMD")
 else
-  real_devin="$DVB_DEVIN_PATH"
-  if [[ ! -x "$real_devin" ]]; then
-    echo "Error: devin binary not found: $real_devin" >&2
+  resolve_backend_binary
+  if [[ ! -x "$_backend_binary" ]]; then
+    echo "Error: $backend binary not found: ${_backend_binary:-not in PATH}" >&2
     exit 1
   fi
-  devin_cmd=("$real_devin")
+  devin_cmd=("$_backend_binary")
 fi
 
 # Prevent sleep for the entire grind loop, not just individual sessions.
@@ -574,7 +628,7 @@ trap 'graceful_shutdown 130' INT
 trap 'graceful_shutdown 143' TERM
 trap 'final_sync; cleanup' EXIT
 
-echo "☕ taskgrind: ${hours}h (until ${end_time}) — skill=$skill, model=$model, repo=$repo"
+echo "☕ taskgrind: ${hours}h (until ${end_time}) — backend=$backend, skill=$skill, model=$model, repo=$repo"
 echo "   Each session runs $skill. Git sync every ${sync_interval} sessions."
 if [[ -n "$extra_prompt" ]]; then
   echo "   Focus: $extra_prompt"
@@ -588,7 +642,7 @@ chmod 600 "$log_file"
 
 {
   echo "# taskgrind started $(date '+%Y-%m-%d %H:%M')"
-  echo -n "# hours=$hours skill=$skill model=$model repo=$repo"
+  echo -n "# hours=$hours backend=$backend skill=$skill model=$model repo=$repo"
   if [[ -n "$extra_prompt" ]]; then
     echo -n " prompt=$extra_prompt"
   fi
@@ -713,18 +767,13 @@ while [[ $(date +%s) -lt $deadline ]]; do
 
     session_start=$(date +%s)
     session_exit=0
+    build_session_args "$sweep_prompt"
     if [[ -n "${DVB_GRIND_CMD:-}" ]]; then
       script -q "$session_output" \
-        "${devin_cmd[@]}" \
-        --model "$model" \
-        --permission-mode dangerous \
-        -p "$sweep_prompt" \
+        "${devin_cmd[@]}" "${_session_args[@]}" \
         || session_exit=$?
     else
-      "${devin_cmd[@]}" \
-        --model "$model" \
-        --permission-mode dangerous \
-        -p "$sweep_prompt" \
+      "${devin_cmd[@]}" "${_session_args[@]}" \
         > >(tee -a "$session_output") \
         2>> "$log_file" &
       _dvb_pid=$!
@@ -810,24 +859,19 @@ while [[ $(date +%s) -lt $deadline ]]; do
 
   session_start=$(date +%s)
   session_exit=0
+  build_session_args "$prompt"
   if [[ -n "${DVB_GRIND_CMD:-}" ]]; then
     # Test mode: foreground with script(1) for output capture
     script -q "$session_output" \
-      "${devin_cmd[@]}" \
-      --model "$model" \
-      --permission-mode dangerous \
-      -p "$prompt" \
+      "${devin_cmd[@]}" "${_session_args[@]}" \
       || session_exit=$?
   else
     # Production: background with timeout watchdog as safety valve.
-    # Devin -p exits on its own, but the timeout catches infinite tool
+    # The backend's -p exits on its own, but the timeout catches infinite tool
     # loops or API outages. Uses sleep &; wait so SIGTERM interrupts
     # the watchdog immediately (no orphaned sleep processes).
     # Capture stdout to session_output for post-mortem diagnostics.
-    "${devin_cmd[@]}" \
-      --model "$model" \
-      --permission-mode dangerous \
-      -p "$prompt" \
+    "${devin_cmd[@]}" "${_session_args[@]}" \
       > >(tee -a "$session_output") \
       2>> "$log_file" &
     _dvb_pid=$!

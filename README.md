@@ -22,6 +22,7 @@ taskgrind 10                           # 10h grind
 taskgrind ~/apps/myrepo 10             # 10h grind in specific repo
 taskgrind --skill fleet-grind 10       # custom skill
 taskgrind --prompt "focus on tests" 8  # focus prompt
+taskgrind --backend claude-code 8       # use Claude Code backend
 taskgrind --dry-run 8 ~/apps/myrepo    # print config without running
 taskgrind --preflight ~/apps/myrepo    # run health checks only
 ```
@@ -30,7 +31,7 @@ Arguments can appear in any order. Hours is any bare integer 1-24.
 
 ## How It Works
 
-1. Launches a Devin session with the `next-task` skill (configurable via `--skill`)
+1. Launches an AI session with the `next-task` skill (configurable via `--skill`, backend via `--backend`)
 2. Session picks a task from `TASKS.md`, implements it, commits, and exits
 3. Between sessions: cooldown, optional git sync (every N sessions)
 4. Exits when: queue empty, deadline reached, or stall detected
@@ -70,6 +71,7 @@ Completed tasks are removed (not checked off). History lives in git log. See the
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `DVB_BACKEND` | `devin` | AI backend: `devin`, `claude-code`, `codex` |
 | `DVB_MODEL` | `claude-opus-4-6-thinking` | AI model |
 | `DVB_SKILL` | `next-task` | Skill to run each session |
 | `DVB_PROMPT` | (none) | Focus prompt for every session |
@@ -102,7 +104,7 @@ Each session logs: start time, remaining minutes, task count, exit code, duratio
 
 ```bash
 make lint       # shellcheck
-make test       # bats test suite (260 tests)
+make test       # bats test suite (291 tests)
 make check      # lint + test
 ```
 
