@@ -938,6 +938,17 @@ while [[ $(date +%s) -lt $deadline ]]; do
     session_elapsed=$(( $(date +%s) - session_start ))
     log_write "[$(date '+%H:%M')] sweep_done exit=$session_exit elapsed=${session_elapsed}s"
 
+    # Fast-failure recovery for sweep sessions — same logic as regular sessions.
+    # Without this, a network drop during sweep permanently ends the marathon.
+    if [[ $min_session_secs -gt 0 && $session_elapsed -lt $min_session_secs ]]; then
+      if ! check_network; then
+        wait_for_network || break
+        _sweep_done=0  # allow retry — network caused the failure, not an empty repo
+        session=$((session - 1))
+        continue
+      fi
+    fi
+
     tasks_found=$(count_tasks "$repo/TASKS.md")
     if [[ "$tasks_found" -gt 0 ]]; then
       echo "   ✓ Sweep found $tasks_found tasks — continuing grind."

@@ -691,6 +691,20 @@ SCRIPT
   [ "$sweep_count" -ge 2 ]
 }
 
+@test "sweep session checks network on fast failure" {
+  # Empty queue triggers sweep. Sweep crashes fast (no network file).
+  # Network check should fire and pause the marathon.
+  printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
+  export DVB_MIN_SESSION=999  # every session is "fast" failure
+  export DVB_NET_FILE="$TEST_DIR/net-up"
+  # Network is down (no sentinel file) — should log network_down
+  export DVB_DEADLINE=$(( $(date +%s) + 3 ))
+  export DVB_NET_MAX_WAIT=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  # Should have detected network down during sweep recovery
+  grep -q 'network_down\|network_timeout' "$TEST_LOG"
+}
+
 @test "non-empty queue launches a session" {
   cat > "$TEST_REPO/TASKS.md" <<'TASKS'
 # Tasks
