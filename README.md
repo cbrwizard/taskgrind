@@ -22,6 +22,14 @@ Taskgrind defaults to Devin. Use `--backend claude-code` or `--backend codex` to
 
 ## Install
 
+### Homebrew (macOS / Linux)
+
+```bash
+brew install cbrwizard/tap/taskgrind
+```
+
+### Manual
+
 ```bash
 # One-liner
 curl -fsSL https://raw.githubusercontent.com/cbrwizard/taskgrind/main/install.sh | sh
@@ -36,7 +44,7 @@ TASKGRIND_INSTALL_DIR=~/tools/taskgrind sh -c "$(curl -fsSL https://raw.githubus
 export PATH="$HOME/apps/taskgrind/bin:$PATH"
 ```
 
-To update: `cd ~/apps/taskgrind && git pull`
+To update: `brew upgrade taskgrind` (Homebrew) or `cd ~/apps/taskgrind && git pull` (manual)
 
 ## Usage
 
@@ -167,7 +175,7 @@ The file is re-read before each session. Combined with `--prompt` if both are se
 ```bash
 make install    # symlink to /usr/local/bin + install man page
 make lint       # shellcheck
-make test       # bats test suite (376 tests)
+make test       # bats test suite (384 tests)
 make check      # lint + test
 make uninstall  # remove symlink and man page
 ```
