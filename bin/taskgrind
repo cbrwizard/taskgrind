@@ -1490,17 +1490,32 @@ while [[ $(date +%s) -lt $deadline ]]; do
         elif grep -q 'fetch_failed' "$_git_out" 2>/dev/null; then
           _git_fail=$(grep 'fetch_failed' "$_git_out" 2>/dev/null | head -1 | tr -cd '[:print:]' | head -c 500)
           echo "   ⚠ git sync: $_git_fail"
-          log_write "[$(date '+%H:%M')] git_sync fetch_failed"
+          log_write "[$(date '+%H:%M')] $_git_fail"
         elif grep -q 'checkout_failed' "$_git_out" 2>/dev/null; then
           _git_fail=$(grep 'checkout_failed' "$_git_out" 2>/dev/null | head -1 | tr -cd '[:print:]' | head -c 500)
           echo "   ⚠ git sync: $_git_fail"
-          log_write "[$(date '+%H:%M')] git_sync checkout_failed"
+          log_write "[$(date '+%H:%M')] $_git_fail"
         elif grep -q 'stash_failed' "$_git_out" 2>/dev/null; then
           _git_fail=$(grep 'stash_failed' "$_git_out" 2>/dev/null | head -1 | tr -cd '[:print:]' | head -c 500)
           echo "   ⚠ git sync: $_git_fail"
-          log_write "[$(date '+%H:%M')] git_sync stash_failed"
+          log_write "[$(date '+%H:%M')] $_git_fail"
         elif grep -q 'rebase_aborted' "$_git_out" 2>/dev/null; then
+          if grep -q 'rebase_failed' "$_git_out" 2>/dev/null; then
+            _git_fail=$(awk '
+              /rebase_failed:/ { capture=1 }
+              capture { print }
+            ' "$_git_out" 2>/dev/null | tr -cd '[:print:]\n' | tr '\n' ' ' | head -c 500)
+            echo "   ⚠ git sync: $_git_fail"
+            log_write "[$(date '+%H:%M')] $_git_fail"
+          fi
           log_write "[$(date '+%H:%M')] git_sync rebase_aborted"
+        elif grep -q 'rebase_failed' "$_git_out" 2>/dev/null; then
+          _git_fail=$(awk '
+            /rebase_failed:/ { capture=1 }
+            capture { print }
+          ' "$_git_out" 2>/dev/null | tr -cd '[:print:]\n' | tr '\n' ' ' | head -c 500)
+          echo "   ⚠ git sync: $_git_fail"
+          log_write "[$(date '+%H:%M')] $_git_fail"
         elif grep -q 'git_sync stashed' "$_git_out" 2>/dev/null; then
           log_write "[$(date '+%H:%M')] git_sync ok (stashed dirty tree)"
         else

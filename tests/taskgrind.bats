@@ -2995,7 +2995,40 @@ SCRIPT
   export DVB_SYNC_INTERVAL=0
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
-  grep -q 'git_sync fetch_failed' "$TEST_LOG"
+  grep -q 'git_sync fetch_failed:' "$TEST_LOG"
+  grep -q '/nonexistent/bare.git' "$TEST_LOG"
+}
+
+@test "git rebase failure logs conflict details" {
+  git -C "$TEST_REPO" init -q -b main
+  git -C "$TEST_REPO" config user.email "test@test.com"
+  git -C "$TEST_REPO" config user.name "Test"
+  printf 'shared\n' > "$TEST_REPO/README.md"
+  git -C "$TEST_REPO" add README.md
+  git -C "$TEST_REPO" commit -q --no-verify -m "init"
+
+  local bare="$TEST_DIR/bare.git"
+  local remote_worktree="$TEST_DIR/remote-worktree"
+  git init -q --bare "$bare"
+  git -C "$TEST_REPO" remote add origin "$bare"
+  git -C "$TEST_REPO" push -q -u origin main 2>/dev/null
+
+  git clone -q "$bare" "$remote_worktree"
+  git -C "$remote_worktree" config user.email "test@test.com"
+  git -C "$remote_worktree" config user.name "Test"
+  printf 'remote-change\n' > "$remote_worktree/README.md"
+  git -C "$remote_worktree" commit -qam "remote change"
+  git -C "$remote_worktree" push -q origin main 2>/dev/null
+
+  printf 'local-change\n' > "$TEST_REPO/README.md"
+  git -C "$TEST_REPO" commit -qam "local change"
+
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
+  export DVB_SYNC_INTERVAL=0
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'git_sync rebase_failed:' "$TEST_LOG"
+  grep -q 'CONFLICT' "$TEST_LOG"
 }
 
 @test "git checkout failure is logged with checkout_failed marker" {

@@ -81,17 +81,6 @@
   - [ ] CI workflow updated to use `--jobs` flag
   - [ ] No test relies on ordering between files (each is fully isolated)
 
-- [ ] Log git sync subshell failures instead of silently swallowing them
-  **ID**: log-git-sync-failures
-  **Tags**: stability, git
-  **Details**: The git sync subshell (bin/taskgrind:1399-1423) redirects stderr to /dev/null and uses `|| true` on checkout, fetch, and rebase. A failed `git fetch` (auth error, network) produces zero diagnostic output — not to stdout, not to the log. The outer `wait` sees exit 0 because `|| true` masks the real exit code. Capture each git command's exit code and stderr to `$_git_out` so the outer handler can diagnose which step failed. This is the #1 silent failure mode in production.
-  **Files**: bin/taskgrind
-  **Acceptance**:
-  - [ ] `git fetch` failure writes the error message to `$_git_out` (not /dev/null)
-  - [ ] `git checkout` and `git rebase` failures similarly captured
-  - [ ] Log entry distinguishes which git op failed (e.g., `git_sync fetch_failed`)
-  - [ ] Existing tests pass; add a test that verifies fetch failure is logged
-
 - [ ] Surface git push error output in final_sync
   **ID**: surface-push-errors
   **Tags**: stability, git
