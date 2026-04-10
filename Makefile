@@ -5,7 +5,7 @@ PREFIX ?= /usr/local
 help:
 	@echo "Available targets:"
 	@echo "  make lint      — run shellcheck on all scripts"
-	@echo "  make test      — run bats test suite (357 tests)"
+	@echo "  make test      — run bats test suite (376 tests)"
 	@echo "  make check     — lint + test (run before committing)"
 	@echo "  make install   — symlink taskgrind to $(PREFIX)/bin and install man page"
 	@echo "  make uninstall — remove symlink and man page"

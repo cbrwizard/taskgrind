@@ -3804,3 +3804,139 @@ TASKS
   run "$DVB_GRIND" 1 "$TEST_REPO"
   ! grep -q 'productive_timeout' "$TEST_LOG"
 }
+
+# ── --model CLI flag ─────────────────────────────────────────────────
+
+@test "--model flag sets model" {
+  run "$DVB_GRIND" --dry-run --model gpt-5-4 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"model:    gpt-5-4"* ]]
+}
+
+@test "--model=gpt-5-4 equals syntax works" {
+  run "$DVB_GRIND" --dry-run --model=gpt-5-4 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"model:    gpt-5-4"* ]]
+}
+
+@test "--model flag overrides TG_MODEL env" {
+  export TG_MODEL=env-model
+  run "$DVB_GRIND" --dry-run --model cli-model 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"model:    cli-model"* ]]
+}
+
+@test "--model flag overrides DVB_MODEL env" {
+  export DVB_MODEL=env-model
+  run "$DVB_GRIND" --dry-run --model cli-model 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"model:    cli-model"* ]]
+}
+
+@test "--model without value exits with clear error" {
+  run "$DVB_GRIND" --model
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"--model requires a name"* ]]
+}
+
+@test "--model= empty value exits with clear error" {
+  run "$DVB_GRIND" 1 "$TEST_REPO" "--model="
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"requires a non-empty name"* ]]
+}
+
+@test "--model two-arg with empty string exits with clear error" {
+  run "$DVB_GRIND" 1 "$TEST_REPO" --model ""
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"requires a non-empty name"* ]]
+}
+
+@test "--model passes through to backend invocation" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" --model gpt-5-4 1 "$TEST_REPO"
+  grep -q -- '--model gpt-5-4' "$DVB_GRIND_INVOKE_LOG"
+}
+
+@test "--model works with --backend and --skill" {
+  run "$DVB_GRIND" --dry-run --model gpt-5-4 --backend codex --skill fleet-grind 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"model:    gpt-5-4"* ]]
+  [[ "$output" == *"backend:  codex"* ]]
+  [[ "$output" == *"skill:    fleet-grind"* ]]
+}
+
+@test "--model shows in startup banner" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" --model custom-model 1 "$TEST_REPO"
+  [[ "$output" == *"model=custom-model"* ]]
+}
+
+@test "--model shows in log file header" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" --model custom-model 1 "$TEST_REPO"
+  grep -q 'model=custom-model' "$TEST_LOG"
+}
+
+@test "--model suppresses codex-claude warning when overriding" {
+  run "$DVB_GRIND" --dry-run --backend codex --model o3 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  ! [[ "$output" == *"Warning"* ]]
+}
+
+@test "--help shows --model in usage" {
+  run "$DVB_GRIND" --help
+  [[ "$output" == *"--model"* ]]
+}
+
+# ── Dynamic prompt file (prompt injection between sessions) ──────────
+
+@test "reads prompt file between sessions" {
+  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  _prompt_file="$TEST_REPO/.taskgrind-prompt"
+  echo "focus on testing" > "$_prompt_file"
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  grep -q 'focus on testing' "$DVB_GRIND_INVOKE_LOG"
+}
+
+@test "prompt file updates are picked up between sessions" {
+  # Second session should see updated prompt file content
+  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  _prompt_file="$TEST_REPO/.taskgrind-prompt"
+  echo "focus on testing" > "$_prompt_file"
+  # Multiple sessions — fake devin runs fast, so both sessions will see the prompt
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  grep -q 'focus on testing' "$DVB_GRIND_INVOKE_LOG"
+}
+
+@test "missing prompt file is fine (no error)" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  rm -f "$TEST_REPO/.taskgrind-prompt"
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+}
+
+@test "--prompt and prompt file combine" {
+  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  _prompt_file="$TEST_REPO/.taskgrind-prompt"
+  echo "also do this" > "$_prompt_file"
+  run "$DVB_GRIND" --prompt "do that" 1 "$TEST_REPO"
+  # Both should appear in the invocation
+  grep -q 'do that' "$DVB_GRIND_INVOKE_LOG"
+  grep -q 'also do this' "$DVB_GRIND_INVOKE_LOG"
+}
+
+@test "prompt file shown in startup banner when present" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  _prompt_file="$TEST_REPO/.taskgrind-prompt"
+  echo "file-based focus" > "$_prompt_file"
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [[ "$output" == *"file-based focus"* ]]
+}
+
+@test "--dry-run shows prompt file content" {
+  _prompt_file="$TEST_REPO/.taskgrind-prompt"
+  echo "file-based focus" > "$_prompt_file"
+  run "$DVB_GRIND" --dry-run 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"file-based focus"* ]]
+}

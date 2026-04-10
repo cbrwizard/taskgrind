@@ -3,7 +3,7 @@
 taskgrind \- autonomous multi-session grind tool
 .SH SYNOPSIS
 .B taskgrind
-[\fIhours\fR] [\fIrepo\fR] [\fB\-\-skill\fR \fIname\fR] [\fB\-\-backend\fR \fIname\fR] [\fB\-\-prompt\fR \fItext\fR] [\fB\-\-dry\-run\fR] [\fB\-\-preflight\fR] [\fB\-\-help\fR] [\fB\-\-version\fR]
+[\fIhours\fR] [\fIrepo\fR] [\fB\-\-model\fR \fIname\fR] [\fB\-\-skill\fR \fIname\fR] [\fB\-\-backend\fR \fIname\fR] [\fB\-\-prompt\fR \fItext\fR] [\fB\-\-dry\-run\fR] [\fB\-\-preflight\fR] [\fB\-\-help\fR] [\fB\-\-version\fR]
 .SH DESCRIPTION
 Runs sequential AI coding sessions against a TASKS.md repo until a deadline.
 Each session starts with full context, picks a task from TASKS.md, implements
@@ -19,6 +19,9 @@ Skill to run each session (default: next\-task).
 .TP
 .BR \-\-backend " " \fIname\fR
 AI backend: devin, claude\-code, codex (default: devin).
+.TP
+.BR \-\-model " " \fIname\fR
+AI model to use (default: claude\-opus\-4\-6\-thinking). Overrides TG_MODEL env var.
 .TP
 .BR \-\-prompt " " \fItext\fR
 Focus prompt prepended to every session.
@@ -107,19 +110,24 @@ Exit early on low throughput (default: 1, 0 to disable).
 .I TASKS.md
 Task queue file in the target repo. Uses the tasks.md spec.
 .TP
+.I .taskgrind\-prompt
+Optional file in the target repo. Content is injected into every session prompt.
+Re\-read before each session, so changes take effect live. Combine with \-\-prompt.
+.TP
 .I ${TMPDIR:\-/tmp}/taskgrind\-*.log
 Session logs (one per grind invocation).
 .SH EXAMPLES
 .nf
 taskgrind                           # 8h grind, current dir
 taskgrind 10 ~/apps/myrepo         # 10h grind in specific repo
+taskgrind \-\-model gpt\-5\-4 8       # use specific model
 taskgrind \-\-skill fleet\-grind 10  # custom skill
 taskgrind \-\-backend claude\-code 8  # use Claude Code backend
 taskgrind \-\-prompt "test coverage" 8
 taskgrind \-\-dry\-run 8             # print config only
 taskgrind \-\-preflight             # health checks only
 taskgrind \-\-version               # print version
-TG_MODEL=sonnet taskgrind 8        # override model
+TG_MODEL=sonnet taskgrind 8        # override model via env
 .fi
 .SH EXIT STATUS
 .TP

@@ -32,7 +32,7 @@ taskgrind/
 ```bash
 make install    # symlink to /usr/local/bin + install man page
 make lint       # shellcheck (run from bin/ with -x for source resolution)
-make test       # bats test suite (357 tests)
+make test       # bats test suite (376 tests)
 make check      # lint + test (run before committing)
 make uninstall  # remove symlink and man page
 ```

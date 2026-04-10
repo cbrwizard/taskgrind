@@ -44,6 +44,7 @@ To update: `cd ~/apps/taskgrind && git pull`
 taskgrind                              # 8h grind (default), current dir
 taskgrind 10                           # 10h grind
 taskgrind ~/apps/myrepo 10             # 10h grind in specific repo
+taskgrind --model gpt-5-4 8            # use specific model
 taskgrind --skill fleet-grind 10       # custom skill
 taskgrind --prompt "focus on test coverage" 8  # focus prompt
 taskgrind --backend claude-code 8       # use Claude Code backend
@@ -84,6 +85,8 @@ Completed tasks are removed (not checked off). History lives in git log. See the
 ## Features
 
 - **Multi-backend support** — works with Devin, Claude Code, and Codex via `--backend`
+- **Model selection** — `--model gpt-5-4` or `TG_MODEL=gpt-5-4` to use any model the backend supports
+- **Live prompt injection** — create/edit `.taskgrind-prompt` in the repo while running; changes take effect at the next session
 - **Preflight checks** — 7 health checks (binary, network, git state, remote, disk, TASKS.md, network-watchdog) before launch. `network-watchdog` is optional; if missing, taskgrind falls back to `curl` for connectivity checks.
 - **Self-copy protection** — copies itself to `$TMPDIR` before running, survives script edits mid-grind
 - **Per-repo locking** — `flock` (Linux) / `perl flock(2)` (macOS) prevents duplicate grinds on the same repo
@@ -149,12 +152,22 @@ cat "${TMPDIR:-/tmp}"/taskgrind-*.log       # review completed sessions
 
 Each session logs: start time, remaining minutes, task count, exit code, duration, and shipped count. The `grind_done` summary includes ship rate, remaining tasks, and average session duration.
 
+### Live prompt injection
+
+While taskgrind is running, create or edit `.taskgrind-prompt` in the target repo to add instructions to every subsequent session:
+
+```bash
+echo "focus on test coverage" > ~/apps/myrepo/.taskgrind-prompt
+```
+
+The file is re-read before each session. Combined with `--prompt` if both are set. Delete the file to stop injecting.
+
 ## Development
 
 ```bash
 make install    # symlink to /usr/local/bin + install man page
 make lint       # shellcheck
-make test       # bats test suite (357 tests)
+make test       # bats test suite (376 tests)
 make check      # lint + test
 make uninstall  # remove symlink and man page
 ```

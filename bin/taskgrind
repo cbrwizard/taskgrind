@@ -7,6 +7,7 @@
 # Usage: taskgrind                              → 8h grind (default)
 #        taskgrind 10                          → 10h grind, current dir
 #        taskgrind ~/apps/myrepo 10            → 10h grind in specific repo
+#        taskgrind --model gpt-5-4 8           → 8h grind with specific model
 #        taskgrind --skill fleet-grind 10      → 10h fleet-grind
 #        taskgrind ~/apps/bosun --skill fleet-grind 10
 #        taskgrind --backend claude-code 8     → 8h grind with Claude Code
@@ -102,12 +103,13 @@ unset _tg_var _tg_ref
 # Save original args before parsing — caffeinate re-exec needs them intact
 _orig_args=("$@")
 
-# Parse all args in any order: hours (integer), --skill NAME, --backend NAME, --prompt TEXT, --dry-run, --preflight, repo path
+# Parse all args in any order: hours (integer), --model NAME, --skill NAME, --backend NAME, --prompt TEXT, --dry-run, --preflight, repo path
 hours="8"
 repo="."
 skill="${DVB_SKILL:-next-task}"
 extra_prompt="${DVB_PROMPT:-}"
 _cli_backend=""
+_cli_model=""
 dry_run=0
 preflight_only=0
 while [[ $# -gt 0 ]]; do
@@ -116,6 +118,15 @@ while [[ $# -gt 0 ]]; do
     --version|-V) echo "taskgrind $(git -C "$TASKGRIND_DIR" log -1 --format='%h %ci' 2>/dev/null || echo 'unknown')"; exit 0 ;;
     --dry-run) dry_run=1; shift ;;
     --preflight) preflight_only=1; shift ;;
+    --model=*) _cli_model="${1#--model=}"; [[ -z "$_cli_model" ]] && { echo "Error: --model requires a non-empty name" >&2; exit 1; }; shift ;;
+    --model)
+      if [[ $# -lt 2 ]]; then
+        echo "Error: --model requires a name" >&2; exit 1
+      fi
+      _cli_model="$2"
+      [[ -z "$_cli_model" ]] && { echo "Error: --model requires a non-empty name" >&2; exit 1; }
+      shift 2
+      ;;
     --skill=*) skill="${1#--skill=}"; [[ -z "$skill" ]] && { echo "Error: --skill requires a non-empty name" >&2; exit 1; }; shift ;;
     --skill)
       if [[ $# -lt 2 ]]; then
@@ -151,8 +162,9 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-model="${DVB_MODEL:-$DVB_DEFAULT_MODEL}"
+model="${_cli_model:-${DVB_MODEL:-$DVB_DEFAULT_MODEL}}"
 backend="${_cli_backend:-${DVB_BACKEND:-devin}}"
+_cli_prompt="$extra_prompt"
 cooldown="${DVB_COOL:-5}"
 max_hours=24
 max_fast="${DVB_MAX_FAST:-5}"
@@ -235,6 +247,30 @@ if [[ ! -d "$repo" ]]; then
 fi
 
 repo="$(cd "$repo" && pwd)"
+
+# ── Dynamic prompt file ──────────────────────────────────────────────
+# Users can create/edit $repo/.taskgrind-prompt while taskgrind runs.
+# Content is re-read before each session and combined with --prompt.
+_prompt_file="$repo/.taskgrind-prompt"
+
+# Rebuild extra_prompt from CLI prompt + prompt file content.
+# Call before each session to pick up live edits.
+_refresh_prompt() {
+  local file_prompt=""
+  if [[ -f "$_prompt_file" ]]; then
+    file_prompt=$(cat "$_prompt_file" 2>/dev/null) || true
+    # Strip trailing newlines
+    file_prompt="${file_prompt%$'\n'}"
+  fi
+  if [[ -n "$_cli_prompt" && -n "$file_prompt" ]]; then
+    extra_prompt="$_cli_prompt LIVE_PROMPT: $file_prompt"
+  elif [[ -n "$file_prompt" ]]; then
+    extra_prompt="$file_prompt"
+  else
+    extra_prompt="$_cli_prompt"
+  fi
+}
+_refresh_prompt
 
 # ── Network check functions ──────────────────────────────────────────
 # Defined early so preflight_check() can reuse them (instead of a bare curl).
@@ -904,6 +940,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
     echo "🔍 Queue empty — running sweep to find work..."
     log_write "[$(date '+%H:%M')] queue_empty tasks=0 — launching sweep session"
 
+    _refresh_prompt
     sweep_prompt="TASKS.md is empty. Audit this repository and populate TASKS.md with actionable tasks."
     sweep_prompt+=" Look at: open TODOs/FIXMEs in code, test coverage gaps, lint warnings, outdated dependencies, missing docs, README gaps."
     sweep_prompt+=" Write tasks following the tasks.md spec: checkbox format under P0-P3 priority headings, with **ID**, **Tags**, **Details**, **Files**, **Acceptance** metadata."
@@ -987,6 +1024,9 @@ while [[ $(date +%s) -lt $deadline ]]; do
   log_write "[$(date '+%H:%M')] session=$session remaining=${remaining_min}m tasks=$tasks_before"
 
   # ── Build the session prompt ──────────────────────────────────────
+  # Re-read prompt file for live updates between sessions
+  _refresh_prompt
+
   # Thin prompt — the skill handles task selection and execution.
   prompt="Run the $skill skill."
   prompt+=" Session $session, ${remaining_min} minutes remaining, timeout ${max_session}s."
