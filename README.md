@@ -30,7 +30,7 @@ curl -fsSL https://raw.githubusercontent.com/cbrwizard/taskgrind/main/install.sh
 git clone https://github.com/cbrwizard/taskgrind.git ~/apps/taskgrind
 
 # Custom install directory
-TASKGRIND_INSTALL_DIR=~/tools/taskgrind curl -fsSL https://raw.githubusercontent.com/cbrwizard/taskgrind/main/install.sh | sh
+TASKGRIND_INSTALL_DIR=~/tools/taskgrind sh -c "$(curl -fsSL https://raw.githubusercontent.com/cbrwizard/taskgrind/main/install.sh)"
 
 # Add to PATH (add to your shell rc)
 export PATH="$HOME/apps/taskgrind/bin:$PATH"
@@ -153,7 +153,7 @@ Each session logs: start time, remaining minutes, task count, exit code, duratio
 
 ```bash
 make lint       # shellcheck
-make test       # bats test suite (345 tests)
+make test       # bats test suite (352 tests)
 make check      # lint + test
 ```
 

@@ -121,14 +121,18 @@ while [[ $# -gt 0 ]]; do
       if [[ $# -lt 2 ]]; then
         echo "Error: --skill requires a name" >&2; exit 1
       fi
-      skill="$2"; shift 2
+      skill="$2"
+      [[ -z "$skill" ]] && { echo "Error: --skill requires a non-empty name" >&2; exit 1; }
+      shift 2
       ;;
     --backend=*) _cli_backend="${1#--backend=}"; [[ -z "$_cli_backend" ]] && { echo "Error: --backend requires a name (devin, claude-code, codex)" >&2; exit 1; }; shift ;;
     --backend)
       if [[ $# -lt 2 ]]; then
         echo "Error: --backend requires a name (devin, claude-code, codex)" >&2; exit 1
       fi
-      _cli_backend="$2"; shift 2
+      _cli_backend="$2"
+      [[ -z "$_cli_backend" ]] && { echo "Error: --backend requires a name (devin, claude-code, codex)" >&2; exit 1; }
+      shift 2
       ;;
     --prompt=*) extra_prompt="${1#--prompt=}"; shift ;;
     --prompt)
@@ -448,12 +452,17 @@ if [[ -z "${DVB_GRIND_CMD:-}" ]]; then
   _lock_file="$_dvb_tmp/taskgrind-lock-${_lock_hash}"
   # Open fd 9 on the lockfile (creates if needed)
   exec 9>"$_lock_file"
-  if [[ "$(uname)" == "Darwin" ]]; then
-    _lock_ok=true
-    lockf -t 0 9 2>/dev/null || _lock_ok=false
-  else
+  if command -v flock >/dev/null 2>&1; then
+    # Linux (always), or macOS with Homebrew util-linux
     _lock_ok=true
     flock -n 9 2>/dev/null || _lock_ok=false
+  else
+    # macOS default: no flock(1) — use perl to call flock(2) on the open FD.
+    # perl's >&= mode references the existing fd without duping, so the lock
+    # persists on the parent's fd 9 after perl exits (flock locks are per-open-
+    # file-description, released when ALL fds to that description are closed).
+    _lock_ok=true
+    perl -e 'use Fcntl qw(:flock); open(my $fh, ">&=", 9) or exit 1; flock($fh, LOCK_EX|LOCK_NB) or exit 1' 2>/dev/null || _lock_ok=false
   fi
   if [[ "$_lock_ok" == "false" ]]; then
     _lock_info=$(cat "$_lock_file" 2>/dev/null)
@@ -538,6 +547,8 @@ _git_out=""
 last_session_summary=""
 _dvb_pid=0
 _dvb_timeout_pid=0
+_git_pid=0
+_git_timer=0
 
 # format_duration provided by lib/constants.sh as dvb_format_duration
 format_duration() { dvb_format_duration "$@"; }
@@ -645,6 +656,15 @@ graceful_shutdown() {
       wait "$_dvb_timeout_pid" 2>/dev/null || true
     fi
   fi
+  # Kill git sync processes if interrupted mid-sync
+  if [[ $_git_pid -gt 0 ]] && kill -0 "$_git_pid" 2>/dev/null; then
+    kill "$_git_pid" 2>/dev/null || true
+    wait "$_git_pid" 2>/dev/null || true
+  fi
+  if [[ $_git_timer -gt 0 ]] && kill -0 "$_git_timer" 2>/dev/null; then
+    kill "$_git_timer" 2>/dev/null || true
+    wait "$_git_timer" 2>/dev/null || true
+  fi
   final_sync
   cleanup
   exit "$sig_exit"
@@ -703,7 +723,17 @@ cleanup() {
   [[ -n "${_lock_file:-}" && -f "${_lock_file}" ]] && rm -f "$_lock_file"
   rm -f "$session_output"
   rm -f "$_task_attempts_file"
+  rm -f "${_task_attempts_file}.new" 2>/dev/null || true
   [[ -n "${_git_out:-}" ]] && rm -f "$_git_out" || true
+  # Kill orphaned git sync processes (interrupted mid-sync)
+  if [[ ${_git_pid:-0} -gt 0 ]] && kill -0 "$_git_pid" 2>/dev/null; then
+    kill "$_git_pid" 2>/dev/null || true
+    wait "$_git_pid" 2>/dev/null || true
+  fi
+  if [[ ${_git_timer:-0} -gt 0 ]] && kill -0 "$_git_timer" 2>/dev/null; then
+    kill "$_git_timer" 2>/dev/null || true
+    wait "$_git_timer" 2>/dev/null || true
+  fi
 }
 # INT/TERM → graceful shutdown (wait for session, push, then exit)
 trap 'graceful_shutdown 130' INT
@@ -793,6 +823,7 @@ else
 fi
 consecutive_fast=0
 consecutive_zero_ship=0
+_productive_zero_ship=0
 _sweep_done=0
 
 wait_for_network() {

@@ -1823,6 +1823,18 @@ SCRIPT
   [[ "$output" == *"requires a name"* ]]
 }
 
+@test "--skill two-arg with empty string exits with clear error" {
+  run "$DVB_GRIND" 1 "$TEST_REPO" --skill ""
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"requires a non-empty name"* ]]
+}
+
+@test "--backend two-arg with empty string exits with clear error" {
+  run "$DVB_GRIND" 1 "$TEST_REPO" --backend ""
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"requires a name"* ]]
+}
+
 @test "DVB_COOL=abc exits with must be numeric error" {
   export DVB_COOL=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
@@ -2237,6 +2249,20 @@ SCRIPT
   grep -q 'DVB_SHUTDOWN_GRACE' "$DVB_GRIND"
 }
 
+@test "structural: graceful_shutdown kills orphaned git sync processes" {
+  grep -q '_git_pid=0' "$DVB_GRIND"
+  grep -q '_git_timer=0' "$DVB_GRIND"
+  # graceful_shutdown kills git processes
+  grep -A40 'graceful_shutdown()' "$DVB_GRIND" | grep -q '_git_pid'
+  # cleanup also kills git processes
+  grep -A60 'cleanup()' "$DVB_GRIND" | grep -q '_git_pid'
+}
+
+@test "structural: _productive_zero_ship initialized before loop" {
+  # Must be initialized before the while loop to avoid set -u crash
+  grep -q '_productive_zero_ship=0' "$DVB_GRIND"
+}
+
 @test "structural: final_sync pushes local commits" {
   grep -q 'final_sync' "$DVB_GRIND"
   grep -q 'git.*push.*origin' "$DVB_GRIND"
@@ -2308,8 +2334,9 @@ TASKS
   grep -q 'idle:sleep' "$DVB_GRIND"
 }
 
-@test "Linux: flock fallback for lockf (structural)" {
+@test "Linux: flock preferred, perl fallback when flock unavailable (structural)" {
   grep -q 'flock -n 9' "$DVB_GRIND"
+  grep -q 'perl.*Fcntl.*LOCK_EX' "$DVB_GRIND"
 }
 
 @test "Linux: notify-send fallback for osascript (structural)" {
@@ -3039,9 +3066,9 @@ TASKS
 
 # ── Multi-project locking ─────────────────────────────────────────────
 
-@test "locking uses lockf(1) on macOS and flock(1) on Linux" {
-  grep -q 'lockf -t 0 9' "$DVB_GRIND"
+@test "locking uses flock(1) with perl fallback for macOS" {
   grep -q 'flock -n 9' "$DVB_GRIND"
+  grep -q 'perl -e.*Fcntl.*flock' "$DVB_GRIND"
 }
 
 @test "lock file path is derived from repo hash" {
