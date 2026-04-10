@@ -22,7 +22,7 @@
 #        Args can appear in any order. Hours is any bare integer (1-24).
 #
 # Env:   TG_BACKEND     — AI backend: devin, claude-code, codex (default: devin)
-#        TG_MODEL       — AI model (default: "GPT-5.4 XHigh Thinking fast")
+#        TG_MODEL       — AI model (default: "gpt-5.4")
 #        TG_COOL        — seconds between sessions (default: 5)
 #        TG_SKILL       — skill to run (default: next-task)
 #        TG_PROMPT      — extra focus prompt prepended to every session
@@ -1444,13 +1444,22 @@ while [[ $(date +%s) -lt $deadline ]]; do
         # Handle dirty working tree — stash uncommitted changes before switching
         _dirty=0
         if ! git -C "$repo" diff --quiet 2>/dev/null || ! git -C "$repo" diff --cached --quiet 2>/dev/null; then
-          git -C "$repo" stash --include-untracked -m "taskgrind: auto-stash before sync" 2>/dev/null || true
-          _dirty=1
-          echo "git_sync stashed"
+          if _err=$(git -C "$repo" stash --include-untracked -m "taskgrind: auto-stash before sync" 2>&1); then
+            _dirty=1
+            echo "git_sync stashed"
+          else
+            echo "git_sync stash_failed: $_err"
+          fi
         fi
-        git -C "$repo" checkout "$_default_branch" 2>/dev/null || true
-        git -C "$repo" fetch origin --prune 2>/dev/null || true
-        git -C "$repo" rebase "origin/$_default_branch" 2>/dev/null || true
+        if ! _err=$(git -C "$repo" checkout "$_default_branch" 2>&1); then
+          echo "git_sync checkout_failed: $_err"
+        fi
+        if ! _err=$(git -C "$repo" fetch origin --prune 2>&1); then
+          echo "git_sync fetch_failed: $_err"
+        fi
+        if ! _err=$(git -C "$repo" rebase "origin/$_default_branch" 2>&1); then
+          echo "git_sync rebase_failed: $_err"
+        fi
         # Abort broken rebase — a conflicted rebase leaves the repo in a
         # "rebase in progress" state that breaks every subsequent session.
         _git_dir="$(git -C "$repo" rev-parse --absolute-git-dir 2>/dev/null)"
@@ -1478,6 +1487,18 @@ while [[ $(date +%s) -lt $deadline ]]; do
         if grep -q 'stash_pop_failed' "$_git_out" 2>/dev/null; then
           echo "   ⚠ git stash pop failed — stash preserved for manual recovery"
           log_write "[$(date '+%H:%M')] git_sync stash_pop_failed (stash preserved)"
+        elif grep -q 'fetch_failed' "$_git_out" 2>/dev/null; then
+          _git_fail=$(grep 'fetch_failed' "$_git_out" 2>/dev/null | head -1 | tr -cd '[:print:]' | head -c 500)
+          echo "   ⚠ git sync: $_git_fail"
+          log_write "[$(date '+%H:%M')] git_sync fetch_failed"
+        elif grep -q 'checkout_failed' "$_git_out" 2>/dev/null; then
+          _git_fail=$(grep 'checkout_failed' "$_git_out" 2>/dev/null | head -1 | tr -cd '[:print:]' | head -c 500)
+          echo "   ⚠ git sync: $_git_fail"
+          log_write "[$(date '+%H:%M')] git_sync checkout_failed"
+        elif grep -q 'stash_failed' "$_git_out" 2>/dev/null; then
+          _git_fail=$(grep 'stash_failed' "$_git_out" 2>/dev/null | head -1 | tr -cd '[:print:]' | head -c 500)
+          echo "   ⚠ git sync: $_git_fail"
+          log_write "[$(date '+%H:%M')] git_sync stash_failed"
         elif grep -q 'rebase_aborted' "$_git_out" 2>/dev/null; then
           log_write "[$(date '+%H:%M')] git_sync rebase_aborted"
         elif grep -q 'git_sync stashed' "$_git_out" 2>/dev/null; then
