@@ -255,12 +255,23 @@ _prompt_file="$repo/.taskgrind-prompt"
 
 # Rebuild extra_prompt from CLI prompt + prompt file content.
 # Call before each session to pick up live edits.
+# Guards: skips files > 10KB (likely accidental), strips all trailing whitespace.
+_prompt_file_max=10240  # 10KB — prompts should be short
 _refresh_prompt() {
   local file_prompt=""
   if [[ -f "$_prompt_file" ]]; then
-    file_prompt=$(cat "$_prompt_file" 2>/dev/null) || true
-    # Strip trailing newlines
-    file_prompt="${file_prompt%$'\n'}"
+    local file_size
+    file_size=$(wc -c < "$_prompt_file" 2>/dev/null) || file_size=0
+    file_size="${file_size## }"  # trim leading space (macOS wc)
+    if [[ "$file_size" -gt "$_prompt_file_max" ]]; then
+      echo "   ⚠ .taskgrind-prompt too large (${file_size}B > ${_prompt_file_max}B) — skipping" >&2
+    else
+      file_prompt=$(cat "$_prompt_file" 2>/dev/null) || true
+    fi
+    # Strip all trailing whitespace (newlines, spaces, tabs)
+    while [[ "$file_prompt" =~ [[:space:]]$ ]]; do
+      file_prompt="${file_prompt%?}"
+    done
   fi
   if [[ -n "$_cli_prompt" && -n "$file_prompt" ]]; then
     extra_prompt="$_cli_prompt LIVE_PROMPT: $file_prompt"
@@ -582,8 +593,8 @@ tasks_remaining=0
 sessions_zero_ship=0
 _recent_shipped=()  # rolling window of per-session shipped counts
 _dvb_finalizing=0
-session_output=$(mktemp "$_dvb_tmp/taskgrind-ses-XXXXXX")
-_task_attempts_file=$(mktemp "$_dvb_tmp/taskgrind-att-XXXXXX")
+session_output=$(mktemp "$_dvb_tmp/taskgrind-ses-XXXXXX") || { echo "Error: cannot create temp file in $_dvb_tmp" >&2; exit 1; }
+_task_attempts_file=$(mktemp "$_dvb_tmp/taskgrind-att-XXXXXX") || { echo "Error: cannot create temp file in $_dvb_tmp" >&2; exit 1; }
 _git_out=""
 : > "$_task_attempts_file" 2>/dev/null || true
 last_session_summary=""
@@ -642,6 +653,13 @@ final_sync() {
   fi
   if [[ -z "$(git -C "$repo" remote 2>/dev/null)" ]]; then
     return 0  # No remote configured
+  fi
+  # Guard: don't push from detached HEAD — could push to unexpected ref
+  local _current_branch
+  _current_branch=$(git -C "$repo" symbolic-ref --short HEAD 2>/dev/null) || true
+  if [[ -z "$_current_branch" ]]; then
+    log_write "[$(date '+%H:%M')] final_sync skipped — detached HEAD"
+    return 0
   fi
   # Only push if there are local commits ahead of origin
   local _default_branch
@@ -925,6 +943,22 @@ while [[ $(date +%s) -lt $deadline ]]; do
     break
   fi
 
+  # ── Git state recovery ──────────────────────────────────────────────
+  # If the repo ended up in a broken git state (mid-rebase, mid-merge) from
+  # a crashed session or interrupted sync, recover before launching the next
+  # session. Without this, every subsequent session fails on git operations.
+  if git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
+    _git_dir="$(git -C "$repo" rev-parse --absolute-git-dir 2>/dev/null)" || _git_dir=""
+    if [[ -n "$_git_dir" && ( -d "$_git_dir/rebase-merge" || -d "$_git_dir/rebase-apply" ) ]]; then
+      git -C "$repo" rebase --abort 2>/dev/null || true
+      log_write "[$(date '+%H:%M')] pre_session_recovery rebase_aborted"
+    fi
+    if [[ -n "$_git_dir" && -f "$_git_dir/MERGE_HEAD" ]]; then
+      git -C "$repo" merge --abort 2>/dev/null || true
+      log_write "[$(date '+%H:%M')] pre_session_recovery merge_aborted"
+    fi
+  fi
+
   # ── Empty queue handling ──────────────────────────────────────────
   # When the queue is empty, launch a sweep session to audit the repo
   # and populate TASKS.md. If the sweep finds nothing, exit.
@@ -978,6 +1012,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
       ) &
       _dvb_timeout_pid=$!
       wait "$_dvb_pid" 2>/dev/null || session_exit=$?
+      sleep 0.1 2>/dev/null || true  # let tee flush
       kill "$_dvb_timeout_pid" 2>/dev/null || true
       wait "$_dvb_timeout_pid" 2>/dev/null || true
       _dvb_timeout_pid=0
@@ -1126,6 +1161,8 @@ while [[ $(date +%s) -lt $deadline ]]; do
       _dvb_timer_pid=$!
     fi
     wait "$_dvb_pid" 2>/dev/null || session_exit=$?
+    # Brief pause for process substitution (tee) to flush before we truncate session_output
+    sleep 0.1 2>/dev/null || true  # let tee flush
     # Stop elapsed timer and timeout watchdog
     if [[ $_dvb_timer_pid -gt 0 ]]; then
       kill "$_dvb_timer_pid" 2>/dev/null || true

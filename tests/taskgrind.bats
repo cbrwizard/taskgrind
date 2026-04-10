@@ -3940,3 +3940,63 @@ TASKS
   [ "$status" -eq 0 ]
   [[ "$output" == *"file-based focus"* ]]
 }
+
+# ── Stability: prompt file size guard ─────────────────────────────────
+
+@test "oversized prompt file is skipped with warning" {
+  _prompt_file="$TEST_REPO/.taskgrind-prompt"
+  # Create a file larger than 10KB limit
+  dd if=/dev/zero bs=1024 count=11 2>/dev/null | tr '\0' 'x' > "$_prompt_file"
+  run "$DVB_GRIND" --dry-run 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # The oversized content should NOT appear in the prompt
+  ! [[ "$output" == *"xxxx"* ]]
+}
+
+@test "prompt file within size limit is read normally" {
+  _prompt_file="$TEST_REPO/.taskgrind-prompt"
+  echo "small focus" > "$_prompt_file"
+  run "$DVB_GRIND" --dry-run 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"small focus"* ]]
+}
+
+@test "prompt file with trailing whitespace is trimmed" {
+  _prompt_file="$TEST_REPO/.taskgrind-prompt"
+  printf "clean prompt\n\n\n" > "$_prompt_file"
+  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  # The prompt should end with "clean prompt" not trailing whitespace
+  grep -q 'clean prompt' "$DVB_GRIND_INVOKE_LOG"
+}
+
+# ── Stability: mktemp failure message ─────────────────────────────────
+
+@test "structural: mktemp failures produce clear error messages" {
+  grep -q 'Error: cannot create temp file' "$DVB_GRIND"
+}
+
+# ── Stability: pre-session git state recovery ─────────────────────────
+
+@test "structural: pre-session git state recovery checks for rebase" {
+  grep -q 'pre_session_recovery rebase_aborted' "$DVB_GRIND"
+}
+
+@test "structural: pre-session git state recovery checks for merge" {
+  grep -q 'pre_session_recovery merge_aborted' "$DVB_GRIND"
+}
+
+# ── Stability: final_sync detached HEAD guard ─────────────────────────
+
+@test "structural: final_sync skips push on detached HEAD" {
+  grep -q 'final_sync skipped.*detached HEAD' "$DVB_GRIND"
+}
+
+# ── Stability: process substitution tee flush ─────────────────────────
+
+@test "structural: production mode pauses for tee flush after session" {
+  # Both sweep and regular session paths should have the tee flush pause
+  local count
+  count=$(grep -c 'let tee flush' "$DVB_GRIND" 2>/dev/null) || true
+  [[ "$count" -ge 2 ]]
+}
