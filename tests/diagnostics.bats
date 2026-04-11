@@ -292,6 +292,13 @@ SCRIPT
   [[ "$output" == *"TG_GIT_SYNC_TIMEOUT must be numeric"* ]]
 }
 
+@test "DVB_EMPTY_QUEUE_WAIT=abc exits with must be numeric error" {
+  export DVB_EMPTY_QUEUE_WAIT=abc
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"TG_EMPTY_QUEUE_WAIT must be numeric"* ]]
+}
+
 @test "DVB_DEADLINE=abc exits with must be epoch error" {
   export DVB_DEADLINE=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"

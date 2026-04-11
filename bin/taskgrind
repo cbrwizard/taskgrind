@@ -46,6 +46,7 @@
 #        TG_DEVIN_PATH  — override devin binary path (default: auto-detect from PATH)
 #        TG_GIT_SYNC_TIMEOUT — max seconds for between-session git sync (default: 30)
 #        TG_SYNC_INTERVAL — git sync every N sessions (default: 5, 0=every session)
+#        TG_EMPTY_QUEUE_WAIT — seconds to wait after an empty sweep (default: 600)
 #        TG_SHUTDOWN_GRACE — seconds to wait for current session on exit (default: 120)
 #        TG_SESSION_GRACE — seconds to wait after session SIGINT before SIGTERM (default: 15)
 #        TG_EARLY_EXIT_ON_STALL — exit early on low throughput (default: 0)
@@ -97,7 +98,7 @@ _dvb_is_tty="${_dvb_is_tty:-0}"
 # If TG_X is set, it takes precedence over DVB_X. Internal/test-only vars
 # (DVB_GRIND_CMD, DVB_DEADLINE, DVB_NET_FILE, DVB_CAFFEINATED) stay as DVB_.
 for _tg_var in BACKEND BACKOFF_BASE BACKOFF_MAX COOL DEVIN_PATH \
-               EARLY_EXIT_ON_STALL GIT_SYNC_TIMEOUT LOG MAX_FAST MAX_INSTANCES \
+               EARLY_EXIT_ON_STALL EMPTY_QUEUE_WAIT GIT_SYNC_TIMEOUT LOG MAX_FAST MAX_INSTANCES \
                MAX_SESSION MAX_ZERO_SHIP MIN_SESSION MODEL NET_CHECK_URL NET_MAX_WAIT \
                NET_RETRIES NET_RETRY_DELAY NET_WAIT NOTIFY PROMPT \
                SESSION_GRACE SHUTDOWN_GRACE SKILL STATUS_FILE SYNC_INTERVAL; do
@@ -235,6 +236,9 @@ if [[ -n "${DVB_BACKOFF_MAX:-}" ]] && ! [[ "${DVB_BACKOFF_MAX}" =~ ^[0-9]+$ ]]; 
 fi
 if [[ -n "${DVB_GIT_SYNC_TIMEOUT:-}" ]] && ! [[ "${DVB_GIT_SYNC_TIMEOUT}" =~ ^[0-9]+$ ]]; then
   echo "Error: TG_GIT_SYNC_TIMEOUT must be numeric, got '${DVB_GIT_SYNC_TIMEOUT}'" >&2; exit 1
+fi
+if [[ -n "${DVB_EMPTY_QUEUE_WAIT:-}" ]] && ! [[ "${DVB_EMPTY_QUEUE_WAIT}" =~ ^[0-9]+$ ]]; then
+  echo "Error: TG_EMPTY_QUEUE_WAIT must be numeric, got '${DVB_EMPTY_QUEUE_WAIT}'" >&2; exit 1
 fi
 if [[ -n "${DVB_DEADLINE:-}" ]] && ! [[ "${DVB_DEADLINE}" =~ ^[0-9]+$ ]]; then
   echo "Error: DVB_DEADLINE must be a Unix epoch integer, got '${DVB_DEADLINE}'" >&2; exit 1
@@ -1376,7 +1380,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
     fi
     if [[ "$_sweep_done" -eq 1 ]]; then
       # Sweep already ran once and found nothing — wait before giving up
-      _empty_wait=600  # 10 minutes
+      _empty_wait="${DVB_EMPTY_QUEUE_WAIT:-600}"
       # Cap at remaining deadline so tests and short runs aren't stuck
       _remaining=$(( deadline - $(date +%s) ))
       [[ $_remaining -lt $_empty_wait ]] && _empty_wait=$_remaining
@@ -1468,10 +1472,9 @@ while [[ $(date +%s) -lt $deadline ]]; do
       log_write "[$(date '+%H:%M')] sweep_found tasks=$tasks_found"
       set_phase "queue_refilled"
     else
-      echo "   ✓ Sweep found no tasks — exiting."
-      log_write "[$(date '+%H:%M')] sweep_empty tasks=0 — exiting"
-      set_phase "queue_empty"
-      break
+      echo "   ✓ Sweep found no tasks — waiting for external task injection."
+      log_write "[$(date '+%H:%M')] sweep_empty tasks=0"
+      set_phase "queue_empty_wait"
     fi
     # Re-enter loop — next iteration will pick up the new tasks.
     # session already incremented at top of loop; sweep counts as session $session.

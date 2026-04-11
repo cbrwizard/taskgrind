@@ -104,7 +104,7 @@ Completed tasks are removed (not checked off). History lives in git log. See the
 - **Blocked-queue detection** — exits early when all remaining tasks have `**Blocked by**:` metadata
 - **Caffeinate integration** — prevents system sleep on macOS (`caffeinate`) and Linux (`systemd-inhibit`)
 - **Git sync with stash/rebase** — between-session sync stashes dirty work, rebases on default branch, cleans merged branches
-- **Empty-queue sweep** — when `TASKS.md` is empty, launches a sweep session to find work before exiting
+- **Empty-queue sweep** — when `TASKS.md` is empty, launches a sweep session to find work, then waits for external task injection before exiting
 - **Network resilience** — pauses on network loss, extends deadline on recovery
 - **Stall detection** — bails after consecutive zero-ship sessions (configurable via `TG_MAX_ZERO_SHIP`)
 - **Per-task retry cap** — skips tasks attempted 3+ times without shipping
@@ -148,6 +148,7 @@ Before deploying, ensure:
 | `TG_NET_CHECK_URL` | `https://connectivitycheck.gstatic.com/generate_204` | Override the fallback curl connectivity URL when `network-watchdog` is unavailable |
 | `TG_GIT_SYNC_TIMEOUT` | `30` | Max seconds for between-session git sync |
 | `TG_SYNC_INTERVAL` | `5` | Git sync every N sessions (0=every) |
+| `TG_EMPTY_QUEUE_WAIT` | `600` | Seconds to wait after an empty sweep before giving up |
 | `TG_EARLY_EXIT_ON_STALL` | `0` | Exit on low throughput (1=enabled) |
 | `TG_MAX_INSTANCES` | `2` | Max concurrent instances per repo |
 | `TG_DEVIN_PATH` | auto | Override devin binary path |

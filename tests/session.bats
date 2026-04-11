@@ -539,6 +539,16 @@ SCRIPT
   grep -q 'network_down\|network_timeout' "$TEST_LOG"
 }
 
+@test "empty queue wait honors DVB_EMPTY_QUEUE_WAIT" {
+  printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
+  export DVB_EMPTY_QUEUE_WAIT=2
+  export DVB_DEADLINE=$(( $(date +%s) + 6 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"waiting 2s for external task injection"* ]]
+  grep -q 'queue_empty tasks=0 sweep=done — waiting 2s' "$TEST_LOG"
+}
+
 @test "non-empty queue launches a session" {
   cat > "$TEST_REPO/TASKS.md" <<'TASKS'
 # Tasks
