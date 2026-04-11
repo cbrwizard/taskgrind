@@ -42,18 +42,6 @@
   - [ ] Test verifies model name appears in the session banner output
   - [ ] All existing tests pass
 
-- [ ] Reduce taskgrind test turnaround for local iteration
-  **ID**: improve-test-speed
-  **Tags**: dx, test, performance
-  **Details**: The suite is now parallelized, but local iteration is still too slow when contributors rerun `make check`, repeat a single bats file several times, or exercise timing-sensitive cases under load. Measure where wall-clock time is still going (fixed sleeps, repeated repo setup, duplicated fake-devin scaffolding, whole-suite startup overhead, and other hotspots) and make the fastest safe reductions without weakening coverage or disabling parallel execution.
-  **Files**: Makefile, tests/*.bats, tests/test_helper.bash, .github/workflows/check.yml, AGENTS.md
-  **Acceptance**:
-  - [ ] Baseline timings are captured for `make test`, `make check`, and at least one targeted bats-file rerun
-  - [ ] At least one real runtime reduction lands (for example shorter deterministic waits, shared helpers, lighter setup, or a faster targeted command path)
-  - [ ] Local whole-suite or targeted rerun wall-clock time measurably improves versus the baseline
-  - [ ] Parallel execution remains the primary verification path
-  - [ ] Any remaining slow or timing-sensitive paths are documented in `AGENTS.md`
-
 ## P1
 
 - [ ] Stabilize `tests/session.bats` shipped and zero-ship assertions under parallel `make check` (@devin)

@@ -33,6 +33,7 @@ taskgrind/
 make install    # symlink to /usr/local/bin + install man page
 make lint       # shellcheck (run from bin/ with -x for source resolution)
 make test       # bats test suite (392 tests)
+make test TESTS=tests/bash-compat.bats  # targeted rerun with its own cache key
 make check      # lint + test (run before committing)
 make uninstall  # remove symlink and man page
 ```
@@ -44,8 +45,14 @@ make uninstall  # remove symlink and man page
 3. **Env vars use `TG_` prefix (primary)** — `DVB_` is supported as a backward-compatible alias. Internal/test-only vars keep the `DVB_` prefix.
 4. **Source paths are relative** — `$TASKGRIND_DIR/lib/constants.sh`, derived from script location
 5. **Test with `DVB_GRIND_CMD`** — all tests use a fake devin stub, never the real binary
-6. **Timing-sensitive tests** — a handful of network recovery and branch cleanup tests may fail intermittently under load; pre-existing, not a regression
-7. **Keep runtime files `/bin/bash` 3.2 compatible** — `tests/bash-compat.bats` smokes `/bin/bash bin/taskgrind --dry-run` and rejects common Bash-4-only syntax in sourced runtime files
+6. **Use `TESTS=...` for tight loops** — `make test TESTS=tests/bash-compat.bats` or another file reruns just that selection and caches it separately from the full suite
+7. **Timing-sensitive tests** — a handful of network recovery and branch cleanup tests may fail intermittently under load; pre-existing, not a regression
+8. **Keep runtime files `/bin/bash` 3.2 compatible** — `tests/bash-compat.bats` smokes `/bin/bash bin/taskgrind --dry-run` and rejects common Bash-4-only syntax in sourced runtime files
+
+## Local Test Timing Notes
+
+- Baseline during `improve-test-speed`: `make test-force` reached the current suite failure point in about 34s, `make check` reached the same point in about 36s, and a direct `bats tests/bash-compat.bats` rerun took about 14s.
+- After the `TESTS=...` Makefile path landed, `make test TESTS=tests/bash-compat.bats` ran the file in about 4s on a warm cache, while the default full-suite parallel path stayed unchanged.
 
 ## Architecture
 

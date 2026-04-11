@@ -1,15 +1,20 @@
 .PHONY: lint test test-force check help install uninstall
 
 PREFIX ?= /usr/local
+TESTS ?= tests/*.bats
+TEST_JOBS ?= 9
+TEST_CACHE_BASENAME = .test-cache
 
 # Files that affect test outcomes — used for git-based cache
-TEST_DEPS = bin/taskgrind lib/constants.sh lib/fullpower.sh tests/test_helper.bash $(wildcard tests/*.bats)
-TEST_CACHE = .test-cache
+TEST_SHARED_DEPS = bin/taskgrind lib/constants.sh lib/fullpower.sh tests/test_helper.bash
+TEST_TARGET_KEY = $(subst /,_,$(subst *,_all_,$(TESTS)))
+TEST_CACHE = $(TEST_CACHE_BASENAME)-$(TEST_TARGET_KEY)
 
 help:
 	@echo "Available targets:"
 	@echo "  make lint       — run shellcheck on all scripts"
 	@echo "  make test       — run tests (cached, skips if unchanged)"
+	@echo "                    set TESTS=<glob-or-file> for targeted reruns"
 	@echo "  make test-force — run tests (ignore cache)"
 	@echo "  make check      — lint + test (run before committing)"
 	@echo "  make install    — symlink taskgrind to $(PREFIX)/bin and install man page"
@@ -23,19 +28,23 @@ lint:
 	@echo "✓ All scripts pass shellcheck"
 
 test:
-	@_hash=$$(cat $(TEST_DEPS) 2>/dev/null | shasum | cut -d' ' -f1); \
+	@set -- $(TESTS); \
+	_test_deps="$(TEST_SHARED_DEPS) $$*"; \
+	_hash=$$(printf '%s\n' "$(TESTS)" "$(TEST_JOBS)"; cat $$_test_deps 2>/dev/null | shasum | cut -d' ' -f1); \
+	_hash=$$(printf '%s' "$$_hash" | shasum | cut -d' ' -f1); \
 	if [ -f $(TEST_CACHE) ] && [ "$$(cat $(TEST_CACHE) 2>/dev/null)" = "$$_hash" ]; then \
 		echo "═══ Tests (cached) ═══"; \
 		echo "✓ No changes since last pass — skipping (use 'make test-force' to override)"; \
 	else \
-		echo "═══ Tests (parallel) ═══"; \
-		bats --jobs 9 tests/*.bats && echo "$$_hash" > $(TEST_CACHE); \
+		echo "═══ Tests ($(TESTS)) ═══"; \
+		bats --jobs $(TEST_JOBS) $(TESTS) && echo "$$_hash" > $(TEST_CACHE); \
 	fi
 
 test-force:
-	@echo "═══ Tests (parallel) ═══"
-	@bats --jobs 9 tests/*.bats
-	@cat $(TEST_DEPS) 2>/dev/null | shasum | cut -d' ' -f1 > $(TEST_CACHE)
+	@echo "═══ Tests ($(TESTS)) ═══"
+	@bats --jobs $(TEST_JOBS) $(TESTS)
+	@set -- $(TESTS); \
+	{ printf '%s\n' "$(TESTS)" "$(TEST_JOBS)"; cat $(TEST_SHARED_DEPS) $$* 2>/dev/null | shasum | cut -d' ' -f1; } | shasum | cut -d' ' -f1 > $(TEST_CACHE)
 
 check: lint test
 
