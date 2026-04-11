@@ -1065,8 +1065,9 @@ while [[ $(date +%s) -lt $deadline ]]; do
     session_exit=0
     build_session_args "$sweep_prompt"
     if [[ -n "${DVB_GRIND_CMD:-}" ]]; then
-      script -q "$session_output" \
-        "${devin_cmd[@]}" "${_session_args[@]}" \
+      "${devin_cmd[@]}" "${_session_args[@]}" \
+        > >(tee -a "$session_output") \
+        2> >(tee -a "$session_output" >&2) \
         || session_exit=$?
     else
       "${devin_cmd[@]}" "${_session_args[@]}" \
@@ -1196,9 +1197,10 @@ while [[ $(date +%s) -lt $deadline ]]; do
   session_exit=0
   build_session_args "$prompt"
   if [[ -n "${DVB_GRIND_CMD:-}" ]]; then
-    # Test mode: foreground with script(1) for output capture
-    script -q "$session_output" \
-      "${devin_cmd[@]}" "${_session_args[@]}" \
+    # Test mode: foreground with tee-based output capture
+    "${devin_cmd[@]}" "${_session_args[@]}" \
+      > >(tee -a "$session_output") \
+      2> >(tee -a "$session_output" >&2) \
       || session_exit=$?
   else
     # Production: background with timeout watchdog as safety valve.
