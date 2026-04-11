@@ -6,6 +6,29 @@ load test_helper
 
 DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
+_wait_for_status_phase() {
+  local status_file="$1"
+  local expected_phase="$2"
+  local attempts=0
+  while [[ $attempts -lt 50 ]]; do
+    if [[ -f "$status_file" ]] && python3 - "$status_file" "$expected_phase" <<'PY'
+import json
+import sys
+
+path, expected = sys.argv[1], sys.argv[2]
+with open(path, "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+sys.exit(0 if data.get("current_phase") == expected else 1)
+PY
+    then
+      return 0
+    fi
+    sleep 0.1
+    attempts=$((attempts + 1))
+  done
+  return 1
+}
+
 # ── Log file ─────────────────────────────────────────────────────────
 
 @test "creates log file" {
@@ -26,6 +49,69 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   export DVB_DEADLINE=$(( $(date +%s) + 5 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   grep -q 'session=1' "$TEST_LOG"
+}
+
+@test "status file captures startup and completion states" {
+  local status_file="$TEST_DIR/status.json"
+  export DVB_STATUS_FILE="$status_file"
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+
+  [ "$status" -eq 0 ]
+  python3 - "$status_file" "$TEST_REPO" <<'PY'
+import json
+import sys
+
+path, expected_repo = sys.argv[1], sys.argv[2]
+with open(path, "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+
+assert data["repo"] == expected_repo
+assert data["current_phase"] == "complete"
+assert data["session"] >= 1
+assert data["backend"] == "devin"
+assert data["skill"] == "next-task"
+assert data["model"] == "gpt-5.4"
+assert data["last_session"]["number"] >= 1
+assert data["last_session"]["result"] == "success"
+assert data["last_session"]["completed_at"]
+PY
+}
+
+@test "status file updates while a session is running" {
+  local status_file="$TEST_DIR/live-status.json"
+  local slow_devin="$TEST_DIR/slow-devin"
+  cat > "$slow_devin" <<'SCRIPT'
+#!/bin/bash
+echo "$@" >> "${DVB_GRIND_INVOKE_LOG:-/tmp/taskgrind-invocations}"
+sleep 2
+SCRIPT
+  chmod +x "$slow_devin"
+  export DVB_GRIND_CMD="$slow_devin"
+  export DVB_STATUS_FILE="$status_file"
+  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+
+  "$DVB_GRIND" 1 "$TEST_REPO" > "$TEST_DIR/live-status.out" 2>&1 &
+  local grind_pid=$!
+
+  _wait_for_status_phase "$status_file" "running_session"
+
+  python3 - "$status_file" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+
+assert data["current_phase"] == "running_session"
+assert data["session"] == 1
+assert data["last_session"]["result"] == "pending"
+assert isinstance(data["remaining_minutes"], int)
+PY
+
+  wait "$grind_pid"
+  [ "$?" -eq 0 ]
 }
 
 @test "session banner and log entry include active model" {

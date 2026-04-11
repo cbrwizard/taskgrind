@@ -151,6 +151,7 @@ Before deploying, ensure:
 | `TG_MAX_INSTANCES` | `2` | Max concurrent instances per repo |
 | `TG_DEVIN_PATH` | auto | Override devin binary path |
 | `TG_LOG` | auto | Override log file path |
+| `TG_STATUS_FILE` | (disabled) | Write machine-readable runtime status JSON to this path |
 | `TG_NOTIFY` | `1` | Desktop notification on completion |
 | `TG_SHUTDOWN_GRACE` | `120` | Seconds to wait for current session on exit |
 | `TG_SESSION_GRACE` | `15` | Seconds to wait after session SIGINT before SIGTERM |
@@ -164,6 +165,15 @@ cat "${TMPDIR:-/tmp}"/taskgrind-*.log       # review completed sessions
 ```
 
 Each session logs: start time, remaining minutes, task count, exit code, duration, and shipped count. The `grind_done` summary includes ship rate, remaining tasks, and average session duration.
+
+For machine-readable monitoring, set `TG_STATUS_FILE` to a JSON file path:
+
+```bash
+TG_STATUS_FILE=/tmp/taskgrind-status.json taskgrind ~/apps/myrepo 8
+cat /tmp/taskgrind-status.json
+```
+
+The status file updates atomically on startup, before and after each session, during network waits, and on final completion or failure. It includes the repo, process ID, slot, backend, skill, model, current session, remaining minutes, current phase, and the most recent session result.
 
 ### Live prompt injection
 

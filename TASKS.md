@@ -61,19 +61,6 @@
 
   - [ ] Verification confirms the documented flow matches the implementation
 
-- [ ] Emit machine-readable heartbeat status for external monitors and wrappers
-  **ID**: heartbeat-status-file
-  **Tags**: feature, observability, ux
-  **Details**: Taskgrind's only live status surface today is human-oriented stdout plus an append-only log file in `$TMPDIR`. That is hard for wrappers, launchd/systemd jobs, menu-bar tools, or watchdog scripts to consume. Adjacent supervisors and CI runners usually expose a structured status file or endpoint that external tooling can poll for health, current phase, session number, remaining minutes, and last error. Add an opt-in heartbeat/status artifact so operators can monitor a running grind without scraping prose logs.
-  **Files**: bin/taskgrind, tests/taskgrind.bats, README.md, man/taskgrind.1
-  **Acceptance**:
-  - [ ] Taskgrind can write a structured status file (for example JSON) to a predictable path while a grind is running
-  - [ ] The status includes repo, pid, slot, backend, skill, model, session number, remaining time, current phase, and the timestamp/result of the most recent session
-  - [ ] The heartbeat updates on startup, before and after each session, during network waits, and on final completion/failure
-  - [ ] The file is written atomically so external readers never see truncated content
-  - [ ] The feature is documented, including the default path or the env var/flag used to override it
-  - [ ] Tests verify heartbeat contents across at least startup, in-session, and completion states
-
 ## P3
 
 - [ ] Make network check URL configurable via TG_NET_CHECK_URL

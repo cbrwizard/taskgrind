@@ -100,6 +100,9 @@ Max seconds for between\-session git sync (default: 30).
 .B TG_LOG
 Override log file path.
 .TP
+.B TG_STATUS_FILE
+Write machine\-readable runtime status JSON to this path.
+.TP
 .B TG_NOTIFY
 Desktop notification on completion (default: 1, 0 to disable).
 .TP
@@ -140,6 +143,10 @@ to see how many slots are currently active before starting another grind.
 .TP
 .I ${TMPDIR:\-/tmp}/taskgrind\-*.log
 Session logs (one per grind invocation).
+.TP
+.I path set by TG_STATUS_FILE
+Optional JSON status file updated atomically on startup, before and after each
+session, during network waits, and on final completion or failure.
 .SH EXAMPLES
 .nf
 taskgrind                           # 10h grind, current dir
@@ -153,6 +160,7 @@ taskgrind \-\-dry\-run 8             # print config only
 taskgrind \-\-preflight             # health checks only
 taskgrind \-\-version               # print version
 TG_MAX_INSTANCES=3 taskgrind 8     # allow three concurrent grinds per repo
+TG_STATUS_FILE=/tmp/taskgrind-status.json taskgrind 8
 TG_MODEL=sonnet taskgrind 8        # resolves to claude-sonnet-4.6
 echo "gpt\-5\-4" > .taskgrind\-model  # switch model mid\-grind
 .fi
