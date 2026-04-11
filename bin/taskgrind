@@ -1729,6 +1729,15 @@ while [[ $(date +%s) -lt $deadline ]]; do
     consecutive_fast=0
   fi
 
+  # The session can delete or move the repo mid-run. Treat that as an abort,
+  # not as an empty queue, so follow-up logic does not misclassify it as shipped.
+  if ! cd "$repo" 2>/dev/null; then
+    echo "   ❌ Repo directory missing: $repo — aborting."
+    log_write "[$(date '+%H:%M')] repo_missing path=$repo"
+    set_phase "failed"
+    break
+  fi
+
   tasks_after=$(count_tasks "$repo/TASKS.md")
   tasks_remaining=$tasks_after
   _ids_after=$(extract_task_ids "$repo/TASKS.md")

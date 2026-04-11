@@ -41,14 +41,6 @@
   **Files**: `Makefile`, `tests/test_helper.bash`, `tests/*.bats`
   **Acceptance**: Repeated local `make test` and `make check` runs at the default parallelism do not fail with `Directory not empty` cleanup errors or follow-on `signal 15` terminations caused by leftover bats temp state.
 
-- [ ] Stabilize the repo-deletion abort regression so reruns do not flap
-  **ID**: stabilize-repo-deletion-abort-test
-  **Tags**: tests, reliability, regression
-  **Details**: The current log set shows `repo deletion mid-marathon aborts gracefully` passing in some runs (`/tmp/taskgrind-check.log`, `/tmp/taskgrind-fix-stash-masking-make-check.log`) and failing in others (`/tmp/taskgrind-detect-invalid-model-make-check.log`, `/tmp/taskgrind-full-test.log`, `/tmp/taskgrind-fix-stash-masking-make-check-rerun.log`). Audit the test timing and runtime behavior around repo disappearance so this regression reflects one deterministic contract instead of flapping across verify runs.
-  **Reviewed 2026-04-11**: The latest repo sweep did not surface any downstream repo queue action from this flake. Treat it as a pure `taskgrind` regression until a future log proves that a product repo's own runtime contract is involved.
-  **Files**: `bin/taskgrind`, `tests/session.bats`, `tests/test_helper.bash`
-  **Acceptance**: The repo-deletion abort regression passes consistently across repeated targeted and full-suite runs, and its assertions describe the intended abort contract without timing-sensitive flakes.
-
 ## P2
 - [ ] Add behavioral tests for macOS priority boosting and Linux no-op fallback
   **ID**: cover-fullpower-runtime

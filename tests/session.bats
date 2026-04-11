@@ -716,7 +716,9 @@ SCRIPT
   run "$DVB_GRIND" 1 "$volatile"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Repo directory missing"* ]]
+  [[ "$output" == *"Grind complete: 1 sessions, 0+ tasks"* ]]
   grep -q 'repo_missing' "$TEST_LOG"
+  ! grep -q 'queue_empty tasks=0' "$TEST_LOG"
 }
 
 @test "log_write does not crash on deleted log file" {
