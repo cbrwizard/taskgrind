@@ -171,15 +171,6 @@
   - [ ] Verifies the second process exits with "another taskgrind is already running"
   - [ ] First process completes normally
 
-- [ ] Add AUTONOMY prompt block test
-  **ID**: test-autonomy-prompt
-  **Tags**: test
-  **Details**: The `AUTONOMY:` prompt block (bin/taskgrind:1073) is appended to every session but never tested. Only `COMPLETION PROTOCOL` is verified. This prompt is critical — without it, agents defer tasks claiming "requires manual steps".
-  **Files**: tests/taskgrind.bats
-  **Acceptance**:
-  - [ ] Test verifies `AUTONOMY:` appears in the session prompt
-  - [ ] Test verifies key phrases: "browser automation", "MCP tools", "do not leave tasks"
-
 - [ ] Extract shared test helpers to reduce duplication
   **ID**: extract-test-helpers
   **Tags**: test, chore

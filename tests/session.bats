@@ -46,6 +46,15 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   grep -q 'remove.*task.*TASKS.md' "$DVB_GRIND_INVOKE_LOG"
 }
 
+@test "prompt includes autonomy block with automation guidance" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  grep -q 'AUTONOMY:' "$DVB_GRIND_INVOKE_LOG"
+  grep -q 'browser automation' "$DVB_GRIND_INVOKE_LOG"
+  grep -q 'MCP tools' "$DVB_GRIND_INVOKE_LOG"
+  grep -q "Do not leave tasks saying 'requires manual work'" "$DVB_GRIND_INVOKE_LOG"
+}
+
 @test "zero-ship session summary tells next session about the problem" {
   local counter_file="$TEST_DIR/counter"
   echo "0" > "$counter_file"
