@@ -208,6 +208,14 @@ TASKS
   [[ "$output" == *"tasks"* ]]
 }
 
+@test "expired deadline logs a startup skip without stall warnings" {
+  export DVB_DEADLINE=$(( $(date +%s) - 1 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'deadline_expired_before_session_loop' "$TEST_LOG"
+  ! grep -q 'stall_warning' "$TEST_LOG"
+}
+
 @test "shows log file path in summary" {
   export DVB_DEADLINE=$(( $(date +%s) + 5 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"

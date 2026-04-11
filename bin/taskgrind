@@ -1319,6 +1319,24 @@ wait_for_network() {
   return 0
 }
 
+skip_session_loop_if_deadline_expired() {
+  local now remaining_secs
+  now=$(date +%s)
+  remaining_secs=$((deadline - now))
+  if [[ "$remaining_secs" -gt 0 ]]; then
+    return 1
+  fi
+
+  echo "⏰ Deadline already expired — skipping session loop."
+  log_write "[$(date '+%H:%M')] deadline_expired_before_session_loop deadline=$deadline now=$now"
+  set_phase "deadline_expired"
+  return 0
+}
+
+if skip_session_loop_if_deadline_expired; then
+  set_phase "complete"
+fi
+
 while [[ $(date +%s) -lt $deadline ]]; do
   session=$((session + 1))
   now=$(date +%s)

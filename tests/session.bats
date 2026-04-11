@@ -341,6 +341,14 @@ TASKS
   [ ! -f "$DVB_GRIND_INVOKE_LOG" ]
 }
 
+@test "expired deadline prints a skip message before the session loop" {
+  export DVB_DEADLINE=$(( $(date +%s) - 1 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Deadline already expired — skipping session loop."* ]]
+  [ ! -f "$DVB_GRIND_INVOKE_LOG" ]
+}
+
 @test "continues loop when devin exits non-zero" {
   # Fake devin that fails
   local bad_devin="$TEST_DIR/bad-devin"

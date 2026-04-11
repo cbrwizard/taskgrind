@@ -23,13 +23,6 @@
   **Files**: `install.sh`, `tests/install.bats`, `tests/test_helper.bash`
   **Acceptance**: A new bats suite exercises the happy path and key failure paths for `install.sh` without touching the network; `make test` includes the suite.
 
-- [ ] Stop launching no-op sessions once the deadline is already exhausted
-  **ID**: guard-expired-deadline-launch
-  **Tags**: reliability, runtime, logs
-  **Details**: Several 2026-04-11 grind logs against temporary fixture repos (`taskgrind-2026-04-11-1805-repo-60489.log`, `...-1810-repo-46402.log`, `...-1824-repo-18279.log`, `...-1825-repo-39851.log`) show taskgrind starting with `remaining=0m` and still running one to four empty sessions before finally stopping. Add an early deadline guard so an already-expired run exits before launching the session loop, logs why it skipped work, and avoids generating misleading stall warnings or repeated zero-ship retries.
-  **Files**: `bin/taskgrind`, `tests/taskgrind.bats`, `tests/session.bats`
-  **Acceptance**: A run with an already-expired deadline exits without launching a session; the log records the expired-deadline skip; no stall-warning or extra zero-ship sessions are emitted in that case.
-
 - [ ] Distinguish real zero-ship sessions from task-count races in multi-agent runs
   **ID**: reconcile-productive-zero-ship-accounting
   **Tags**: reliability, metrics, concurrency
