@@ -45,14 +45,3 @@
 ## P2
 
 ## P3
-
-- [ ] Make network check URL configurable via TG_NET_CHECK_URL
-  **ID**: configurable-net-url
-  **Tags**: feature, config
-  **Details**: The fallback connectivity check URL at bin/taskgrind:297 is hardcoded to `https://connectivitycheck.gstatic.com/generate_204`. This may be blocked in corporate environments. Add a `TG_NET_CHECK_URL` env var for users to override.
-  **Files**: bin/taskgrind, README.md, man/taskgrind.1
-  **Acceptance**:
-  - [ ] `TG_NET_CHECK_URL` overrides the default connectivity URL
-  - [ ] Default behavior unchanged when env var is unset
-  - [ ] Documented in README, man page, and --help
-  - [ ] Test verifies custom URL is used

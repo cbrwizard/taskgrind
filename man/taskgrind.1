@@ -88,6 +88,11 @@ Network check retry attempts before declaring down (default: 3).
 .B TG_NET_RETRY_DELAY
 Seconds between network check retries (default: 2).
 .TP
+.B TG_NET_CHECK_URL
+Override the fallback curl connectivity check URL when
+.B network-watchdog
+is unavailable (default: https://connectivitycheck.gstatic.com/generate_204).
+.TP
 .B TG_SYNC_INTERVAL
 Git sync every N sessions (default: 5, 0=every).
 .TP

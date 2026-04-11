@@ -41,6 +41,7 @@
 #        TG_NET_MAX_WAIT — max time to wait for network in seconds (default: 14400)
 #        TG_NET_RETRIES — network check retry attempts before declaring down (default: 3)
 #        TG_NET_RETRY_DELAY — seconds between network check retries (default: 2)
+#        TG_NET_CHECK_URL — override the fallback connectivity check URL
 #        TG_MIN_SESSION — fast-failure threshold in seconds (default: 30)
 #        TG_DEVIN_PATH  — override devin binary path (default: auto-detect from PATH)
 #        TG_GIT_SYNC_TIMEOUT — max seconds for between-session git sync (default: 30)
@@ -97,7 +98,7 @@ _dvb_is_tty="${_dvb_is_tty:-0}"
 # (DVB_GRIND_CMD, DVB_DEADLINE, DVB_NET_FILE, DVB_CAFFEINATED) stay as DVB_.
 for _tg_var in BACKEND BACKOFF_BASE BACKOFF_MAX COOL DEVIN_PATH \
                EARLY_EXIT_ON_STALL GIT_SYNC_TIMEOUT LOG MAX_FAST MAX_INSTANCES \
-               MAX_SESSION MAX_ZERO_SHIP MIN_SESSION MODEL NET_MAX_WAIT \
+               MAX_SESSION MAX_ZERO_SHIP MIN_SESSION MODEL NET_CHECK_URL NET_MAX_WAIT \
                NET_RETRIES NET_RETRY_DELAY NET_WAIT NOTIFY PROMPT \
                SESSION_GRACE SHUTDOWN_GRACE SKILL STATUS_FILE SYNC_INTERVAL; do
   _tg_ref="TG_${_tg_var}"
@@ -419,6 +420,8 @@ _refresh_model() {
 }
 _refresh_model
 
+net_check_url="${DVB_NET_CHECK_URL:-https://connectivitycheck.gstatic.com/generate_204}"
+
 # ── Network check functions ──────────────────────────────────────────
 # Defined early so preflight_check() can reuse them (instead of a bare curl).
 
@@ -430,7 +433,7 @@ _check_network_once() {
     network-watchdog --check-only >/dev/null 2>&1
   else
     # Fallback: lightweight connectivity test when network-watchdog is missing
-    curl -sf --max-time 5 https://connectivitycheck.gstatic.com/generate_204 >/dev/null 2>&1
+    curl -sf --max-time 5 "$net_check_url" >/dev/null 2>&1
   fi
 }
 

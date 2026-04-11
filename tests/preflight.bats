@@ -42,6 +42,7 @@ SCRIPT
 
 @test "--preflight runs health checks and exits 0 on healthy repo" {
   _preflight_git_init
+  unset DVB_GRIND_CMD
   # Add TASKS.md
   echo "# Tasks" > "$TEST_REPO/TASKS.md"
   run "$DVB_GRIND" --preflight "$TEST_REPO"
@@ -190,6 +191,34 @@ EOF
   run "$DVB_GRIND" --preflight "$TEST_REPO"
   [ "$status" -eq 0 ]
   [[ "$output" == *"test mode"* ]]
+}
+
+@test "preflight uses TG_NET_CHECK_URL for curl fallback" {
+  local fake_bin="$TEST_DIR/fake-bin"
+  local fake_curl_log="$TEST_DIR/fake-curl.log"
+  mkdir -p "$fake_bin"
+
+  create_fake_devin "$fake_bin/devin" <<'SCRIPT'
+#!/bin/bash
+exit 0
+SCRIPT
+
+  cat > "$fake_bin/curl" <<SCRIPT
+#!/bin/bash
+echo "\$*" > "$fake_curl_log"
+exit 0
+SCRIPT
+  chmod +x "$fake_bin/curl"
+
+  _preflight_git_init
+  unset DVB_GRIND_CMD
+  export PATH="$fake_bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  export TG_NET_CHECK_URL="https://example.invalid/healthz"
+
+  run "$DVB_GRIND" --preflight "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"using curl fallback"* ]]
+  grep -q -- 'https://example.invalid/healthz' "$fake_curl_log"
 }
 
 @test "preflight rejects unknown model before the session loop" {

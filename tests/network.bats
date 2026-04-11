@@ -315,3 +315,14 @@ SCRIPT
   # Structural: the elif branch checks for network-watchdog before curl fallback
   grep -q 'elif command -v network-watchdog' "$DVB_GRIND"
 }
+
+@test "help documents TG_NET_CHECK_URL" {
+  run "$DVB_GRIND" --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"TG_NET_CHECK_URL"* ]]
+}
+
+@test "check_network fallback honors DVB_NET_CHECK_URL" {
+  grep -q 'net_check_url="${DVB_NET_CHECK_URL:-https://connectivitycheck.gstatic.com/generate_204}"' "$DVB_GRIND"
+  grep -q 'curl -sf --max-time 5 "$net_check_url"' "$DVB_GRIND"
+}

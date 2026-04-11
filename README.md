@@ -145,6 +145,7 @@ Before deploying, ensure:
 | `TG_NET_MAX_WAIT` | `14400` | Max time to wait for network recovery (4h) |
 | `TG_NET_RETRIES` | `3` | Network check retry attempts before declaring down |
 | `TG_NET_RETRY_DELAY` | `2` | Seconds between network check retries |
+| `TG_NET_CHECK_URL` | `https://connectivitycheck.gstatic.com/generate_204` | Override the fallback curl connectivity URL when `network-watchdog` is unavailable |
 | `TG_GIT_SYNC_TIMEOUT` | `30` | Max seconds for between-session git sync |
 | `TG_SYNC_INTERVAL` | `5` | Git sync every N sessions (0=every) |
 | `TG_EARLY_EXIT_ON_STALL` | `0` | Exit on low throughput (1=enabled) |
