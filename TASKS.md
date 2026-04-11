@@ -127,6 +127,39 @@
 
 ## P1
 
+- [ ] Stabilize `tests/session.bats` shipped and zero-ship assertions under parallel `make check` (@devin)
+  **ID**: stabilize-parallel-session-tests
+  **Parent**: stabilize-parallel-check-suite
+  **Tags**: test, stability
+  **Details**: Recent parallel `make check` failures included `tests/session.bats` assertions around `shipped=` and zero-ship state. Tighten those assertions so they remain deterministic when other bats files run concurrently.
+  **Files**: tests/session.bats, tests/test_helper.bash
+  **Acceptance**:
+  - [ ] `tests/session.bats` no longer intermittently misses `shipped=` or zero-ship assertions during parallel runs
+  - [ ] The fix preserves the behavioral intent of the current session accounting tests
+  - [ ] Targeted `tests/session.bats` runs still pass
+
+- [ ] Stabilize `tests/signals.bats` prompt-warning and graceful-shutdown assertions under parallel `make check`
+  **ID**: stabilize-parallel-signal-tests
+  **Parent**: stabilize-parallel-check-suite
+  **Tags**: test, stability
+  **Details**: Recent parallel `make check` failures included `tests/signals.bats` prompt-warning assertions and graceful-shutdown timing paths. Make those signal-driven tests deterministic without weakening the behavior they cover.
+  **Files**: tests/signals.bats, tests/test_helper.bash
+  **Acceptance**:
+  - [ ] `tests/signals.bats` no longer intermittently fails prompt-warning or shutdown assertions during parallel runs
+  - [ ] The fix preserves SIGINT/SIGTERM behavioral coverage
+  - [ ] Targeted `tests/signals.bats` runs still pass
+
+- [ ] Stabilize the parallel bats verification harness and document any remaining limits
+  **ID**: stabilize-parallel-check-harness
+  **Parent**: stabilize-parallel-check-suite
+  **Tags**: test, dx, stability
+  **Details**: Parallel `make check` has reported full-suite terminations (`bats --jobs 9 tests/*.bats` exiting with signal 15) in addition to file-level assertion failures. Once the flaky specs are stabilized, make the verification harness reliable enough for contributor use and document any residual timing-sensitive limitations in the repo guidance.
+  **Files**: Makefile, .github/workflows/check.yml, AGENTS.md
+  **Acceptance**:
+  - [ ] `make check` no longer terminates spuriously during local parallel verification
+  - [ ] CI/local parallel bats invocation remains enabled as the primary path
+  - [ ] AGENTS.md documents any remaining test limitations with exact commands or scenarios if they still exist
+
 - [ ] Test coverage for per-task skip list (attempt tracking)
   **ID**: test-skip-list
   **Tags**: test, stability
