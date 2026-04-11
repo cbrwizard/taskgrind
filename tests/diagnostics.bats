@@ -10,12 +10,11 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
 @test "non-zero exit code is logged per session" {
   local failing_devin="$TEST_DIR/fail-devin"
-  cat > "$failing_devin" <<'SCRIPT'
+  create_fake_devin "$failing_devin" <<'SCRIPT'
 #!/bin/bash
 echo "$@" >> "${DVB_GRIND_INVOKE_LOG:-/tmp/taskgrind-invocations}"
 exit 42
 SCRIPT
-  chmod +x "$failing_devin"
   export DVB_GRIND_CMD="$failing_devin"
   export DVB_DEADLINE=$(( $(date +%s) + 5 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
@@ -33,9 +32,7 @@ SCRIPT
 }
 
 @test "max fast failures bails out with diagnostic" {
-  local net_file="$TEST_DIR/net-up"
-  touch "$net_file"
-  export DVB_NET_FILE="$net_file"
+  setup_network_sentinel "$TEST_DIR/net-up"
   export DVB_MIN_SESSION=999
   export DVB_MAX_FAST=3
   export DVB_BACKOFF_BASE=0
@@ -49,15 +46,12 @@ SCRIPT
 
 @test "bail out stops the loop (no more sessions after)" {
   local counter_devin="$TEST_DIR/counter-devin"
-  cat > "$counter_devin" <<SCRIPT
+  create_fake_devin "$counter_devin" <<SCRIPT
 #!/bin/bash
 echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
 SCRIPT
-  chmod +x "$counter_devin"
   export DVB_GRIND_CMD="$counter_devin"
-  local net_file="$TEST_DIR/net-up"
-  touch "$net_file"
-  export DVB_NET_FILE="$net_file"
+  setup_network_sentinel "$TEST_DIR/net-up"
   export DVB_MIN_SESSION=999
   export DVB_MAX_FAST=3
   export DVB_BACKOFF_BASE=0
@@ -72,7 +66,7 @@ SCRIPT
 
 @test "fast failure captures session output to log" {
   local err_devin="$TEST_DIR/err-devin"
-  cat > "$err_devin" <<'SCRIPT'
+  create_fake_devin "$err_devin" <<'SCRIPT'
 #!/bin/bash
 echo "$@" >> "${DVB_GRIND_INVOKE_LOG:-/tmp/taskgrind-invocations}"
 if [[ "$*" == *"--help"* ]]; then
@@ -81,11 +75,8 @@ fi
 echo "ERROR: something went wrong"
 exit 1
 SCRIPT
-  chmod +x "$err_devin"
   export DVB_GRIND_CMD="$err_devin"
-  local net_file="$TEST_DIR/net-up"
-  touch "$net_file"
-  export DVB_NET_FILE="$net_file"
+  setup_network_sentinel "$TEST_DIR/net-up"
   export DVB_MIN_SESSION=999
   export DVB_MAX_FAST=2
   export DVB_BACKOFF_BASE=0
@@ -98,7 +89,7 @@ SCRIPT
 
 @test "fast failure captures backend stderr to log" {
   local err_devin="$TEST_DIR/stderr-devin"
-  cat > "$err_devin" <<'SCRIPT'
+  create_fake_devin "$err_devin" <<'SCRIPT'
 #!/bin/bash
 echo "$@" >> "${DVB_GRIND_INVOKE_LOG:-/tmp/taskgrind-invocations}"
 if [[ "$*" == *"--help"* ]]; then
@@ -107,11 +98,8 @@ fi
 echo "Error: Unknown model: 'broken-model'" >&2
 exit 1
 SCRIPT
-  chmod +x "$err_devin"
   export DVB_GRIND_CMD="$err_devin"
-  local net_file="$TEST_DIR/net-up"
-  touch "$net_file"
-  export DVB_NET_FILE="$net_file"
+  setup_network_sentinel "$TEST_DIR/net-up"
   export DVB_MIN_SESSION=999
   export DVB_MAX_FAST=2
   export DVB_BACKOFF_BASE=0
@@ -124,17 +112,14 @@ SCRIPT
 
 @test "bail out shows last session output in terminal" {
   local err_devin="$TEST_DIR/err-devin"
-  cat > "$err_devin" <<'SCRIPT'
+  create_fake_devin "$err_devin" <<'SCRIPT'
 #!/bin/bash
 echo "$@" >> "${DVB_GRIND_INVOKE_LOG:-/tmp/taskgrind-invocations}"
 echo "FATAL: cannot connect to API"
 exit 1
 SCRIPT
-  chmod +x "$err_devin"
   export DVB_GRIND_CMD="$err_devin"
-  local net_file="$TEST_DIR/net-up"
-  touch "$net_file"
-  export DVB_NET_FILE="$net_file"
+  setup_network_sentinel "$TEST_DIR/net-up"
   export DVB_MIN_SESSION=999
   export DVB_MAX_FAST=3
   export DVB_BACKOFF_BASE=0
@@ -145,9 +130,7 @@ SCRIPT
 }
 
 @test "bail out log includes exit code" {
-  local net_file="$TEST_DIR/net-up"
-  touch "$net_file"
-  export DVB_NET_FILE="$net_file"
+  setup_network_sentinel "$TEST_DIR/net-up"
   export DVB_MIN_SESSION=999
   export DVB_MAX_FAST=3
   export DVB_BACKOFF_BASE=0

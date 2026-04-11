@@ -13,9 +13,7 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
 @test "check_network returns true when DVB_NET_FILE exists" {
   # Verify the test-mode sentinel mechanism works
-  local net_file="$TEST_DIR/net-up"
-  touch "$net_file"
-  export DVB_NET_FILE="$net_file"
+  setup_network_sentinel "$TEST_DIR/net-up"
   export DVB_MIN_SESSION=999
   export DVB_DEADLINE=$(( $(date +%s) + 5 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
@@ -30,9 +28,7 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
 @test "fast session triggers network check when DVB_MIN_SESSION set" {
   # Fake devin exits instantly (0s < min_session_secs), network is up
-  local net_file="$TEST_DIR/net-up"
-  touch "$net_file"
-  export DVB_NET_FILE="$net_file"
+  setup_network_sentinel "$TEST_DIR/net-up"
   export DVB_MIN_SESSION=999
   export DVB_DEADLINE=$(( $(date +%s) + 5 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
@@ -43,7 +39,7 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
 @test "network down pauses loop and logs network_down" {
   # No sentinel file = network down. max_wait=0 so it times out immediately.
-  export DVB_NET_FILE="$TEST_DIR/net-up"  # file does NOT exist
+  setup_network_sentinel "$TEST_DIR/net-up" down
   export DVB_MIN_SESSION=999
   export DVB_NET_WAIT=0
   export DVB_NET_MAX_WAIT=0
@@ -55,7 +51,7 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
 @test "network timeout exits the loop" {
   # Network never comes back, max_wait=0 forces immediate timeout
-  export DVB_NET_FILE="$TEST_DIR/net-up"  # does not exist
+  setup_network_sentinel "$TEST_DIR/net-up" down
   export DVB_MIN_SESSION=999
   export DVB_NET_WAIT=0
   export DVB_NET_MAX_WAIT=0
@@ -72,13 +68,12 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   nohup bash -c "sleep 4; touch '$TEST_DIR/net-up'" &>/dev/null &
 
   local restore_devin="$TEST_DIR/restore-devin"
-  cat > "$restore_devin" <<'SCRIPT'
+  create_fake_devin "$restore_devin" <<'SCRIPT'
 #!/bin/bash
 echo "$@" >> "${DVB_GRIND_INVOKE_LOG:-/tmp/taskgrind-invocations}"
 SCRIPT
-  chmod +x "$restore_devin"
   export DVB_GRIND_CMD="$restore_devin"
-  export DVB_NET_FILE="$TEST_DIR/net-up"  # does not exist yet
+  setup_network_sentinel "$TEST_DIR/net-up" down
   export DVB_MIN_SESSION=999
   export DVB_BACKOFF_BASE=0
   export DVB_MAX_FAST=999
@@ -95,13 +90,12 @@ SCRIPT
   nohup bash -c "sleep 2; touch '$TEST_DIR/net-up'" &>/dev/null &
 
   local restore_devin="$TEST_DIR/restore-devin"
-  cat > "$restore_devin" <<'SCRIPT'
+  create_fake_devin "$restore_devin" <<'SCRIPT'
 #!/bin/bash
 echo "$@" >> "${DVB_GRIND_INVOKE_LOG:-/tmp/taskgrind-invocations}"
 SCRIPT
-  chmod +x "$restore_devin"
   export DVB_GRIND_CMD="$restore_devin"
-  export DVB_NET_FILE="$TEST_DIR/net-up"
+  setup_network_sentinel "$TEST_DIR/net-up" down
   export DVB_MIN_SESSION=999
   export DVB_BACKOFF_BASE=0
   export DVB_MAX_FAST=999
@@ -122,9 +116,7 @@ SCRIPT
 
 @test "consecutive fast failures increment counter and trigger backoff" {
   # Network is up but sessions keep failing fast — should see fast_fail in log
-  local net_file="$TEST_DIR/net-up"
-  touch "$net_file"
-  export DVB_NET_FILE="$net_file"
+  setup_network_sentinel "$TEST_DIR/net-up"
   export DVB_MIN_SESSION=999
   export DVB_BACKOFF_BASE=0
   export DVB_COOL=0
@@ -137,9 +129,7 @@ SCRIPT
 }
 
 @test "backoff increases with consecutive fast failures" {
-  local net_file="$TEST_DIR/net-up"
-  touch "$net_file"
-  export DVB_NET_FILE="$net_file"
+  setup_network_sentinel "$TEST_DIR/net-up"
   export DVB_MIN_SESSION=999
   export DVB_BACKOFF_BASE=1
   export DVB_BACKOFF_MAX=10
@@ -154,9 +144,7 @@ SCRIPT
 }
 
 @test "backoff caps at DVB_BACKOFF_MAX" {
-  local net_file="$TEST_DIR/net-up"
-  touch "$net_file"
-  export DVB_NET_FILE="$net_file"
+  setup_network_sentinel "$TEST_DIR/net-up"
   export DVB_MIN_SESSION=999
   export DVB_BACKOFF_BASE=0
   export DVB_BACKOFF_MAX=5
@@ -185,7 +173,7 @@ SCRIPT
   # First few sessions are fast (incrementing consecutive_fast)
   # Then a slow session resets the counter
   local slow_devin="$TEST_DIR/slow-devin"
-  cat > "$slow_devin" <<SCRIPT
+  create_fake_devin "$slow_devin" <<SCRIPT
 #!/bin/bash
 echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
 # On 4th invocation, simulate a long session
@@ -195,11 +183,8 @@ if [ "\$count" -ge 4 ]; then
   sleep 2
 fi
 SCRIPT
-  chmod +x "$slow_devin"
   export DVB_GRIND_CMD="$slow_devin"
-  local net_file="$TEST_DIR/net-up"
-  touch "$net_file"
-  export DVB_NET_FILE="$net_file"
+  setup_network_sentinel "$TEST_DIR/net-up"
   export DVB_MIN_SESSION=1
   export DVB_BACKOFF_BASE=0
   export DVB_COOL=0

@@ -56,3 +56,32 @@ _preflight_git_init() {
   git -C "$TEST_REPO" config user.name "Test"
   git -C "$TEST_REPO" commit --allow-empty -m "init" --quiet
 }
+
+# Helper: create an executable fake devin script from stdin.
+create_fake_devin() {
+  local fake_devin_path="$1"
+  cat > "$fake_devin_path"
+  chmod +x "$fake_devin_path"
+}
+
+# Helper: initialize a test git repo with a default branch and initial commit.
+init_test_repo() {
+  local repo_path="${1:-$TEST_REPO}"
+  local branch_name="${2:-main}"
+  git -C "$repo_path" init -q -b "$branch_name"
+  git -C "$repo_path" config user.email "test@test.com"
+  git -C "$repo_path" config user.name "Test"
+  git -C "$repo_path" commit --allow-empty -m "init" --quiet
+}
+
+# Helper: configure the network sentinel path, optionally creating it.
+setup_network_sentinel() {
+  local sentinel_path="${1:-$TEST_DIR/net-up}"
+  local sentinel_state="${2:-up}"
+  export DVB_NET_FILE="$sentinel_path"
+  if [ "$sentinel_state" = "up" ]; then
+    touch "$sentinel_path"
+  else
+    rm -f "$sentinel_path"
+  fi
+}

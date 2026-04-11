@@ -114,17 +114,6 @@
   - [ ] Verifies the second process exits with "another taskgrind is already running"
   - [ ] First process completes normally
 
-- [ ] Extract shared test helpers to reduce duplication
-  **ID**: extract-test-helpers
-  **Tags**: test, chore
-  **Details**: `tests/test_helper.bash` is effectively empty (6 lines, no functions). The fake-devin creation pattern, git-repo initialization pattern, and network sentinel setup are duplicated across the large monolithic bats suite. Extract into named helper functions.
-  **Files**: tests/test_helper.bash, tests/taskgrind.bats
-  **Acceptance**:
-  - [ ] `test_helper.bash` provides: `create_fake_devin`, `init_test_repo`, `setup_network_sentinel`
-  - [ ] At least 10 tests refactored to use shared helpers
-  - [ ] All tests still pass
-  - [ ] Net reduction in test file line count
-
 - [ ] Add preflight disk space threshold tests
   **ID**: test-disk-thresholds
   **Tags**: test

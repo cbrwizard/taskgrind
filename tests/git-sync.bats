@@ -24,12 +24,10 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
 @test "agent on feature branch gets reset to main next session" {
   # Initialize repo with main + feature branch
-  git -C "$TEST_REPO" init -q -b main
-  git -C "$TEST_REPO" config user.email "test@test.com"
-  git -C "$TEST_REPO" config user.name "Test"
+  init_test_repo "$TEST_REPO"
   echo "init" > "$TEST_REPO/README.md"
   git -C "$TEST_REPO" add README.md
-  git -C "$TEST_REPO" commit -q --no-verify -m "init"
+  git -C "$TEST_REPO" commit -q --amend --no-edit
   local bare="$TEST_DIR/bare.git"
   git init -q --bare "$bare"
   git -C "$TEST_REPO" remote add origin "$bare"
@@ -68,12 +66,10 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
 @test "dirty working tree survives between-session sync" {
   # Initialize repo with main branch and remote
-  git -C "$TEST_REPO" init -q -b main
-  git -C "$TEST_REPO" config user.email "test@test.com"
-  git -C "$TEST_REPO" config user.name "Test"
+  init_test_repo "$TEST_REPO"
   echo "init" > "$TEST_REPO/README.md"
   git -C "$TEST_REPO" add README.md
-  git -C "$TEST_REPO" commit -q --no-verify -m "init"
+  git -C "$TEST_REPO" commit -q --amend --no-edit
   local bare="$TEST_DIR/bare.git"
   git init -q --bare "$bare"
   git -C "$TEST_REPO" remote add origin "$bare"
@@ -95,12 +91,10 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 }
 
 @test "git sync interval skips non-sync sessions and runs on matching modulo" {
-  git -C "$TEST_REPO" init -q -b main
-  git -C "$TEST_REPO" config user.email "test@test.com"
-  git -C "$TEST_REPO" config user.name "Test"
+  init_test_repo "$TEST_REPO"
   echo "init" > "$TEST_REPO/README.md"
   git -C "$TEST_REPO" add README.md
-  git -C "$TEST_REPO" commit -q --no-verify -m "init"
+  git -C "$TEST_REPO" commit -q --amend --no-edit
   local bare="$TEST_DIR/bare.git"
   git init -q --bare "$bare"
   git -C "$TEST_REPO" remote add origin "$bare"
@@ -146,12 +140,10 @@ EOF
   chmod +x "$TEST_DIR/bin/git"
   export PATH="$TEST_DIR/bin:$PATH"
 
-  git -C "$TEST_REPO" init -q -b main
-  git -C "$TEST_REPO" config user.email "test@test.com"
-  git -C "$TEST_REPO" config user.name "Test"
+  init_test_repo "$TEST_REPO"
   echo "init" > "$TEST_REPO/README.md"
   git -C "$TEST_REPO" add README.md
-  git -C "$TEST_REPO" commit -q --no-verify -m "init"
+  git -C "$TEST_REPO" commit -q --amend --no-edit
   local bare="$TEST_DIR/bare.git"
   git init -q --bare "$bare"
   git -C "$TEST_REPO" remote add origin "$bare"
@@ -173,12 +165,10 @@ EOF
 
 @test "merged branches are cleaned up between sessions" {
   # Initialize repo with main
-  git -C "$TEST_REPO" init -q -b main
-  git -C "$TEST_REPO" config user.email "test@test.com"
-  git -C "$TEST_REPO" config user.name "Test"
+  init_test_repo "$TEST_REPO"
   echo "init" > "$TEST_REPO/README.md"
   git -C "$TEST_REPO" add README.md
-  git -C "$TEST_REPO" commit -q --no-verify -m "init"
+  git -C "$TEST_REPO" commit -q --amend --no-edit
   local bare="$TEST_DIR/bare.git"
   git init -q --bare "$bare"
   git -C "$TEST_REPO" remote add origin "$bare"
@@ -202,12 +192,10 @@ EOF
 }
 
 @test "unmerged branches are not deleted" {
-  git -C "$TEST_REPO" init -q -b main
-  git -C "$TEST_REPO" config user.email "test@test.com"
-  git -C "$TEST_REPO" config user.name "Test"
+  init_test_repo "$TEST_REPO"
   echo "init" > "$TEST_REPO/README.md"
   git -C "$TEST_REPO" add README.md
-  git -C "$TEST_REPO" commit -q --no-verify -m "init"
+  git -C "$TEST_REPO" commit -q --amend --no-edit
   local bare="$TEST_DIR/bare.git"
   git init -q --bare "$bare"
   git -C "$TEST_REPO" remote add origin "$bare"
