@@ -155,6 +155,92 @@ Session logs (one per grind invocation).
 .I path set by TG_STATUS_FILE
 Optional JSON status file updated atomically on startup, before and after each
 session, during network waits, and on final completion or failure.
+.PP
+Payload fields:
+.RS
+.TP
+.B repo
+Repo path being ground.
+.TP
+.B pid
+Process ID of the current taskgrind run.
+.TP
+.B slot
+Claimed concurrency slot for this repo.
+.TP
+.B backend
+Active backend such as devin, claude\-code, or codex.
+.TP
+.B skill
+Skill prompt sent to each session.
+.TP
+.B model
+Resolved model name currently in use.
+.TP
+.B session
+Session counter for the current grind run.
+.TP
+.B remaining_minutes
+Whole minutes remaining until the deadline, floored at 0.
+.TP
+.B current_phase
+Lifecycle phase such as startup, preflight, running_session,
+waiting_for_network, queue_empty_wait, git_sync, complete, or failed.
+.TP
+.B updated_at
+Last write timestamp in the local %Y\-%m\-%dT%H:%M:%S%z format.
+.TP
+.B last_session.number
+Most recently finished session number, or 0 before any session completes.
+.TP
+.B last_session.result
+Result label for the most recent session, such as completed, timeout,
+network_wait, or none before the first session.
+.TP
+.B last_session.exit_code
+Backend exit code for the most recent session, or null before the first
+completed session.
+.TP
+.B last_session.shipped
+Tasks shipped by the most recent session.
+.TP
+.B last_session.duration_seconds
+Runtime of the most recent session in seconds.
+.TP
+.B last_session.completed_at
+Completion timestamp for the most recent session, or an empty string before any
+session completes.
+.RE
+.PP
+Lifecycle example:
+.nf
+{
+  "repo": "/Users/alex/apps/myrepo",
+  "pid": 48122,
+  "slot": 0,
+  "backend": "devin",
+  "skill": "next-task",
+  "model": "gpt-5.4",
+  "session": 3,
+  "remaining_minutes": 451,
+  "current_phase": "running_session",
+  "updated_at": "2026-04-11T18:33:44-0700",
+  "last_session": {
+    "number": 2,
+    "result": "completed",
+    "exit_code": 0,
+    "shipped": 1,
+    "duration_seconds": 742,
+    "completed_at": "2026-04-11T18:32:58-0700"
+  }
+}
+.fi
+.PP
+The file starts at startup/preflight, moves through active phases such as
+running_sweep or running_session, then transitions through cooldown, git_sync,
+queue_empty_wait, blocked_wait, or waiting_for_network as needed. A successful
+shutdown writes one final complete state; startup or runtime errors finish as
+failed.
 .SH EXAMPLES
 .nf
 taskgrind                           # 10h grind, current dir

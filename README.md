@@ -177,6 +177,123 @@ cat /tmp/taskgrind-status.json
 
 The status file updates atomically on startup, before and after each session, during network waits, and on final completion or failure. It includes the repo, process ID, slot, backend, skill, model, current session, remaining minutes, current phase, and the most recent session result.
 
+Status payload fields:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `repo` | string | Absolute or user-supplied repo path being ground |
+| `pid` | number | Process ID of the current `taskgrind` run |
+| `slot` | number | Claimed concurrency slot for this repo (`0` owns git sync) |
+| `backend` | string | Active backend such as `devin`, `claude-code`, or `codex` |
+| `skill` | string | Skill prompt sent to each session |
+| `model` | string | Resolved model name currently in use |
+| `session` | number | Session counter for the current grind run |
+| `remaining_minutes` | number | Whole minutes left until the current deadline, floored at `0` |
+| `current_phase` | string | Current lifecycle phase such as `startup`, `preflight`, `running_session`, `cooldown`, `waiting_for_network`, `queue_empty_wait`, `git_sync`, `complete`, or `failed` |
+| `updated_at` | string | Last write time in local ISO-like timestamp format (`%Y-%m-%dT%H:%M:%S%z`) |
+| `last_session.number` | number | Most recently finished session number, or `0` before any session completes |
+| `last_session.result` | string | Result label for the most recent session, such as `completed`, `timeout`, `network_wait`, or `none` before the first session |
+| `last_session.exit_code` | number or `null` | Backend exit code for the most recent session, or `null` before the first completed session |
+| `last_session.shipped` | number | Tasks shipped by the most recent session |
+| `last_session.duration_seconds` | number | Runtime of the most recent session in seconds |
+| `last_session.completed_at` | string | Completion timestamp for the most recent session, or empty string before any session completes |
+
+Example lifecycle snapshots:
+
+```json
+{
+  "repo": "/Users/alex/apps/myrepo",
+  "pid": 48122,
+  "slot": 0,
+  "backend": "devin",
+  "skill": "next-task",
+  "model": "gpt-5.4",
+  "session": 0,
+  "remaining_minutes": 479,
+  "current_phase": "preflight",
+  "updated_at": "2026-04-11T18:05:12-0700",
+  "last_session": {
+    "number": 0,
+    "result": "none",
+    "exit_code": null,
+    "shipped": 0,
+    "duration_seconds": 0,
+    "completed_at": ""
+  }
+}
+```
+
+```json
+{
+  "repo": "/Users/alex/apps/myrepo",
+  "pid": 48122,
+  "slot": 0,
+  "backend": "devin",
+  "skill": "next-task",
+  "model": "gpt-5.4",
+  "session": 3,
+  "remaining_minutes": 451,
+  "current_phase": "running_session",
+  "updated_at": "2026-04-11T18:33:44-0700",
+  "last_session": {
+    "number": 2,
+    "result": "completed",
+    "exit_code": 0,
+    "shipped": 1,
+    "duration_seconds": 742,
+    "completed_at": "2026-04-11T18:32:58-0700"
+  }
+}
+```
+
+```json
+{
+  "repo": "/Users/alex/apps/myrepo",
+  "pid": 48122,
+  "slot": 0,
+  "backend": "devin",
+  "skill": "next-task",
+  "model": "gpt-5.4",
+  "session": 3,
+  "remaining_minutes": 449,
+  "current_phase": "waiting_for_network",
+  "updated_at": "2026-04-11T18:35:21-0700",
+  "last_session": {
+    "number": 3,
+    "result": "network_wait",
+    "exit_code": 1,
+    "shipped": 0,
+    "duration_seconds": 12,
+    "completed_at": "2026-04-11T18:35:19-0700"
+  }
+}
+```
+
+```json
+{
+  "repo": "/Users/alex/apps/myrepo",
+  "pid": 48122,
+  "slot": 0,
+  "backend": "devin",
+  "skill": "next-task",
+  "model": "gpt-5.4",
+  "session": 7,
+  "remaining_minutes": 0,
+  "current_phase": "complete",
+  "updated_at": "2026-04-12T02:05:01-0700",
+  "last_session": {
+    "number": 7,
+    "result": "completed",
+    "exit_code": 0,
+    "shipped": 1,
+    "duration_seconds": 801,
+    "completed_at": "2026-04-12T02:04:55-0700"
+  }
+}
+```
+
+In practice, `current_phase` moves from startup and preflight into active work (`running_sweep` or `running_session`), then through transitional phases such as `session_complete`, `cooldown`, `git_sync`, `queue_empty_wait`, or `blocked_wait`. Temporary interruptions show up as `waiting_for_network` and then `network_restored`. Normal shutdown rewrites the file one last time as `complete`; argument or runtime failures finish as `failed`.
+
 ### Live prompt injection
 
 While taskgrind is running, create or edit `.taskgrind-prompt` in the target repo to add instructions to every subsequent session:

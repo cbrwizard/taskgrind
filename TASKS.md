@@ -23,13 +23,6 @@
   **Files**: `install.sh`, `tests/install.bats`, `tests/test_helper.bash`
   **Acceptance**: A new bats suite exercises the happy path and key failure paths for `install.sh` without touching the network; `make test` includes the suite.
 
-- [ ] Document the runtime status JSON schema and example lifecycle transitions
-  **ID**: document-status-file-schema
-  **Tags**: docs, observability, monitoring
-  **Details**: README mentions `TG_STATUS_FILE` but does not spell out the emitted JSON fields or how values change across startup, active sessions, network waits, and completion. Add a field reference plus one realistic example so operators can build external monitors without reverse-engineering `write_status_file`.
-  **Files**: `README.md`, `man/taskgrind.1`, `bin/taskgrind`
-  **Acceptance**: Docs enumerate the status payload fields written by `write_status_file`; at least one example matches the current runtime shape and phase transitions.
-
 - [ ] Stop launching no-op sessions once the deadline is already exhausted
   **ID**: guard-expired-deadline-launch
   **Tags**: reliability, runtime, logs
