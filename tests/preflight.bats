@@ -6,6 +6,23 @@ load test_helper
 
 DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
+_install_fake_backend_binary() {
+  local binary_name="$1"
+  local script_path="$TEST_DIR/$binary_name"
+
+  cat > "$script_path" <<'SCRIPT'
+#!/bin/bash
+echo "$@" >> "${DVB_GRIND_INVOKE_LOG:-/tmp/taskgrind-invocations}"
+if [[ "$*" == *"--help"* ]] && [[ "$*" == *"--model invalid-model"* ]]; then
+  echo "backend said invalid model: invalid-model" >&2
+  exit 1
+fi
+exit 0
+SCRIPT
+  chmod +x "$script_path"
+  export PATH="$TEST_DIR:$PATH"
+}
+
 # ── Preflight health checks ───────────────────────────────────────────
 
 @test "--preflight runs health checks and exits 0 on healthy repo" {
@@ -185,6 +202,23 @@ SCRIPT
   invoke_count=$(wc -l < "$DVB_GRIND_INVOKE_LOG" | tr -d ' ')
   [ "$invoke_count" -eq 1 ]
   grep -q -- '--help' "$DVB_GRIND_INVOKE_LOG"
+}
+
+@test "preflight validates models through claude-code backend resolution" {
+  _enable_preflight_checks
+  unset DVB_GRIND_CMD
+  _install_fake_backend_binary "claude"
+  _preflight_git_init
+
+  run "$DVB_GRIND" --backend claude-code --model invalid-model 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"backend said invalid model: invalid-model"* ]]
+  [[ "$output" == *"Model rejected by claude-code before starting"* ]]
+
+  local invoke_count
+  invoke_count=$(wc -l < "$DVB_GRIND_INVOKE_LOG" | tr -d ' ' )
+  [ "$invoke_count" -eq 1 ]
+  grep -q -- '--model invalid-model --help' "$DVB_GRIND_INVOKE_LOG"
 }
 
 @test "preflight disk space check runs" {
