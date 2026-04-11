@@ -2,31 +2,6 @@
 
 ## P0
 
-- [ ] Allow multiple taskgrind instances on the same repo via instance slots
-  **ID**: multi-instance-same-repo
-  **Tags**: feature, stability, dx
-  **Details**: The current per-repo exclusive lock (`taskgrind-lock-<hash>`) prevents running two taskgrinds on the same repo simultaneously. The user wants to run a second instance with a read-only audit role (produce tasks, commit, push — no code changes) alongside a code-producing instance. The lock exists to prevent: (1) git conflicts on TASKS.md and working tree, (2) the between-session sync (stash/rebase) stomping the other agent's uncommitted work, (3) two agents picking the same task.
-
-  The right solution is **instance slots + per-instance worktrees** or **a `--no-lock` / `TG_INSTANCE` escape hatch with conflict-avoidance hints** injected into the prompt. The simpler path (no worktrees) is:
-
-  1. Replace the single lock with a numbered slot system: `taskgrind-lock-<repohash>-<N>` where N is 0, 1, 2… Up to `TG_MAX_INSTANCES` (default 1, set to 2+ to allow concurrent). Each new invocation claims the lowest free slot. The slot number becomes the instance ID.
-  2. Add `TG_INSTANCE_ID=<N>` (or `TG_SLOT=<N>`) to the session environment and inject it into the prompt so the agent knows it is instance N.
-  3. Inject conflict-avoidance rules into the prompt for slots ≥1: "You are instance N of M running on this repo. Avoid modifying the same files as instance 0. Before committing, do `git pull --rebase` to absorb concurrent commits. Do not run the between-session git sync (it is managed by instance 0)."
-  4. Disable the between-session git stash/rebase for all slots ≥1 (only slot 0 owns sync). Each slot still does a final push.
-  5. Add `--instance` / `TG_MAX_INSTANCES` flag docs and a `--preflight` check that reports how many slots are in use.
-
-  The task description passed by the user already handles semantic separation (audit-only vs code-changes) — taskgrind just needs to stop blocking the second launch and give each instance enough context to avoid trampling each other.
-  **Files**: bin/taskgrind, tests/taskgrind.bats, README.md, man/taskgrind.1
-  **Acceptance**:
-  - [ ] `TG_MAX_INSTANCES=2 taskgrind` on the same repo as an existing grind succeeds (no lock error)
-  - [ ] Each instance gets a unique slot number (0, 1, …) written to its log and banner
-  - [ ] Slot ≥1 instances skip the between-session git sync (stash/rebase/checkout)
-  - [ ] Slot ≥1 instances have conflict-avoidance language injected into every session prompt
-  - [ ] `--preflight` reports active slot count for the repo
-  - [ ] A third launch with `TG_MAX_INSTANCES=2` still errors (slots full)
-  - [ ] All existing single-instance tests pass unchanged
-  - [ ] At least one test covers two concurrent instances acquiring different slots
-
 - [ ] Resolve short model aliases to their most powerful variant
   **ID**: model-alias-resolution
   **Tags**: ux, models
