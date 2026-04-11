@@ -157,6 +157,16 @@ TASKS
 # ── Cooldown ─────────────────────────────────────────────────────────
 
 @test "DVB_COOL=0 skips sleep between sessions" {
+  local fake_bin="$TEST_DIR/fake-bin"
+  local sleep_log="$TEST_DIR/sleep.log"
+  mkdir -p "$fake_bin"
+  cat > "$fake_bin/sleep" <<SCRIPT
+#!/bin/bash
+printf '%s\n' "\$*" >> "$sleep_log"
+exec /bin/sleep "\$@"
+SCRIPT
+  chmod +x "$fake_bin/sleep"
+  export PATH="$fake_bin:$PATH"
   export DVB_DEADLINE=$(( $(date +%s) + 4 ))
   export DVB_COOL=0
   run "$DVB_GRIND" 1 "$TEST_REPO"
@@ -164,6 +174,7 @@ TASKS
   local count
   count=$(wc -l < "$DVB_GRIND_INVOKE_LOG" | tr -d ' ')
   [ "$count" -ge 2 ]
+  [ ! -e "$sleep_log" ]
 }
 
 @test "TG_COOL takes precedence over DVB_COOL" {
