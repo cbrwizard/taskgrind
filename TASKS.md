@@ -9,13 +9,6 @@
   **Acceptance**: `make lint` exits 0 locally; the fix preserves source-path checking for real issues and does not break runtime path resolution.
 
 ## P1
-- [ ] Reconcile resumable-state docs with the implemented on-disk contract
-  **ID**: align-resume-state-docs
-  **Tags**: docs, resume, reliability
-  **Details**: `docs/resume-state.md` still specifies a JSON resume file with fields such as `schema_version`, `saved_at`, and `task_attempts`, but `bin/taskgrind` currently writes and reads a flat `key=value` file with a much smaller field set. Update the design doc to match reality or expand the implementation, then make the README/man-page resume guidance point at the same contract.
-  **Files**: `docs/resume-state.md`, `README.md`, `man/taskgrind.1`, `bin/taskgrind`
-  **Acceptance**: Resume documentation matches the actual file format and validation rules; a contributor can inspect the docs and correctly predict what `--resume` persists and rejects.
-
 - [ ] Expand resume coverage for malformed and incompatible saved states
   **ID**: harden-resume-validation-tests
   **Tags**: tests, resume, reliability
