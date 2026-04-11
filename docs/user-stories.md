@@ -141,13 +141,14 @@ What happens:
 - Session 1 starts with the model passed via `--model`
 - Taskgrind checks `.taskgrind-model` between sessions, so the change applies at the next session start
 - The current in-flight session keeps running on its original model
+- When the next session picks up the change, taskgrind writes a live model log entry before the next session banner
 - This is useful when you want deeper reasoning early, then faster turnaround once the queue gets simpler
 
 Sample log:
 ```
 [pid=38291] [09:00] session=1 remaining=360m tasks=9 model=claude-opus-4-6-thinking
 [pid=38291] [09:42] session=1 ended exit=0 duration=2520s tasks_after=8 shipped=1
-[pid=38291] [09:47] live_model=claude-sonnet-4.6
+[pid=38291] [09:47] live_model=claude-sonnet-4.6 (startup=claude-opus-4-6-thinking)
 [pid=38291] [09:47] session=2 remaining=313m tasks=8 model=claude-sonnet-4.6
 ```
 
