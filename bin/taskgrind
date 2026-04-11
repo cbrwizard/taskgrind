@@ -16,6 +16,7 @@
 #        taskgrind --prompt "focus on test coverage" 8
 #        taskgrind --dry-run 8 ~/apps/myrepo  → print config without running
 #        taskgrind --preflight ~/apps/myrepo  → run health checks only
+#        taskgrind --resume ~/apps/myrepo     → resume an interrupted grind
 #        taskgrind --help                     → show this help and exit
 #        taskgrind --version                   → print version (commit hash + date)
 #        TG_MODEL=sonnet taskgrind 8           → 8h grind, sonnet model
@@ -118,12 +119,14 @@ _cli_backend=""
 _cli_model=""
 dry_run=0
 preflight_only=0
+resume_run=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --help|-h) sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0 ;;
     --version|-V) echo "taskgrind $(git -C "$TASKGRIND_DIR" log -1 --format='%h %ci' 2>/dev/null || echo 'unknown')"; exit 0 ;;
     --dry-run) dry_run=1; shift ;;
     --preflight) preflight_only=1; shift ;;
+    --resume) resume_run=1; shift ;;
     --model=*) _cli_model="${1#--model=}"; [[ -z "$_cli_model" ]] && { echo "Error: --model requires a non-empty name" >&2; exit 1; }; shift ;;
     --model)
       if [[ $# -lt 2 ]]; then
@@ -168,8 +171,10 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-model="$(dvb_resolve_model_alias "${_cli_model:-${DVB_MODEL:-$DVB_DEFAULT_MODEL}}")"
-backend="${_cli_backend:-${DVB_BACKEND:-devin}}"
+requested_model="$(dvb_resolve_model_alias "${_cli_model:-${DVB_MODEL:-$DVB_DEFAULT_MODEL}}")"
+requested_backend="${_cli_backend:-${DVB_BACKEND:-devin}}"
+model="$requested_model"
+backend="$requested_backend"
 _cli_prompt="$extra_prompt"
 cooldown="${DVB_COOL:-5}"
 max_hours=24
@@ -260,6 +265,78 @@ if [[ ! -d "$repo" ]]; then
 fi
 
 repo="$(cd "$repo" && pwd)"
+state_file="${DVB_STATE_FILE:-$repo/$DVB_RESUME_STATE_BASENAME}"
+
+state_deadline=""
+state_session=""
+state_tasks_shipped=""
+state_sessions_zero_ship=""
+state_consecutive_zero_ship=""
+state_backend=""
+state_skill=""
+state_model=""
+state_startup_model=""
+state_repo=""
+state_status=""
+state_version=""
+resume_loaded=0
+resume_reason=""
+
+load_resume_state() {
+  [[ -f "$state_file" ]] || return 1
+  while IFS='=' read -r key value; do
+    case "$key" in
+      version) state_version="$value" ;;
+      repo) state_repo="$value" ;;
+      status) state_status="$value" ;;
+      deadline) state_deadline="$value" ;;
+      session) state_session="$value" ;;
+      tasks_shipped) state_tasks_shipped="$value" ;;
+      sessions_zero_ship) state_sessions_zero_ship="$value" ;;
+      consecutive_zero_ship) state_consecutive_zero_ship="$value" ;;
+      backend) state_backend="$value" ;;
+      skill) state_skill="$value" ;;
+      model) state_model="$value" ;;
+      startup_model) state_startup_model="$value" ;;
+    esac
+  done < "$state_file"
+}
+
+clear_resume_state() {
+  rm -f "$state_file" 2>/dev/null || true
+}
+
+if [[ "$resume_run" -eq 1 ]]; then
+  if ! load_resume_state; then
+    echo "Error: no resume state found for $repo" >&2
+    exit 1
+  fi
+  if [[ "$state_version" != "$DVB_RESUME_STATE_VERSION" ]]; then
+    resume_reason="version mismatch"
+  elif [[ "$state_repo" != "$repo" ]]; then
+    resume_reason="repo mismatch"
+  elif [[ "$state_status" != "running" ]]; then
+    resume_reason="state is not resumable (status=$state_status)"
+  elif ! [[ "$state_deadline" =~ ^[0-9]+$ && "$state_session" =~ ^[0-9]+$ && "$state_tasks_shipped" =~ ^[0-9]+$ && "$state_sessions_zero_ship" =~ ^[0-9]+$ && "$state_consecutive_zero_ship" =~ ^[0-9]+$ ]]; then
+    resume_reason="state file is malformed"
+  elif [[ -n "$_cli_backend" && "$requested_backend" != "$state_backend" ]]; then
+    resume_reason="backend override does not match saved state"
+  elif [[ -n "$_cli_model" && "$requested_model" != "$state_model" ]]; then
+    resume_reason="model override does not match saved state"
+  elif [[ "$skill" != "$state_skill" ]]; then
+    resume_reason="skill does not match saved state"
+  fi
+  if [[ -n "$resume_reason" ]]; then
+    echo "Error: cannot resume $repo — saved state is incompatible: $resume_reason" >&2
+    exit 1
+  fi
+  deadline="$state_deadline"
+  model="$state_model"
+  backend="$state_backend"
+  skill="$state_skill"
+  _startup_model="${state_startup_model:-$state_model}"
+  resume_loaded=1
+fi
 
 # ── Dynamic prompt file ──────────────────────────────────────────────
 # Users can create/edit $repo/.taskgrind-prompt while taskgrind runs.
@@ -301,7 +378,9 @@ _refresh_prompt
 # Content is re-read before each session and overrides --model / TG_MODEL.
 # Deleting the file reverts to the original startup model.
 _model_file="$repo/.taskgrind-model"
-_startup_model="$model"  # preserve original for revert on file deletion
+if [[ "$resume_loaded" -ne 1 ]]; then
+  _startup_model="$model"  # preserve original for revert on file deletion
+fi
 
 # Re-read model from file. Call before each session to pick up live edits.
 # Guards: skips files > 1KB (likely accidental), strips trailing whitespace.
@@ -710,6 +789,9 @@ fi
 
 start_epoch=$(date +%s)
 deadline="${DVB_DEADLINE:-$(( start_epoch + hours * 3600 ))}"
+if [[ "$resume_loaded" -eq 1 ]]; then
+  deadline="$state_deadline"
+fi
 if [[ -n "${DVB_GRIND_CMD:-}" ]]; then
   # Behavioral tests often use very short future deadlines (for example +5s)
   # to keep runs fast while still expecting at least one session to launch.
@@ -762,6 +844,14 @@ _dvb_pid=0
 _dvb_timeout_pid=0
 _git_pid=0
 _git_timer=0
+consecutive_zero_ship=0
+
+if [[ "$resume_loaded" -eq 1 ]]; then
+  session="$state_session"
+  tasks_shipped="$state_tasks_shipped"
+  sessions_zero_ship="$state_sessions_zero_ship"
+  consecutive_zero_ship="$state_consecutive_zero_ship"
+fi
 
 # format_duration provided by lib/constants.sh as dvb_format_duration
 format_duration() { dvb_format_duration "$@"; }
@@ -769,6 +859,28 @@ format_duration() { dvb_format_duration "$@"; }
 # Safe log append — never crash the loop on disk-full or deleted log.
 # Every line is PID-prefixed for defense-in-depth against interleaving.
 log_write() { echo "[pid=$$] $*" >> "$log_file" 2>/dev/null || true; }
+
+write_resume_state() {
+  local state_dir state_tmp
+  state_dir="$(dirname "$state_file")"
+  mkdir -p "$state_dir" 2>/dev/null || return 0
+  state_tmp=$(mktemp "${state_file}.tmp.XXXXXX") 2>/dev/null || return 0
+  cat > "$state_tmp" <<EOF
+version=$DVB_RESUME_STATE_VERSION
+repo=$repo
+status=${1:-running}
+deadline=$deadline
+session=$session
+tasks_shipped=$tasks_shipped
+sessions_zero_ship=$sessions_zero_ship
+consecutive_zero_ship=$consecutive_zero_ship
+backend=$backend
+skill=$skill
+model=$model
+startup_model=$_startup_model
+EOF
+  mv -f "$state_tmp" "$state_file" 2>/dev/null || rm -f "$state_tmp"
+}
 
 json_escape() {
   local value="${1:-}"
@@ -820,6 +932,7 @@ EOF
 
 set_phase() {
   current_phase="$1"
+  write_resume_state "running"
   write_status_file
 }
 
@@ -962,6 +1075,7 @@ graceful_shutdown() {
       wait "$_dvb_timer_pid" 2>/dev/null || true
     fi
   fi
+  clear_resume_state
   # Kill git sync processes if interrupted mid-sync
   if [[ $_git_pid -gt 0 ]] && kill -0 "$_git_pid" 2>/dev/null; then
     kill "$_git_pid" 2>/dev/null || true
@@ -984,6 +1098,9 @@ cleanup() {
   _dvb_finalizing=1
   if [[ "$current_phase" != "failed" ]]; then
     current_phase="complete"
+  fi
+  if [[ "$current_phase" == "complete" ]]; then
+    clear_resume_state
   fi
   write_status_file
   dvb_spinner_stop
@@ -1056,6 +1173,9 @@ echo "☕ taskgrind: ${hours}h (until ${end_time}) — backend=$backend, skill=$
 if [[ "$max_instances" -gt 1 ]]; then
   echo "   Instance slot: $_dvb_slot of $max_instances"
 fi
+if [[ "$resume_loaded" -eq 1 ]]; then
+  echo "   Resuming: session=$session shipped=$tasks_shipped zero-ship=$consecutive_zero_ship"
+fi
 echo "   Each session runs $skill. Git sync every ${sync_interval} sessions."
 if [[ "$model" != "$_startup_model" ]]; then
   echo "   Live model: $model (from .taskgrind-model, startup=$_startup_model)"
@@ -1085,6 +1205,7 @@ chmod 600 "$log_file" 2>/dev/null || true
 
 # Export instance slot so child processes (devin sessions) can see it
 export TG_INSTANCE_ID="$_dvb_slot"
+write_resume_state "running"
 write_status_file
 
 # Run preflight checks before entering the main loop
@@ -1152,7 +1273,6 @@ else
   min_session_secs=30
 fi
 consecutive_fast=0
-consecutive_zero_ship=0
 _productive_zero_ship=0
 _sweep_done=0
 

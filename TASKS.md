@@ -59,17 +59,6 @@
   - [ ] README, man page, and `--help` document how resume works and when to prefer a fresh run
   - [ ] Tests cover save-on-progress, resume-after-interruption, and stale-state rejection
 
-- [ ] Persist and restore resumable grind runtime state
-  **ID**: resumable-grind-state-runtime
-  **Parent**: resumable-grind-state
-  **Tags**: feature, reliability
-  **Details**: Implement the durable state file writes during the grind loop and the `--resume` startup path that restores counters and runtime configuration for the same repo when the saved state passes compatibility checks.
-  **Files**: bin/taskgrind, lib/constants.sh
-  **Acceptance**:
-  - [ ] Taskgrind saves deadline, session count, shipped count, zero-ship streak, backend, skill, and model to a per-repo state file
-  - [ ] `taskgrind --resume` restores the saved state for the same repo and refuses incompatible state with a clear message
-  - [ ] Normal completion and explicit abort paths clean up or invalidate resume state
-
 - [ ] Cover resumable grind state with tests and operator docs
   **ID**: resumable-grind-state-verify
   **Parent**: resumable-grind-state
@@ -106,4 +95,3 @@
   - [ ] Default behavior unchanged when env var is unset
   - [ ] Documented in README, man page, and --help
   - [ ] Test verifies custom URL is used
-
