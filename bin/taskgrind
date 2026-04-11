@@ -29,8 +29,8 @@
 #        TG_LOG         — override log file path
 #        TG_NOTIFY      — desktop notification on completion (default: 1, set 0 to disable)
 #        TG_MAX_SESSION — max seconds per session before timeout (default: 3600)
-#        TG_MAX_FAST    — max consecutive fast failures before bail out (default: 5)
-#        TG_MAX_ZERO_SHIP — max consecutive zero-ship sessions before bail (default: 8)
+#        TG_MAX_FAST    — max consecutive fast failures before bail out (default: 20)
+#        TG_MAX_ZERO_SHIP — max consecutive zero-ship sessions before bail (default: 50)
 #        TG_BACKOFF_BASE — base seconds for fast-failure backoff (default: 15)
 #        TG_BACKOFF_MAX — cap for fast-failure backoff (default: 120)
 #        TG_NET_WAIT    — network polling interval in seconds (default: 30)
@@ -169,9 +169,9 @@ backend="${_cli_backend:-${DVB_BACKEND:-devin}}"
 _cli_prompt="$extra_prompt"
 cooldown="${DVB_COOL:-5}"
 max_hours=24
-max_fast="${DVB_MAX_FAST:-5}"
+max_fast="${DVB_MAX_FAST:-20}"
 max_session="${DVB_MAX_SESSION:-3600}"
-max_zero_ship="${DVB_MAX_ZERO_SHIP:-8}"
+max_zero_ship="${DVB_MAX_ZERO_SHIP:-50}"
 sync_interval="${DVB_SYNC_INTERVAL:-5}"
 max_instances="${DVB_MAX_INSTANCES:-1}"
 
@@ -1098,14 +1098,36 @@ while [[ $(date +%s) -lt $deadline ]]; do
 
   # ── Empty queue handling ──────────────────────────────────────────
   # When the queue is empty, launch a sweep session to audit the repo
-  # and populate TASKS.md. If the sweep finds nothing, exit.
+  # and populate TASKS.md. If the sweep finds nothing, wait and retry
+  # once — another agent or user may add tasks externally.
   # _sweep_done resets when tasks are shipped, so a grind that clears
   # all tasks can sweep again for more work.
   if [[ "$tasks_before" -eq 0 ]]; then
-    if [[ "$_sweep_done" -eq 1 ]]; then
-      echo "   ✓ Queue empty after sweep — exiting."
-      log_write "[$(date '+%H:%M')] queue_empty tasks=0 sweep=done — exiting"
+    if [[ "$_sweep_done" -ge 2 ]]; then
+      echo "   ✓ Queue still empty after sweep + wait — exiting."
+      log_write "[$(date '+%H:%M')] queue_empty tasks=0 sweep=exhausted — exiting"
       break
+    fi
+    if [[ "$_sweep_done" -eq 1 ]]; then
+      # Sweep already ran once and found nothing — wait before giving up
+      _empty_wait=600  # 10 minutes
+      # Cap at remaining deadline so tests and short runs aren't stuck
+      _remaining=$(( deadline - $(date +%s) ))
+      [[ $_remaining -lt $_empty_wait ]] && _empty_wait=$_remaining
+      [[ $_empty_wait -le 0 ]] && { _sweep_done=2; continue; }
+      echo "   ⏸ Queue empty after sweep — waiting ${_empty_wait}s for external task injection..."
+      log_write "[$(date '+%H:%M')] queue_empty tasks=0 sweep=done — waiting ${_empty_wait}s"
+      dvb_countdown_sleep "$_empty_wait" "Waiting for tasks"
+      deadline=$((deadline + _empty_wait))
+      tasks_before=$(count_tasks "$repo/TASKS.md")
+      if [[ "$tasks_before" -gt 0 ]]; then
+        echo "   ✓ Tasks appeared ($tasks_before) — resuming."
+        log_write "[$(date '+%H:%M')] tasks_appeared tasks=$tasks_before — resuming"
+        _sweep_done=0
+        continue
+      fi
+      _sweep_done=2  # mark exhausted — next iteration will exit
+      continue
     fi
     _sweep_done=1
     echo "🔍 Queue empty — running sweep to find work..."
@@ -1189,11 +1211,33 @@ while [[ $(date +%s) -lt $deadline ]]; do
 
   # ── Blocked queue detection ─────────────────────────────────────────
   # When all remaining tasks have **Blocked by**: metadata, running more
-  # sessions won't decrease the task count. Exit to save compute.
+  # sessions won't decrease the task count. Wait and re-check — external
+  # events (CI, merges, other agents) can unblock tasks.
   if all_tasks_blocked "$repo/TASKS.md"; then
-    echo "   ✓ All $tasks_before remaining tasks are blocked — exiting."
-    log_write "[$(date '+%H:%M')] all_tasks_blocked tasks=$tasks_before — exiting"
-    break
+    _blocked_wait=600  # 10 minutes
+    # Cap at remaining deadline so tests and short runs aren't stuck
+    _remaining=$(( deadline - $(date +%s) ))
+    [[ $_remaining -lt $_blocked_wait ]] && _blocked_wait=$_remaining
+    if [[ $_blocked_wait -le 0 ]]; then
+      echo "   ✓ All $tasks_before remaining tasks are blocked and deadline reached — exiting."
+      log_write "[$(date '+%H:%M')] all_tasks_blocked tasks=$tasks_before deadline_reached — exiting"
+      break
+    fi
+    echo "   ⏸ All $tasks_before remaining tasks are blocked — waiting ${_blocked_wait}s for external unblock..."
+    log_write "[$(date '+%H:%M')] all_tasks_blocked tasks=$tasks_before — waiting ${_blocked_wait}s"
+    dvb_countdown_sleep "$_blocked_wait" "Blocked"
+    # Extend deadline by wait time — dead time should not count against the marathon
+    deadline=$((deadline + _blocked_wait))
+    # Re-check after wait
+    if all_tasks_blocked "$repo/TASKS.md"; then
+      echo "   ✓ All tasks still blocked after wait — exiting."
+      log_write "[$(date '+%H:%M')] all_tasks_blocked tasks=$tasks_before still_blocked — exiting"
+      break
+    fi
+    echo "   ✓ Tasks unblocked — resuming."
+    log_write "[$(date '+%H:%M')] tasks_unblocked tasks=$(count_tasks "$repo/TASKS.md") — resuming"
+    tasks_before=$(count_tasks "$repo/TASKS.md")
+    _ids_before=$(extract_task_ids "$repo/TASKS.md")
   fi
 
   # ── Build the session prompt ──────────────────────────────────────

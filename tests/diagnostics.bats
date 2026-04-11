@@ -28,8 +28,8 @@ SCRIPT
   [[ "$output" == *"exit=0"* ]]
 }
 
-@test "DVB_MAX_FAST defaults to 5" {
-  grep -q 'DVB_MAX_FAST:-5' "$DVB_GRIND"
+@test "DVB_MAX_FAST defaults to 20" {
+  grep -q 'DVB_MAX_FAST:-20' "$DVB_GRIND"
 }
 
 @test "max fast failures bails out with diagnostic" {

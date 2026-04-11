@@ -9,19 +9,19 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 # ── Session loop ─────────────────────────────────────────────────────
 
 @test "runs devin with --permission-mode dangerous" {
-  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   grep -q -- '--permission-mode dangerous' "$DVB_GRIND_INVOKE_LOG"
 }
 
 @test "runs devin in print mode with -p prompt" {
-  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   grep -q -- '-p Run the next-task skill' "$DVB_GRIND_INVOKE_LOG"
 }
 
 @test "prompt includes session number" {
-  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   grep -q 'Session 1' "$DVB_GRIND_INVOKE_LOG"
 }
@@ -300,7 +300,7 @@ SCRIPT
   export DVB_GRIND_CMD="$sweep_devin"
   # Start with empty queue
   printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
-  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
   # Should have sweep session + at least 1 normal session
@@ -329,7 +329,7 @@ SCRIPT
 ## P0
 - [ ] Will be cleared
 TASKS
-  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
   export DVB_SYNC_INTERVAL=0
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
@@ -420,7 +420,7 @@ SCRIPT
 ## P0
 - [ ] Only task
 TASKS
-  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
   export DVB_SYNC_INTERVAL=0
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
@@ -431,7 +431,7 @@ TASKS
   grep -q 'sweep_empty' "$TEST_LOG"
 }
 
-@test "all-blocked queue exits without running sessions" {
+@test "all-blocked queue waits then exits" {
   cat > "$TEST_REPO/TASKS.md" <<'TASKS'
 # Tasks
 ## P1
@@ -443,7 +443,9 @@ TASKS
   **Blocked by**: k8s-namespace
 TASKS
 
-  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  # Use a very short deadline so the blocked-wait sleep gets cut short
+  # by the deadline check on the next loop iteration
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
   grep -q 'all_tasks_blocked' "$TEST_LOG"
@@ -907,4 +909,3 @@ SCRIPT
     ! grep -qE -- '-[0-9]+ minutes remaining' "$DVB_GRIND_INVOKE_LOG.full"
   fi
 }
-

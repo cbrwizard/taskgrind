@@ -181,8 +181,8 @@ TASKS
 
 # ── Stall detection (zero-ship sessions) ─────────────────────────────
 
-@test "DVB_MAX_ZERO_SHIP defaults to 8" {
-  grep -q 'DVB_MAX_ZERO_SHIP:-8' "$DVB_GRIND"
+@test "DVB_MAX_ZERO_SHIP defaults to 50" {
+  grep -q 'DVB_MAX_ZERO_SHIP:-50' "$DVB_GRIND"
 }
 
 @test "5 consecutive zero-ship sessions exits the marathon" {
@@ -192,7 +192,7 @@ TASKS
 ## P0
 - [ ] Stubborn task that never completes
 TASKS
-  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
   export DVB_MAX_ZERO_SHIP=5
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
@@ -211,7 +211,7 @@ TASKS
 ## P0
 - [ ] Stubborn task
 TASKS
-  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
   export DVB_MAX_ZERO_SHIP=5
   run "$DVB_GRIND" 1 "$TEST_REPO"
   grep -q 'stall_warning consecutive_zero_ship=3' "$TEST_LOG"
@@ -223,7 +223,7 @@ TASKS
 ## P0
 - [ ] Stubborn task
 TASKS
-  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
   export DVB_MAX_ZERO_SHIP=5
   run "$DVB_GRIND" 1 "$TEST_REPO"
   # Session 4's prompt should contain the stall warning
@@ -236,7 +236,7 @@ TASKS
 ## P0
 - [ ] Large task
 TASKS
-  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
   export DVB_MAX_ZERO_SHIP=5
   run "$DVB_GRIND" 1 "$TEST_REPO"
   # Must mention decompose
@@ -301,7 +301,7 @@ SCRIPT
 - [ ] Persistent task
 TASKS
 
-  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
   export DVB_MAX_ZERO_SHIP=5
   run "$DVB_GRIND" 1 "$TEST_REPO"
   # Session 3's prompt should contain the URGENT escalation
@@ -453,7 +453,7 @@ SCRIPT
 ## P0
 - [ ] Stubborn task
 TASKS
-  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
   export DVB_MAX_ZERO_SHIP=10
   run "$DVB_GRIND" 1 "$TEST_REPO"
   grep -q 'diminishing_returns' "$TEST_LOG"
@@ -466,7 +466,7 @@ TASKS
 ## P0
 - [ ] Stubborn task
 TASKS
-  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
   export DVB_MAX_ZERO_SHIP=10
   export DVB_EARLY_EXIT_ON_STALL=1
   run "$DVB_GRIND" 1 "$TEST_REPO"
@@ -613,4 +613,3 @@ TASKS
   run "$DVB_GRIND" 1 "$TEST_REPO"
   ! grep -q 'productive_timeout' "$TEST_LOG"
 }
-

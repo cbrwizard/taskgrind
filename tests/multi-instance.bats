@@ -315,7 +315,7 @@ _wait_for_slot_file() {
 }
 
 @test "lock file includes slot number" {
-  grep -q 'taskgrind-lock-.*-.*_slot' "$DVB_GRIND"
+  grep -Fq 'taskgrind-lock-${_lock_hash}-${slot}' "$DVB_GRIND"
 }
 
 @test "slot-based lock uses per-slot file descriptors" {

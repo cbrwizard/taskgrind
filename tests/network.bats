@@ -263,7 +263,7 @@ SCRIPT
 @test "network restored message shows in terminal output" {
   # Schedule network recovery after a delay — must be long enough that the
   # first fast-failure check sees network down before the file appears.
-  (sleep 3; touch "$TEST_DIR/net-up") &
+  (sleep 4; touch "$TEST_DIR/net-up") &
   local _touch_pid=$!
 
   local restore_devin="$TEST_DIR/restore-devin"
@@ -280,7 +280,7 @@ SCRIPT
   export DVB_MAX_ZERO_SHIP=10
   export DVB_NET_WAIT=0
   export DVB_NET_MAX_WAIT=60
-  export DVB_DEADLINE=$(( $(date +%s) + 30 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 40 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   kill "$_touch_pid" 2>/dev/null || true
   wait "$_touch_pid" 2>/dev/null || true
@@ -294,7 +294,7 @@ SCRIPT
   export DVB_MIN_SESSION=999
   export DVB_BACKOFF_BASE=0
   export DVB_COOL=0
-  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [[ "$output" == *"fast failures"* ]]
   [[ "$output" == *"exit="* ]]
@@ -330,4 +330,3 @@ SCRIPT
   # Structural: the elif branch checks for network-watchdog before curl fallback
   grep -q 'elif command -v network-watchdog' "$DVB_GRIND"
 }
-

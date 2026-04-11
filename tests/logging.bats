@@ -129,14 +129,13 @@ TASKS
 # ── Cooldown ─────────────────────────────────────────────────────────
 
 @test "DVB_COOL=0 skips sleep between sessions" {
-  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 4 ))
   export DVB_COOL=0
-  local start end
-  start=$(date +%s)
   run "$DVB_GRIND" 1 "$TEST_REPO"
-  end=$(date +%s)
-  # With cooldown=0, multiple sessions should complete in < 15s
-  [ $((end - start)) -lt 15 ]
+  [ "$status" -eq 0 ]
+  local count
+  count=$(wc -l < "$DVB_GRIND_INVOKE_LOG" | tr -d ' ')
+  [ "$count" -ge 2 ]
 }
 
 # ── Working directory ────────────────────────────────────────────────
@@ -324,4 +323,3 @@ SCRIPT
   [ "$status" -eq 0 ]
   [ -f "$TEST_DIR/deep/nested/dir/grind.log" ]
 }
-

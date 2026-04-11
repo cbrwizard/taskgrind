@@ -136,8 +136,8 @@ Before deploying, ensure:
 | `TG_COOL` | `5` | Seconds between sessions |
 | `TG_MAX_SESSION` | `3600` | Max seconds per session |
 | `TG_MIN_SESSION` | `30` | Fast-failure threshold in seconds |
-| `TG_MAX_FAST` | `5` | Max consecutive fast failures before bail |
-| `TG_MAX_ZERO_SHIP` | `8` | Consecutive zero-ship sessions before bail |
+| `TG_MAX_FAST` | `20` | Max consecutive fast failures before bail |
+| `TG_MAX_ZERO_SHIP` | `50` | Consecutive zero-ship sessions before bail |
 | `TG_BACKOFF_BASE` | `15` | Base seconds for fast-failure backoff |
 | `TG_BACKOFF_MAX` | `120` | Cap for fast-failure backoff in seconds |
 | `TG_NET_WAIT` | `30` | Network polling interval in seconds |
