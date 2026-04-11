@@ -2222,7 +2222,11 @@ SCRIPT
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ -f "$TEST_LOG" ]
   local perms
-  perms=$(stat -f '%Lp' "$TEST_LOG" 2>/dev/null || stat -c '%a' "$TEST_LOG" 2>/dev/null)
+  if stat --version >/dev/null 2>&1; then
+    perms=$(stat -c '%a' "$TEST_LOG")
+  else
+    perms=$(stat -f '%Lp' "$TEST_LOG")
+  fi
   [ "$perms" = "600" ]
 }
 
@@ -2476,7 +2480,6 @@ TASKS
   git -C "$TEST_REPO" remote add origin "$bare"
   git -C "$TEST_REPO" push -q origin main 2>/dev/null
   git -C "$bare" symbolic-ref HEAD refs/heads/main
-  git -C "$bare" symbolic-ref HEAD refs/heads/main
   # Create a feature branch and leave the repo on it
   git -C "$TEST_REPO" checkout -q -b chore/grind-session-1
   echo "feature" > "$TEST_REPO/feature.txt"
@@ -2521,7 +2524,6 @@ TASKS
   git init -q --bare "$bare"
   git -C "$TEST_REPO" remote add origin "$bare"
   git -C "$TEST_REPO" push -q origin main 2>/dev/null
-  git -C "$bare" symbolic-ref HEAD refs/heads/main
   git -C "$bare" symbolic-ref HEAD refs/heads/main
 
   # Create a dirty file (simulating agent leaving uncommitted changes)
@@ -2842,6 +2844,7 @@ SCRIPT
   git init -q --bare "$bare"
   git -C "$TEST_REPO" remote add origin "$bare"
   git -C "$TEST_REPO" push -q origin main 2>/dev/null
+  git -C "$bare" symbolic-ref HEAD refs/heads/main
   # Create a feature branch, push it, then delete it on the remote
   git -C "$TEST_REPO" checkout -q -b stale-feature
   echo "feature" > "$TEST_REPO/feature.txt"
@@ -2873,6 +2876,7 @@ SCRIPT
   git init -q --bare "$bare"
   git -C "$TEST_REPO" remote add origin "$bare"
   git -C "$TEST_REPO" push -q origin main 2>/dev/null
+  git -C "$bare" symbolic-ref HEAD refs/heads/main
   # Create two feature branches, push them, delete on remote
   for branch_name in stale-one stale-two; do
     git -C "$TEST_REPO" checkout -q -b "$branch_name"
