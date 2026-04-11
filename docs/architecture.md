@@ -18,9 +18,11 @@ Git sync (fetch, rebase, branch cleanup) introduces overhead and can create reba
 
 Earlier versions tracked stall by counting total tasks before and after each session. This broke when sessions added new tasks while working — the count could stay the same even though work was done. ID-based tracking fixes this: after each session, taskgrind extracts `**ID**:` values from TASKS.md and diffs them against the previous set. Each surviving task ID gets an attempt counter incremented. After 3 attempts, the task ID is added to a skip list in the next session's prompt. This correctly handles the common pattern where a session scouts new tasks while shipping one, and prevents infinite loops on tasks that consistently fail.
 
-## Why empty-queue sweep then exit
+## Why empty-queue sweep then wait, then exit
 
-When TASKS.md is empty, taskgrind runs a single sweep session that audits the repo for work (TODOs, test gaps, lint warnings) and populates TASKS.md. If the sweep finds tasks, the grind continues normally. If the sweep finds nothing, taskgrind exits. The `_sweep_done` flag prevents infinite sweep loops, but resets whenever a task is shipped — so a grind that empties the queue can sweep again after clearing all work. This ensures the grind discovers all available work without wasting sessions on repeated empty sweeps.
+When TASKS.md is empty, taskgrind runs a single sweep session that audits the repo for work (TODOs, test gaps, lint warnings) and populates TASKS.md. If the sweep finds tasks, the grind continues normally. If the sweep finds nothing, taskgrind does not exit immediately: it waits up to 10 minutes for another agent, hook, or human to inject fresh tasks, then exits if the queue is still empty. That pause makes short autonomous runs more useful in shared repos where new tasks may appear just after a cleanup session finishes.
+
+The `_sweep_done` flag tracks that control flow. `0` means no empty-queue sweep has run yet, `1` means the sweep already ran and the grind is in its one-time wait-for-work window, and `2` means the empty-queue path is exhausted so the next loop exits cleanly. The flag resets whenever a session ships work, which lets a grind that empties the queue sweep again later instead of getting stuck in a permanent "already swept" state.
 
 ## Why next-task over custom grind skill
 
