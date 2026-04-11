@@ -1,14 +1,19 @@
-.PHONY: lint test check help install uninstall
+.PHONY: lint test test-force check help install uninstall
 
 PREFIX ?= /usr/local
 
+# Files that affect test outcomes — used for git-based cache
+TEST_DEPS = bin/taskgrind lib/constants.sh lib/fullpower.sh tests/test_helper.bash $(wildcard tests/*.bats)
+TEST_CACHE = .test-cache
+
 help:
 	@echo "Available targets:"
-	@echo "  make lint      — run shellcheck on all scripts"
-	@echo "  make test      — run bats test suite (401 tests, parallel)"
-	@echo "  make check     — lint + test (run before committing)"
-	@echo "  make install   — symlink taskgrind to $(PREFIX)/bin and install man page"
-	@echo "  make uninstall — remove symlink and man page"
+	@echo "  make lint       — run shellcheck on all scripts"
+	@echo "  make test       — run tests (cached, skips if unchanged)"
+	@echo "  make test-force — run tests (ignore cache)"
+	@echo "  make check      — lint + test (run before committing)"
+	@echo "  make install    — symlink taskgrind to $(PREFIX)/bin and install man page"
+	@echo "  make uninstall  — remove symlink and man page"
 
 lint:
 	@echo "═══ Shellcheck ═══"
@@ -18,8 +23,19 @@ lint:
 	@echo "✓ All scripts pass shellcheck"
 
 test:
+	@_hash=$$(cat $(TEST_DEPS) 2>/dev/null | shasum | cut -d' ' -f1); \
+	if [ -f $(TEST_CACHE) ] && [ "$$(cat $(TEST_CACHE) 2>/dev/null)" = "$$_hash" ]; then \
+		echo "═══ Tests (cached) ═══"; \
+		echo "✓ No changes since last pass — skipping (use 'make test-force' to override)"; \
+	else \
+		echo "═══ Tests (parallel) ═══"; \
+		bats --jobs 9 tests/*.bats && echo "$$_hash" > $(TEST_CACHE); \
+	fi
+
+test-force:
 	@echo "═══ Tests (parallel) ═══"
 	@bats --jobs 9 tests/*.bats
+	@cat $(TEST_DEPS) 2>/dev/null | shasum | cut -d' ' -f1 > $(TEST_CACHE)
 
 check: lint test
 
