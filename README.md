@@ -216,7 +216,7 @@ taskgrind --resume ~/apps/myrepo
 
 Taskgrind saves resumable runtime state in `~/apps/myrepo/.taskgrind-state` while the grind is active. A resumed run restores the original deadline, session counter, shipped count, backend, skill, and model instead of starting from session 1 again.
 
-Use `--resume` when the previous run was interrupted by a terminal crash, reboot, or similar external interruption. Prefer a fresh `taskgrind` launch when you intentionally want a new deadline or different runtime settings.
+Use `--resume` when the previous run was interrupted by a terminal crash, reboot, or similar external interruption. Prefer a fresh `taskgrind` launch when you intentionally want a new deadline or different runtime settings. If the saved deadline already expired, taskgrind rejects the stale state and tells you to start fresh.
 
 ## Development
 

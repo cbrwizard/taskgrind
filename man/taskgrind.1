@@ -179,7 +179,9 @@ machine reboot. The saved
 .I .taskgrind\-state
 file restores the original deadline and runtime counters. Start a fresh
 .B taskgrind
-run instead when you want a new deadline or different runtime settings.
+run instead when you want a new deadline or different runtime settings. If the
+saved deadline already expired, taskgrind rejects the stale state and tells you
+to start a fresh grind.
 .TP
 .B 130
 Interrupted by SIGINT (Ctrl\-C). Waits for running session, pushes commits.

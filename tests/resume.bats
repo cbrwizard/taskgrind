@@ -103,3 +103,28 @@ EOF
   [ "$status" -eq 1 ]
   [[ "$output" == *"saved state is incompatible: version mismatch"* ]]
 }
+
+@test "--resume rejects expired saved state" {
+  local state_file="$TEST_DIR/resume-state"
+  export DVB_STATE_FILE="$state_file"
+  cat > "$state_file" <<EOF
+version=1
+repo=$TEST_REPO
+status=running
+deadline=$(( $(date +%s) - 60 ))
+session=1
+tasks_shipped=0
+sessions_zero_ship=0
+consecutive_zero_ship=0
+backend=devin
+skill=next-task
+model=gpt-5.4
+startup_model=gpt-5.4
+EOF
+
+  run "$DVB_GRIND" --resume "$TEST_REPO"
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"saved state is incompatible: deadline expired"* ]]
+  [[ "$output" == *"start a fresh grind"* ]]
+}

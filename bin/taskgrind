@@ -319,6 +319,8 @@ if [[ "$resume_run" -eq 1 ]]; then
     resume_reason="state is not resumable (status=$state_status)"
   elif ! [[ "$state_deadline" =~ ^[0-9]+$ && "$state_session" =~ ^[0-9]+$ && "$state_tasks_shipped" =~ ^[0-9]+$ && "$state_sessions_zero_ship" =~ ^[0-9]+$ && "$state_consecutive_zero_ship" =~ ^[0-9]+$ ]]; then
     resume_reason="state file is malformed"
+  elif [[ "$state_deadline" -le "$(date +%s)" ]]; then
+    resume_reason="deadline expired"
   elif [[ -n "$_cli_backend" && "$requested_backend" != "$state_backend" ]]; then
     resume_reason="backend override does not match saved state"
   elif [[ -n "$_cli_model" && "$requested_model" != "$state_model" ]]; then
@@ -328,6 +330,9 @@ if [[ "$resume_run" -eq 1 ]]; then
   fi
   if [[ -n "$resume_reason" ]]; then
     echo "Error: cannot resume $repo — saved state is incompatible: $resume_reason" >&2
+    if [[ "$resume_reason" == "deadline expired" ]]; then
+      echo "start a fresh grind instead: taskgrind $repo" >&2
+    fi
     exit 1
   fi
   deadline="$state_deadline"
