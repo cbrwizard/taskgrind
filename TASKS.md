@@ -60,7 +60,6 @@
   - [ ] Tests cover save-on-progress, resume-after-interruption, and stale-state rejection
 
   - [ ] Verification confirms the documented flow matches the implementation
-
 ## P3
 
 - [ ] Make network check URL configurable via TG_NET_CHECK_URL
@@ -73,3 +72,13 @@
   - [ ] Default behavior unchanged when env var is unset
   - [ ] Documented in README, man page, and --help
   - [ ] Test verifies custom URL is used
+
+- [ ] Refresh contributor docs for the split bats suite and current local workflow (@instance-1)
+  **ID**: contributing-doc-drift
+  **Tags**: docs, onboarding
+  **Details**: `CONTRIBUTING.md` still points contributors at `tests/taskgrind.bats` even though the suite is now split across focused `.bats` files. It should also mention the `TESTS=...` rerun path from the Makefile so local iteration matches the current workflow.
+  **Files**: CONTRIBUTING.md
+  **Acceptance**:
+  - [ ] Contributor docs describe the current split test layout
+  - [ ] Contributor docs mention targeted reruns with `make test TESTS=...`
+  - [ ] Guidance stays consistent with the current Makefile behavior
