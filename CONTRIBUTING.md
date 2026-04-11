@@ -26,7 +26,7 @@ sudo dnf install -y bats ShellCheck
 
 ## Adding a Feature
 
-1. **Write a failing test first** — add tests to `tests/taskgrind.bats`
+1. **Write a failing test first** — add coverage in the focused `.bats` file that matches the behavior under test (`tests/network.bats`, `tests/session.bats`, `tests/logging.bats`, etc.)
 2. **Implement the feature** — edit `bin/taskgrind` (or `lib/*.sh` for shared code)
 3. **Run `make check`** — shellcheck + all bats tests must pass
 4. **Commit on `main`** — this repo uses trunk-based development for small changes
@@ -58,10 +58,11 @@ When adding a new env var:
 
 ## Test Conventions
 
-- Tests live in `tests/taskgrind.bats` with helpers in `tests/test_helper.bash`
+- Tests live in focused `tests/*.bats` files with shared helpers in `tests/test_helper.bash`
 - Each test gets a fresh `$TEST_DIR` via `setup()` — no shared state between tests
 - Use `DVB_DEADLINE` to control loop duration — set in the past for immediate exit (tests that validate args), or a few seconds ahead to run 1-2 sessions
 - Use `DVB_GRIND_CMD` to point at a stub script (never the real binary)
+- Use `make test TESTS=tests/<file>.bats` for tight local reruns before falling back to the full suite
 - Structural tests (`grep -q` on the script) are fine for verifying code patterns
 
 ## Known Issues
@@ -75,7 +76,7 @@ When adding a new env var:
 bin/taskgrind           Main script (the whole tool)
 lib/constants.sh        Shared constants (model, binary path, caffeinate flags)
 lib/fullpower.sh        Priority boosting (taskpolicy on macOS)
-tests/taskgrind.bats    Test suite
+tests/*.bats            Focused bats suites by subsystem
 tests/test_helper.bash  Shared test helpers
 man/taskgrind.1         Man page
 docs/                   Architecture docs and user stories
