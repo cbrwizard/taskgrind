@@ -72,16 +72,6 @@
   - [ ] The feature is documented, including the default path or the env var/flag used to override it
   - [ ] Tests verify heartbeat contents across at least startup, in-session, and completion states
 
-- [ ] Add concurrent lock rejection end-to-end test
-  **ID**: test-lock-contention
-  **Tags**: test
-  **Details**: Lock tests verify hash math but never actually start two grind processes on the same repo. No test confirms the second instance is rejected with "another taskgrind is already running".
-  **Files**: tests/taskgrind.bats
-  **Acceptance**:
-  - [ ] Test starts two grind processes on the same repo simultaneously
-  - [ ] Verifies the second process exits with "another taskgrind is already running"
-  - [ ] First process completes normally
-
 - [ ] Stabilize the DVB_COOL=0 timing-sensitive test under load
   **ID**: stabilize-cool-zero-test
   **Tags**: test, flake

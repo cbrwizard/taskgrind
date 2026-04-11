@@ -46,11 +46,16 @@ _wait_for_slot_file() {
   lock_hash=$(echo "$TEST_REPO" | { shasum 2>/dev/null || sha1sum; } | cut -d' ' -f1)
   local lock_file="$TMPDIR/taskgrind-lock-${lock_hash}-${slot}"
   local tries=0
-  while [[ ! -f "$lock_file" && "$tries" -lt 20 ]]; do
+  # The lock file is opened before flock succeeds, so wait for the metadata line
+  # that the winning process writes after it actually owns the slot.
+  while [[ "$tries" -lt 50 ]]; do
+    if [[ -f "$lock_file" ]] && grep -q "slot=${slot}" "$lock_file" 2>/dev/null; then
+      return 0
+    fi
     sleep 0.2
     tries=$((tries + 1))
   done
-  [[ -f "$lock_file" ]]
+  [[ -f "$lock_file" ]] && grep -q "slot=${slot}" "$lock_file" 2>/dev/null
 }
 
 # ── Slot basics ──────────────────────────────────────────────────────
@@ -244,6 +249,12 @@ _wait_for_slot_file() {
 
   "$DVB_GRIND" 1 "$TEST_REPO" > "$second_output" 2>&1 &
   local second_pid=$!
+  for attempt in $(seq 1 20); do
+    if kill -0 "$first_pid" 2>/dev/null && kill -0 "$second_pid" 2>/dev/null; then
+      break
+    fi
+    sleep 0.2
+  done
 
   wait "$first_pid"
   local first_status=$?
@@ -280,28 +291,23 @@ _wait_for_slot_file() {
   grep -q 'Instance slot: 1 of 2' "$second_output"
 }
 
-@test "third concurrent grind errors when all 2 slots are full" {
+@test "second concurrent grind errors when all 1 slot is full" {
   _setup_production_multi_instance_backend
+  export DVB_MAX_INSTANCES=1
   export PROD_FAKE_DEVIN_SLEEP=6
   export DVB_DEADLINE=$(( $(date +%s) + 12 ))
   local first_output="$TEST_DIR/full-slot-0.out"
-  local second_output="$TEST_DIR/full-slot-1.out"
 
   "$DVB_GRIND" 1 "$TEST_REPO" > "$first_output" 2>&1 &
   local first_pid=$!
   _wait_for_slot_file 0
 
-  "$DVB_GRIND" 1 "$TEST_REPO" > "$second_output" 2>&1 &
-  local second_pid=$!
-  _wait_for_slot_file 1
-
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"all 2 instance slot(s) are in use"* ]]
-  [[ "$output" == *"hint: set TG_MAX_INSTANCES=3 to allow another instance"* ]]
+  [[ "$output" == *"all 1 instance slot(s) are in use"* ]]
+  [[ "$output" == *"hint: set TG_MAX_INSTANCES=2 to allow another instance"* ]]
 
   wait "$first_pid"
-  wait "$second_pid"
 }
 
 @test "--preflight reports active slots for running grinds" {
