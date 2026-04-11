@@ -44,17 +44,6 @@
 
 ## P1
 
-- [ ] Stabilize the parallel bats verification harness and document any remaining limits
-  **ID**: stabilize-parallel-check-harness
-  **Parent**: stabilize-parallel-check-suite
-  **Tags**: test, dx, stability
-  **Details**: Parallel `make check` has reported full-suite terminations (`bats --jobs 9 tests/*.bats` exiting with signal 15) in addition to file-level assertion failures. Once the flaky specs are stabilized, make the verification harness reliable enough for contributor use and document any residual timing-sensitive limitations in the repo guidance.
-  **Files**: Makefile, .github/workflows/check.yml, AGENTS.md
-  **Acceptance**:
-  - [ ] `make check` no longer terminates spuriously during local parallel verification
-  - [ ] CI/local parallel bats invocation remains enabled as the primary path
-  - [ ] AGENTS.md documents any remaining test limitations with exact commands or scenarios if they still exist
-
 ## P2
 
 - [ ] Add resumable grind state so interrupted runs can continue without losing counters
@@ -82,16 +71,6 @@
   - [ ] The file is written atomically so external readers never see truncated content
   - [ ] The feature is documented, including the default path or the env var/flag used to override it
   - [ ] Tests verify heartbeat contents across at least startup, in-session, and completion states
-
-- [ ] Add SIGTERM graceful shutdown behavioral test
-  **ID**: test-sigterm
-  **Tags**: test
-  **Details**: All graceful-shutdown behavioral tests only send SIGINT (tests/taskgrind.bats). No test sends SIGTERM to a running grind and verifies the session finishes. SIGTERM uses the same `graceful_shutdown` function but with exit code 143 instead of 130.
-  **Files**: tests/taskgrind.bats
-  **Acceptance**:
-  - [ ] Test sends SIGTERM to a running grind, verifies session completes
-  - [ ] Verifies exit code is 143
-  - [ ] Verifies "Grind complete" summary is printed
 
 - [ ] Add concurrent lock rejection end-to-end test
   **ID**: test-lock-contention

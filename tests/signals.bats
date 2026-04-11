@@ -77,6 +77,37 @@ SCRIPT
   grep -q 'session_finished' "$TEST_DIR/session-lifecycle.log"
 }
 
+@test "TERM signal waits for running session before exiting with status 143" {
+  local slow_devin="$TEST_DIR/slow-devin"
+  cat > "$slow_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+echo "session_started" >> "$TEST_DIR/session-lifecycle.log"
+sleep 3
+echo "session_finished" >> "$TEST_DIR/session-lifecycle.log"
+SCRIPT
+  chmod +x "$slow_devin"
+  export DVB_GRIND_CMD="$slow_devin"
+  export DVB_DEADLINE=$(( $(date +%s) + 30 ))
+  export DVB_SHUTDOWN_GRACE=10
+
+  "$DVB_GRIND" 1 "$TEST_REPO" > "$TEST_DIR/graceful-term-output.txt" 2>&1 &
+  local grind_pid=$!
+  local status
+  _wait_for_file_pattern "$TEST_DIR/session-lifecycle.log" 'session_started'
+
+  kill -TERM "$grind_pid" 2>/dev/null || true
+
+  set +e
+  wait "$grind_pid"
+  status=$?
+  set -e
+
+  [ "$status" -eq 143 ]
+  grep -q 'session_finished' "$TEST_DIR/session-lifecycle.log"
+  grep -q 'Grind complete' "$TEST_DIR/graceful-term-output.txt"
+}
+
 @test "graceful shutdown function is called on INT" {
   # Structural: INT trap calls graceful_shutdown, not just cleanup
   grep -q "trap 'graceful_shutdown 130' INT" "$DVB_GRIND"
