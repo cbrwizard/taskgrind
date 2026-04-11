@@ -33,6 +33,16 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [[ "$output" == *"backend:  claude-code"* ]]
 }
 
+@test "TG_BACKEND takes precedence over DVB_BACKEND during a real run" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export DVB_BACKEND=codex
+  export TG_BACKEND=devin
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"backend=devin"* ]]
+  grep -q -- '--permission-mode dangerous' "$DVB_GRIND_INVOKE_LOG"
+}
+
 @test "--backend flag overrides DVB_BACKEND env" {
   export DVB_BACKEND=codex
   run "$DVB_GRIND" --dry-run --backend claude-code 1 "$TEST_REPO"

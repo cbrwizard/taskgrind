@@ -217,6 +217,15 @@ SCRIPT
   [[ "$output" == *"TG_MAX_SESSION must be numeric"* ]]
 }
 
+@test "TG_MAX_SESSION takes precedence over DVB_MAX_SESSION" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export DVB_MAX_SESSION=9
+  export TG_MAX_SESSION=17
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'timeout 17s' "$DVB_GRIND_INVOKE_LOG"
+}
+
 @test "DVB_SHUTDOWN_GRACE=abc exits with must be numeric error" {
   export DVB_SHUTDOWN_GRACE=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
@@ -577,4 +586,3 @@ TASKS
 @test "devin binary validation uses -x check (executable)" {
   grep -q '\-x "$_backend_binary"' "$DVB_GRIND"
 }
-

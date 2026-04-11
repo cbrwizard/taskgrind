@@ -103,16 +103,6 @@
   - [ ] CI/local parallel bats invocation remains enabled as the primary path
   - [ ] AGENTS.md documents any remaining test limitations with exact commands or scenarios if they still exist
 
-- [ ] Test coverage for TG_ prefix precedence on remaining 16 env vars
-  **ID**: test-tg-prefix
-  **Tags**: test
-  **Details**: Only `TG_MODEL`, `TG_SKILL`, and `TG_PROMPT` have behavioral precedence tests. The other 16 TG_ vars (LOG, NOTIFY, BACKEND, COOL, DEVIN_PATH, MAX_SESSION, MAX_FAST, MAX_ZERO_SHIP, etc.) have no behavioral test confirming TG_X overrides DVB_X at runtime. The mapping loop at bin/taskgrind:91-101 is structurally tested but not exercised.
-  **Files**: tests/taskgrind.bats
-  **Acceptance**:
-  - [ ] Behavioral tests for at least: TG_BACKEND, TG_COOL, TG_LOG, TG_NOTIFY, TG_EARLY_EXIT_ON_STALL, TG_MAX_SESSION
-  - [ ] Each test sets TG_X and DVB_X to different values, runs grind, asserts TG_ value took effect
-  - [ ] All existing tests still pass
-
 - [ ] Add test for sync_interval > 0 modulo logic
   **ID**: test-sync-interval
   **Tags**: test

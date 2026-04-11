@@ -67,6 +67,18 @@ TASKS
   [ -f "$custom_log" ]
 }
 
+@test "TG_LOG takes precedence over DVB_LOG" {
+  local legacy_log="$TEST_DIR/legacy.log"
+  local tg_log="$TEST_DIR/tg.log"
+  export DVB_LOG="$legacy_log"
+  export TG_LOG="$tg_log"
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [ -f "$tg_log" ]
+  [ ! -f "$legacy_log" ]
+}
+
 @test "default log file uses timestamp format" {
   unset DVB_LOG
   export DVB_DEADLINE=$(( $(date +%s) + 5 ))
@@ -152,6 +164,15 @@ TASKS
   local count
   count=$(wc -l < "$DVB_GRIND_INVOKE_LOG" | tr -d ' ')
   [ "$count" -ge 2 ]
+}
+
+@test "TG_COOL takes precedence over DVB_COOL" {
+  export DVB_DEADLINE=$(( $(date +%s) + 3 ))
+  export DVB_COOL=0
+  export TG_COOL=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Cooling down 1s"* ]]
 }
 
 # ── Working directory ────────────────────────────────────────────────
@@ -296,6 +317,24 @@ SCRIPT
 @test "DVB_NOTIFY=0 suppresses notification" {
   grep -q 'DVB_NOTIFY:-1' "$DVB_GRIND"
   grep -q 'DVB_NOTIFY' "$DVB_GRIND"
+}
+
+@test "TG_NOTIFY takes precedence over DVB_NOTIFY" {
+  local fake_bin="$TEST_DIR/fake-bin"
+  local notify_log="$TEST_DIR/osascript.log"
+  mkdir -p "$fake_bin"
+  cat > "$fake_bin/osascript" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$notify_log"
+SCRIPT
+  chmod +x "$fake_bin/osascript"
+  export PATH="$fake_bin:$PATH"
+  export DVB_NOTIFY=1
+  export TG_NOTIFY=0
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [ ! -f "$notify_log" ]
 }
 
 @test "notification includes session count and tasks shipped" {

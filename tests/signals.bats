@@ -658,6 +658,22 @@ TASKS
   grep -q 'stall_bail' "$TEST_LOG"
 }
 
+@test "TG_EARLY_EXIT_ON_STALL takes precedence over DVB_EARLY_EXIT_ON_STALL" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Stubborn task
+TASKS
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
+  export DVB_MAX_ZERO_SHIP=10
+  export DVB_EARLY_EXIT_ON_STALL=0
+  export TG_EARLY_EXIT_ON_STALL=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'early_exit_stall' "$TEST_LOG"
+  [[ "$output" == *"TG_EARLY_EXIT_ON_STALL=1"* ]]
+}
+
 @test "early exit stops the grind loop (no more sessions)" {
   cat > "$TEST_REPO/TASKS.md" <<'TASKS'
 # Tasks
