@@ -60,6 +60,7 @@ taskgrind --dry-run 8 ~/apps/myrepo    # print config without running
 taskgrind --preflight ~/apps/myrepo    # run health checks only
 taskgrind --help / -h                  # show usage and environment variables
 taskgrind --version / -V               # print version (commit hash + date)
+TG_MAX_INSTANCES=2 taskgrind 8         # allow two concurrent grinds per repo
 ```
 
 Arguments can appear in any order. Hours is any bare integer 1-24.
@@ -96,9 +97,9 @@ Completed tasks are removed (not checked off). History lives in git log. See the
 - **Model selection** — `--model gpt-5-4` or `TG_MODEL=gpt-5-4` to use any model the backend supports
 - **Live model switching** — create/edit `.taskgrind-model` in the repo while running; changes take effect at the next session. Delete the file to revert to the startup model.
 - **Live prompt injection** — create/edit `.taskgrind-prompt` in the repo while running; changes take effect at the next session
-- **Preflight checks** — 7 health checks (binary, network, git state, remote, disk, TASKS.md, network-watchdog) before launch. `network-watchdog` is optional; if missing, taskgrind falls back to `curl` for connectivity checks.
+- **Preflight checks** — 8 health checks plus active slot reporting before launch. `network-watchdog` is optional; if missing, taskgrind falls back to `curl` for connectivity checks.
 - **Self-copy protection** — copies itself to `$TMPDIR` before running, survives script edits mid-grind
-- **Per-repo locking** — `flock` (Linux) / `perl flock(2)` (macOS) prevents duplicate grinds on the same repo
+- **Slot-based per-repo locking** — `TG_MAX_INSTANCES` allows multiple concurrent grinds on the same repo; slot 0 owns between-session git sync, higher slots get conflict-avoidance prompt guidance
 - **Blocked-queue detection** — exits early when all remaining tasks have `**Blocked by**:` metadata
 - **Caffeinate integration** — prevents system sleep on macOS (`caffeinate`) and Linux (`systemd-inhibit`)
 - **Git sync with stash/rebase** — between-session sync stashes dirty work, rebases on default branch, cleans merged branches
@@ -146,6 +147,7 @@ Before deploying, ensure:
 | `TG_GIT_SYNC_TIMEOUT` | `30` | Max seconds for between-session git sync |
 | `TG_SYNC_INTERVAL` | `5` | Git sync every N sessions (0=every) |
 | `TG_EARLY_EXIT_ON_STALL` | `1` | Exit on low throughput (0=disabled) |
+| `TG_MAX_INSTANCES` | `1` | Max concurrent instances per repo |
 | `TG_DEVIN_PATH` | auto | Override devin binary path |
 | `TG_LOG` | auto | Override log file path |
 | `TG_NOTIFY` | `1` | Desktop notification on completion |
@@ -181,12 +183,22 @@ echo "gpt-5-4" > ~/apps/myrepo/.taskgrind-model
 
 The file is re-read before each session. Overrides `--model` and `TG_MODEL` when present. Delete the file to revert to the original startup model. Files larger than 1KB are skipped (safety guard).
 
+### Concurrent instances on one repo
+
+Allow more than one grind on the same repo by raising `TG_MAX_INSTANCES`:
+
+```bash
+TG_MAX_INSTANCES=2 taskgrind ~/apps/myrepo 8
+```
+
+Each running grind claims the lowest free slot (`0`, `1`, ...). Slot 0 remains the primary instance and owns the between-session git sync. Higher slots skip that sync and get extra prompt guidance to avoid overlapping file edits. `taskgrind --preflight` reports how many slots are active before you launch another grind.
+
 ## Development
 
 ```bash
 make install    # symlink to /usr/local/bin + install man page
 make lint       # shellcheck
-make test       # bats test suite (392 tests)
+make test       # bats test suite (400+ tests)
 make check      # lint + test
 make uninstall  # remove symlink and man page
 ```

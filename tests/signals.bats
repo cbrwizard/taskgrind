@@ -171,7 +171,7 @@ TASKS
 }
 
 @test "Linux: flock preferred, perl fallback when flock unavailable (structural)" {
-  grep -q 'flock -n 9' "$DVB_GRIND"
+  grep -q 'flock -n "$_lock_fd"' "$DVB_GRIND"
   grep -q 'perl.*Fcntl.*LOCK_EX' "$DVB_GRIND"
 }
 

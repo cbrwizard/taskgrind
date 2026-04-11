@@ -460,7 +460,7 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 # ── Multi-project locking ─────────────────────────────────────────────
 
 @test "locking uses flock(1) with perl fallback for macOS" {
-  grep -q 'flock -n 9' "$DVB_GRIND"
+  grep -q 'flock -n "$_lock_fd"' "$DVB_GRIND"
   grep -q 'perl -e.*Fcntl.*flock' "$DVB_GRIND"
 }
 
@@ -474,7 +474,7 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 }
 
 @test "lock error message shows repo path" {
-  grep -q 'another taskgrind is already running' "$DVB_GRIND"
+  grep -q 'all.*instance slot(s) are in use' "$DVB_GRIND"
   grep -q 'repo:' "$DVB_GRIND"
 }
 

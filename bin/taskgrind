@@ -43,6 +43,7 @@
 #        TG_SYNC_INTERVAL — git sync every N sessions (default: 5, 0=every session)
 #        TG_SHUTDOWN_GRACE — seconds to wait for current session on exit (default: 120)
 #        TG_EARLY_EXIT_ON_STALL — exit early on low throughput (default: 1)
+#        TG_MAX_INSTANCES — max concurrent instances per repo (default: 1)
 #
 #        DVB_ prefix is supported as a backward-compatible alias for all TG_ vars.
 #
@@ -83,16 +84,17 @@ trap '[[ -n "${_DVB_SELF_COPY:-}" && -f "${_DVB_SELF_COPY}" ]] && rm -f "$_DVB_S
 TASKGRIND_DIR="${TASKGRIND_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 # shellcheck source=../lib/constants.sh
 source "$TASKGRIND_DIR/lib/constants.sh"
+_dvb_is_tty="${_dvb_is_tty:-0}"
 
 # ── TG_ prefix resolution ─────────────────────────────────────────────
 # TG_ is the canonical prefix; DVB_ is kept for backward compat.
 # If TG_X is set, it takes precedence over DVB_X. Internal/test-only vars
 # (DVB_GRIND_CMD, DVB_DEADLINE, DVB_NET_FILE, DVB_CAFFEINATED) stay as DVB_.
 for _tg_var in BACKEND BACKOFF_BASE BACKOFF_MAX COOL DEVIN_PATH \
-               EARLY_EXIT_ON_STALL GIT_SYNC_TIMEOUT LOG MAX_FAST MAX_SESSION \
-               MAX_ZERO_SHIP MIN_SESSION MODEL NET_MAX_WAIT NET_RETRIES \
-               NET_RETRY_DELAY NET_WAIT NOTIFY PROMPT SHUTDOWN_GRACE SKILL \
-               SYNC_INTERVAL; do
+               EARLY_EXIT_ON_STALL GIT_SYNC_TIMEOUT LOG MAX_FAST MAX_INSTANCES \
+               MAX_SESSION MAX_ZERO_SHIP MIN_SESSION MODEL NET_MAX_WAIT \
+               NET_RETRIES NET_RETRY_DELAY NET_WAIT NOTIFY PROMPT \
+               SHUTDOWN_GRACE SKILL SYNC_INTERVAL; do
   _tg_ref="TG_${_tg_var}"
   if [[ -n "${!_tg_ref:-}" ]]; then
     export "DVB_${_tg_var}"="${!_tg_ref}"
@@ -171,6 +173,7 @@ max_fast="${DVB_MAX_FAST:-5}"
 max_session="${DVB_MAX_SESSION:-3600}"
 max_zero_ship="${DVB_MAX_ZERO_SHIP:-8}"
 sync_interval="${DVB_SYNC_INTERVAL:-5}"
+max_instances="${DVB_MAX_INSTANCES:-1}"
 
 # Validate numeric env vars
 if ! [[ "$cooldown" =~ ^[0-9]+$ ]]; then
@@ -187,6 +190,9 @@ if ! [[ "$max_zero_ship" =~ ^[0-9]+$ ]]; then
 fi
 if ! [[ "$sync_interval" =~ ^[0-9]+$ ]]; then
   echo "Error: TG_SYNC_INTERVAL must be numeric, got '$sync_interval'" >&2; exit 1
+fi
+if ! [[ "$max_instances" =~ ^[0-9]+$ ]] || [[ "$max_instances" -lt 1 ]]; then
+  echo "Error: TG_MAX_INSTANCES must be a positive integer, got '$max_instances'" >&2; exit 1
 fi
 # Validate optional numeric env vars — these are used in arithmetic/sleep mid-loop
 # and would crash with set -euo pipefail if non-numeric.
@@ -415,6 +421,25 @@ preflight_pass()  { echo "  ✓ $1"; _pf_pass=$((_pf_pass + 1)); }
 preflight_warn()  { echo "  ⚠ $1"; _pf_warn=$((_pf_warn + 1)); }
 preflight_fail()  { echo "  ✗ $1"; _pf_fail=$((_pf_fail + 1)); }
 
+slot_lock_file() {
+  local slot="$1"
+  echo "$_dvb_tmp/taskgrind-lock-${_lock_hash}-${slot}"
+}
+
+slot_lock_pid() {
+  local lock_file="$1"
+  [[ -f "$lock_file" ]] || return 1
+  sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' "$lock_file" 2>/dev/null | head -1
+}
+
+slot_lock_active() {
+  local lock_file="$1"
+  local lock_pid
+  lock_pid=$(slot_lock_pid "$lock_file") || return 1
+  [[ -n "$lock_pid" ]] || return 1
+  kill -0 "$lock_pid" 2>/dev/null
+}
+
 preflight_check() {
   echo "Preflight checks for: $repo"
   echo ""
@@ -563,44 +588,65 @@ if [[ "$preflight_only" -eq 1 ]]; then
   if [[ -n "$extra_prompt" ]]; then
     echo "  prompt:   $extra_prompt"
   fi
+  # Report active instance slots
+  _lock_hash=$(echo "$repo" | { shasum 2>/dev/null || sha1sum; } | cut -d' ' -f1)
+  _active_slots=0
+  for (( _slot=0; _slot < max_instances; _slot++ )); do
+    _pf_lock=$(slot_lock_file "$_slot")
+    if slot_lock_active "$_pf_lock"; then
+      (( _active_slots++ )) || true
+    fi
+  done
+  echo "  slots:    $_active_slots/$max_instances active"
   echo ""
   preflight_check
   exit $?
 fi
 
-# ── Per-repo lock ─────────────────────────────────────────────────────
-# One grind per repo directory. Multiple grinds across different repos are OK.
-# Uses lockf(1) on macOS or flock(1) on Linux — lock auto-releases on exit/crash.
+# ── Per-repo slot lock ────────────────────────────────────────────────
+# Slot-based locking: up to max_instances grinds per repo directory.
+# Each instance claims the lowest free slot (0, 1, …, max_instances-1).
+# Slot 0 is the primary (owns git sync); slots ≥1 skip between-session sync.
+# Uses flock(1) on Linux or perl flock(2) on macOS — lock auto-releases on exit/crash.
 # Skip locking in test mode (DVB_GRIND_CMD set) to avoid fd conflicts with bats.
+_dvb_slot=0
 if [[ -z "${DVB_GRIND_CMD:-}" ]]; then
   _lock_hash=$(echo "$repo" | { shasum 2>/dev/null || sha1sum; } | cut -d' ' -f1)
-  _lock_file="$_dvb_tmp/taskgrind-lock-${_lock_hash}"
-  # Open fd 9 on the lockfile (creates if needed)
-  exec 9>"$_lock_file"
-  if command -v flock >/dev/null 2>&1; then
-    # Linux (always), or macOS with Homebrew util-linux
+  _lock_acquired=false
+  for (( _slot=0; _slot < max_instances; _slot++ )); do
+    _lock_file=$(slot_lock_file "$_slot")
+    # Each slot gets its own fd: slot 0 → fd 9, slot 1 → fd 10, etc.
+    _lock_fd=$(( 9 + _slot ))
+    eval "exec ${_lock_fd}>\"$_lock_file\""
     _lock_ok=true
-    flock -n 9 2>/dev/null || _lock_ok=false
-  else
-    # macOS default: no flock(1) — use perl to call flock(2) on the open FD.
-    # perl's >&= mode references the existing fd without duping, so the lock
-    # persists on the parent's fd 9 after perl exits (flock locks are per-open-
-    # file-description, released when ALL fds to that description are closed).
-    _lock_ok=true
-    perl -e 'use Fcntl qw(:flock); open(my $fh, ">&=", 9) or exit 1; flock($fh, LOCK_EX|LOCK_NB) or exit 1' 2>/dev/null || _lock_ok=false
-  fi
-  if [[ "$_lock_ok" == "false" ]]; then
-    _lock_info=$(cat "$_lock_file" 2>/dev/null)
-    echo "Error: another taskgrind is already running for this repo" >&2
+    if command -v flock >/dev/null 2>&1; then
+      flock -n "$_lock_fd" 2>/dev/null || _lock_ok=false
+    else
+      perl -e "use Fcntl qw(:flock); open(my \$fh, \">&=\", $_lock_fd) or exit 1; flock(\$fh, LOCK_EX|LOCK_NB) or exit 1" 2>/dev/null || _lock_ok=false
+    fi
+    if [[ "$_lock_ok" == "true" ]]; then
+      _dvb_slot=$_slot
+      _lock_acquired=true
+      echo "repo=$repo pid=$$ slot=$_dvb_slot started=$(date '+%Y-%m-%d %H:%M')" >&"$_lock_fd"
+      break
+    fi
+  done
+  if [[ "$_lock_acquired" == "false" ]]; then
+    # All slots full — report which instances hold them
+    echo "Error: all $max_instances instance slot(s) are in use for this repo" >&2
     echo "  repo: $repo" >&2
-    echo "  lock: $_lock_file" >&2
-    if [[ -n "$_lock_info" ]]; then
-      echo "  held: $_lock_info" >&2
+    for (( _slot=0; _slot < max_instances; _slot++ )); do
+      _lock_file=$(slot_lock_file "$_slot")
+      _lock_info=$(cat "$_lock_file" 2>/dev/null)
+      if [[ -n "$_lock_info" ]]; then
+        echo "  slot $_slot: $_lock_info" >&2
+      fi
+    done
+    if [[ "$max_instances" -eq 1 ]]; then
+      echo "  hint: set TG_MAX_INSTANCES=2 to allow a second instance" >&2
     fi
     exit 1
   fi
-  # Write diagnostic info to the lockfile (visible to competing instances)
-  echo "repo=$repo pid=$$ started=$(date '+%Y-%m-%d %H:%M')" >&9
 
   # Clean up orphaned temp files from previous runs (older than 1 day).
   # Only runs in production mode (test mode skips locking entirely).
@@ -613,6 +659,10 @@ if [[ -z "${DVB_GRIND_CMD:-}" ]]; then
     find "$_dvb_tmp" -maxdepth 1 -type f -name 'taskgrind-lock-*' -mtime +1 -delete 2>/dev/null || true
     find "$_dvb_tmp" -maxdepth 1 -type f \( -name 'taskgrind-ses-*' -o -name 'taskgrind-gsy-*' -o -name 'taskgrind-att-*' -o -name 'taskgrind-*.session.out' -o -name 'taskgrind-*.git-sync' -o -name 'taskgrind-*.task-attempts*' \) -mtime +1 -delete 2>/dev/null || true
   fi
+fi
+# Test mode: allow DVB_SLOT to override slot for testing multi-instance behavior
+if [[ -n "${DVB_GRIND_CMD:-}" && -n "${DVB_SLOT:-}" ]]; then
+  _dvb_slot="$DVB_SLOT"
 fi
 
 # --dry-run: print config and exit without running sessions
@@ -628,6 +678,9 @@ if [[ "$dry_run" -eq 1 ]]; then
   echo "  notify:   ${DVB_NOTIFY:-1}"
   echo "  max_session: ${max_session}s"
   echo "  early_exit_on_stall: ${DVB_EARLY_EXIT_ON_STALL:-1}"
+  if [[ "$max_instances" -gt 1 ]]; then
+    echo "  max_instances: $max_instances (slot=$_dvb_slot)"
+  fi
   if [[ -n "$extra_prompt" ]]; then
     echo "  prompt:   $extra_prompt"
   fi
@@ -880,6 +933,9 @@ trap 'graceful_shutdown 143' TERM
 trap 'final_sync; cleanup' EXIT
 
 echo "☕ taskgrind: ${hours}h (until ${end_time}) — backend=$backend, skill=$skill, model=$model, repo=$repo"
+if [[ "$max_instances" -gt 1 ]]; then
+  echo "   Instance slot: $_dvb_slot of $max_instances"
+fi
 echo "   Each session runs $skill. Git sync every ${sync_interval} sessions."
 if [[ "$model" != "$_startup_model" ]]; then
   echo "   Live model: $model (from .taskgrind-model, startup=$_startup_model)"
@@ -896,13 +952,16 @@ chmod 600 "$log_file" 2>/dev/null || true
 
 {
   echo "# taskgrind started $(date '+%Y-%m-%d %H:%M')"
-  echo -n "# hours=$hours backend=$backend skill=$skill model=$model repo=$repo"
+  echo -n "# hours=$hours backend=$backend skill=$skill model=$model repo=$repo slot=$_dvb_slot"
   if [[ -n "$extra_prompt" ]]; then
     echo -n " prompt=$extra_prompt"
   fi
   echo ""
   echo ""
 } >> "$log_file"
+
+# Export instance slot so child processes (devin sessions) can see it
+export TG_INSTANCE_ID="$_dvb_slot"
 
 # Run preflight checks before entering the main loop
 if ! preflight_check; then
@@ -1158,6 +1217,11 @@ while [[ $(date +%s) -lt $deadline ]]; do
 
   # Autonomy — the agent must not defer to humans
   prompt+=" AUTONOMY: You are fully autonomous. Never skip a task claiming it requires manual steps, human intervention, or external service access. You have browser automation, MCP tools, CLI access, and can interact with any web service. If a task involves a UI portal, use your browser skills. If it needs an API, call it. If it needs Jira, use MCP. Do not leave tasks saying 'requires manual work' — figure it out and do it."
+
+  # Multi-instance conflict avoidance — slots ≥1 must coordinate with slot 0
+  if [[ $_dvb_slot -ge 1 ]]; then
+    prompt+=" MULTI-INSTANCE: You are instance $_dvb_slot of $max_instances running on this repo. Instance 0 handles code changes and git sync. Avoid modifying the same files as instance 0. Before committing, run 'git pull --rebase' to absorb concurrent commits. Prefer TASKS.md-only changes, auditing, or non-overlapping work."
+  fi
 
   # Extra focus prompt — user-provided priority for every session
   if [[ -n "$extra_prompt" ]]; then
@@ -1476,7 +1540,10 @@ while [[ $(date +%s) -lt $deadline ]]; do
 
   # Sync to default branch between sessions — but only every N sessions to reduce overhead.
   # sync_interval=0 means every session (backward compat). Default: every 5 sessions.
-  if [[ "$sync_interval" -eq 0 ]] || [[ $((session % sync_interval)) -eq 0 ]]; then
+  # Slot ≥1 instances skip git sync entirely (slot 0 owns it).
+  if [[ $_dvb_slot -ge 1 ]]; then
+    log_write "[$(date '+%H:%M')] git_sync skipped (slot=$_dvb_slot, only slot 0 syncs)"
+  elif [[ "$sync_interval" -eq 0 ]] || [[ $((session % sync_interval)) -eq 0 ]]; then
     if git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 \
        && [[ -n "$(git -C "$repo" remote 2>/dev/null)" ]]; then
       dvb_spinner_start "Syncing git..."

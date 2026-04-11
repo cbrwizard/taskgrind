@@ -88,6 +88,9 @@ Seconds between network check retries (default: 2).
 .B TG_SYNC_INTERVAL
 Git sync every N sessions (default: 5, 0=every).
 .TP
+.B TG_MAX_INSTANCES
+Max concurrent taskgrind instances allowed per repo (default: 1).
+.TP
 .B TG_GIT_SYNC_TIMEOUT
 Max seconds for between\-session git sync (default: 30).
 .TP
@@ -119,6 +122,15 @@ Optional file in the target repo. Content overrides the model for subsequent
 sessions. Re\-read before each session. Overrides \-\-model and TG_MODEL when
 present. Delete the file to revert to the original startup model. Files larger
 than 1KB are skipped.
+.PP
+Set
+.B TG_MAX_INSTANCES
+above 1 to allow multiple concurrent grinds on the same repo. Each running
+grind claims the lowest free slot. Slot 0 owns the between\-session git sync;
+higher slots skip that sync and receive conflict\-avoidance prompt guidance.
+Use
+.B taskgrind \-\-preflight
+to see how many slots are currently active before starting another grind.
 .TP
 .I ${TMPDIR:\-/tmp}/taskgrind\-*.log
 Session logs (one per grind invocation).
@@ -133,6 +145,7 @@ taskgrind \-\-prompt "test coverage" 8
 taskgrind \-\-dry\-run 8             # print config only
 taskgrind \-\-preflight             # health checks only
 taskgrind \-\-version               # print version
+TG_MAX_INSTANCES=2 taskgrind 8     # allow two concurrent grinds per repo
 TG_MODEL=sonnet taskgrind 8        # override model via env
 echo "gpt\-5\-4" > .taskgrind\-model  # switch model mid\-grind
 .fi
