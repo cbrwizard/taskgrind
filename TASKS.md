@@ -9,13 +9,6 @@
   **Acceptance**: `make lint` exits 0 locally; the fix preserves source-path checking for real issues and does not break runtime path resolution.
 
 ## P1
-- [ ] Analyze recent taskgrind logs and refresh repo tasks (@instance-1)
-  **ID**: audit-recent-grind-logs
-  **Tags**: audit, logs, maintenance
-  **Details**: Review the newest unanalyzed taskgrind logs, capture actionable reliability findings, and update the task queues for the affected repos so future sessions work from the observed failures instead of rediscovering them.
-  **Files**: `TASKS.md`
-  **Acceptance**: The recent logs have been reviewed; resulting follow-up tasks are recorded in the relevant task queues; this tracking block is removed once the audit update lands.
-
 - [ ] Reconcile resumable-state docs with the implemented on-disk contract
   **ID**: align-resume-state-docs
   **Tags**: docs, resume, reliability
