@@ -59,10 +59,3 @@
   **Details**: Empty-queue sweeps are part of the product story, but there is no maintainer shortcut for running the same local checks this audit used (`TODO`/`FIXME` scan, shellcheck, focused docs review). Add a lightweight `make audit` or documented equivalent that helps contributors reproduce repo audits consistently.
   **Files**: `Makefile`, `CONTRIBUTING.md`, `README.md`
   **Acceptance**: Contributors have one documented command for the repo-audit workflow, and it completes using existing local tooling without network-only dependencies.
-
-- [ ] Make `--dry-run` show the same completion and autonomy guidance as live sessions (@devin)
-  **ID**: expose-dry-run-session-protocol
-  **Tags**: usability, diagnostics, prompts
-  **Details**: `taskgrind --dry-run` prints only a thin prompt preview, so maintainers cannot see the completion protocol and autonomy instructions that real sessions receive. Expand the dry-run prompt preview and add regression coverage so audit/debug loops can inspect the effective session protocol without launching a backend.
-  **Files**: `bin/taskgrind`, `tests/diagnostics.bats`
-  **Acceptance**: `taskgrind --dry-run` prints the completion protocol and autonomy guidance alongside the prompt preview; regression tests fail before the change and pass after it.

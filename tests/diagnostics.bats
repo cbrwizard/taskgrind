@@ -457,6 +457,15 @@ SCRIPT
   [[ "$output" != *"FOCUS:"* ]]
 }
 
+@test "--dry-run shows completion protocol and autonomy guidance" {
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"COMPLETION PROTOCOL"* ]]
+  [[ "$output" == *"remove its entire block"* ]]
+  [[ "$output" == *"AUTONOMY:"* ]]
+  [[ "$output" == *"browser automation"* ]]
+}
+
 # ── Devin binary PATH fallback ────────────────────────────────────────
 
 @test "devin path resolution checks PATH before default" {

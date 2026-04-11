@@ -790,6 +790,8 @@ if [[ "$dry_run" -eq 1 ]]; then
   echo ""
   echo "Prompt:"
   echo "  Run the $skill skill. Session 1, $((hours * 60)) minutes remaining, timeout ${max_session}s."
+  echo "  COMPLETION PROTOCOL: When you finish a task, you MUST remove its entire block (checkbox + all metadata lines) from TASKS.md and commit. This is how taskgrind tracks progress — if the task line stays in TASKS.md, it counts as zero work done, even if you committed code. If you created a PR, merge it first (use 'gh pr merge --squash' or merge directly). If you committed directly to main, just remove the task. A session that commits code but doesn't remove the task from TASKS.md is a failed session."
+  echo "  AUTONOMY: You are fully autonomous. Never skip a task claiming it requires manual steps, human intervention, or external service access. You have browser automation, MCP tools, CLI access, and can interact with any web service. If a task involves a UI portal, use your browser skills. If it needs an API, call it. If it needs Jira, use MCP. Do not leave tasks saying 'requires manual work' — figure it out and do it."
   if [[ -n "$extra_prompt" ]]; then
     echo "  FOCUS: $extra_prompt"
     echo "  Pick tasks from TASKS.md that relate to this focus first."
