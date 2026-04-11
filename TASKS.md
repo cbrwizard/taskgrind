@@ -103,16 +103,6 @@
   - [ ] CI/local parallel bats invocation remains enabled as the primary path
   - [ ] AGENTS.md documents any remaining test limitations with exact commands or scenarios if they still exist
 
-- [ ] Add test for sync_interval > 0 modulo logic
-  **ID**: test-sync-interval
-  **Tags**: test
-  **Details**: All git-sync tests set `DVB_SYNC_INTERVAL=0`. The modulo path at bin/taskgrind:1389 (`session % sync_interval`) and the `git_sync skipped` log path (line 1483) are never exercised. A test with `DVB_SYNC_INTERVAL=3` and a 4-session run should verify sessions 1-2 log `git_sync skipped` and session 3 logs `git_sync ok`.
-  **Files**: tests/taskgrind.bats
-  **Acceptance**:
-  - [ ] Test with `DVB_SYNC_INTERVAL=3`: sessions 1,2 skip sync; session 3 runs sync
-  - [ ] Test verifies `git_sync skipped` log entries for non-sync sessions
-  - [ ] All existing tests still pass
-
 ## P2
 
 - [ ] Add resumable grind state so interrupted runs can continue without losing counters
