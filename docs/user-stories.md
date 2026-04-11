@@ -124,3 +124,29 @@ Preflight checks for: /Users/you/apps/myproject
   Results: 7 passed, 0 warnings, 0 failed
   ✓ Preflight passed — ready to grind.
 ```
+
+## 6. Switching models mid-grind
+
+You start a long grind with a stronger model for ambiguous work, then switch to a faster one once the remaining tasks are mostly straightforward docs or tests.
+
+```bash
+# Start with a stronger model for harder tasks
+taskgrind --model claude-opus-4-6-thinking ~/apps/myproject 6
+
+# Later, switch future sessions to a faster model
+echo "claude-sonnet-4.6" > ~/apps/myproject/.taskgrind-model
+```
+
+What happens:
+- Session 1 starts with the model passed via `--model`
+- Taskgrind checks `.taskgrind-model` between sessions, so the change applies at the next session start
+- The current in-flight session keeps running on its original model
+- This is useful when you want deeper reasoning early, then faster turnaround once the queue gets simpler
+
+Sample log:
+```
+[pid=38291] [09:00] session=1 remaining=360m tasks=9 model=claude-opus-4-6-thinking
+[pid=38291] [09:42] session=1 ended exit=0 duration=2520s tasks_after=8 shipped=1
+[pid=38291] [09:47] live_model=claude-sonnet-4.6
+[pid=38291] [09:47] session=2 remaining=313m tasks=8 model=claude-sonnet-4.6
+```
