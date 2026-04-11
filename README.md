@@ -223,7 +223,7 @@ Use `--resume` when the previous run was interrupted by a terminal crash, reboot
 ```bash
 make install    # symlink to /usr/local/bin + install man page
 make lint       # shellcheck
-make test       # bats test suite (400+ tests)
+make test       # bats test suite
 make check      # lint + test
 make uninstall  # remove symlink and man page
 ```
