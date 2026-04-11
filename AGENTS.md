@@ -45,6 +45,7 @@ make uninstall  # remove symlink and man page
 4. **Source paths are relative** — `$TASKGRIND_DIR/lib/constants.sh`, derived from script location
 5. **Test with `DVB_GRIND_CMD`** — all tests use a fake devin stub, never the real binary
 6. **Timing-sensitive tests** — a handful of network recovery and branch cleanup tests may fail intermittently under load; pre-existing, not a regression
+7. **Keep runtime files `/bin/bash` 3.2 compatible** — `tests/bash-compat.bats` smokes `/bin/bash bin/taskgrind --dry-run` and rejects common Bash-4-only syntax in sourced runtime files
 
 ## Architecture
 
