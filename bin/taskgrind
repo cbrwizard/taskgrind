@@ -1534,7 +1534,10 @@ while [[ $(date +%s) -lt $deadline ]]; do
       _prev_count="${_prev_count:-0}"
       echo "$_tid $((_prev_count + 1))" >> "$_new_attempts"
     done <<< "$_ids_after"
-    mv "$_new_attempts" "$_task_attempts_file" 2>/dev/null || true
+    if ! mv "$_new_attempts" "$_task_attempts_file" 2>/dev/null; then
+      log_write "[$(date '+%H:%M')] attempt_write_failed: could not update task attempts file"
+      rm -f "$_new_attempts" 2>/dev/null || true
+    fi
     # Log any newly skipped tasks (just crossed the threshold)
     _newly_skipped=$(awk '$2 == 3 { printf "%s ", $1 }' "$_task_attempts_file" 2>/dev/null)
     if [[ -n "$_newly_skipped" ]]; then

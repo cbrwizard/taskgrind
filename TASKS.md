@@ -201,15 +201,6 @@
   - [ ] Verifies the second process exits with "another taskgrind is already running"
   - [ ] First process completes normally
 
-- [ ] Log on task-attempts file write failure
-  **ID**: log-attempts-failure
-  **Tags**: stability
-  **Details**: At bin/taskgrind:1289, `mv "$_new_attempts" "$_task_attempts_file" 2>/dev/null || true` silently loses the session's attempt increments on disk-full. Stuck tasks won't be added to the skip list. Add a `log_write` on failure.
-  **Files**: bin/taskgrind
-  **Acceptance**:
-  - [ ] Failed `mv` of attempts file writes a log entry
-  - [ ] Skip list still functions when individual writes fail (graceful degradation)
-
 - [ ] Add AUTONOMY prompt block test
   **ID**: test-autonomy-prompt
   **Tags**: test
