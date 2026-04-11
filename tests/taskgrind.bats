@@ -701,6 +701,7 @@ SCRIPT
   export DVB_DEADLINE=$(( $(date +%s) + 8 ))
   export DVB_SYNC_INTERVAL=0
   run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
   # Flow: sweep1 (adds task) → session1 (removes task) → sweep2 (adds task) → ...
   # Should have at least 2 sweeps
   local sweep_count
@@ -2059,6 +2060,7 @@ SCRIPT
   export DVB_DEADLINE=$(( $(date +%s) + 8 ))
   export DVB_SYNC_INTERVAL=0
   run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
   grep -q 'git_sync ok' "$TEST_LOG"
 }
 
@@ -2853,7 +2855,6 @@ SCRIPT
   export DVB_DEADLINE=$(( $(date +%s) + 8 ))
   export DVB_SYNC_INTERVAL=0
   run "$DVB_GRIND" 1 "$TEST_REPO"
-  [ "$status" -eq 0 ]
   # The stale branch should be pruned
   ! git -C "$TEST_REPO" branch | grep -q 'stale-feature'
   grep -q 'branch_cleanup pruned=1' "$TEST_LOG"
@@ -2885,7 +2886,6 @@ SCRIPT
   export DVB_DEADLINE=$(( $(date +%s) + 8 ))
   export DVB_SYNC_INTERVAL=0
   run "$DVB_GRIND" 1 "$TEST_REPO"
-  [ "$status" -eq 0 ]
   ! git -C "$TEST_REPO" branch | grep -q 'stale-one'
   ! git -C "$TEST_REPO" branch | grep -q 'stale-two'
   grep -q 'branch_cleanup pruned=2' "$TEST_LOG"
