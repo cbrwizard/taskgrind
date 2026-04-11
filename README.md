@@ -61,7 +61,7 @@ taskgrind --dry-run 8 ~/apps/myrepo    # print config without running
 taskgrind --preflight ~/apps/myrepo    # run health checks only
 taskgrind --help / -h                  # show usage and environment variables
 taskgrind --version / -V               # print version (commit hash + date)
-TG_MAX_INSTANCES=2 taskgrind 8         # allow two concurrent grinds per repo
+TG_MAX_INSTANCES=3 taskgrind 8         # allow three concurrent grinds per repo
 ```
 
 Arguments can appear in any order. Hours is any bare integer 1-24.
@@ -148,7 +148,7 @@ Before deploying, ensure:
 | `TG_GIT_SYNC_TIMEOUT` | `30` | Max seconds for between-session git sync |
 | `TG_SYNC_INTERVAL` | `5` | Git sync every N sessions (0=every) |
 | `TG_EARLY_EXIT_ON_STALL` | `0` | Exit on low throughput (1=enabled) |
-| `TG_MAX_INSTANCES` | `1` | Max concurrent instances per repo |
+| `TG_MAX_INSTANCES` | `2` | Max concurrent instances per repo |
 | `TG_DEVIN_PATH` | auto | Override devin binary path |
 | `TG_LOG` | auto | Override log file path |
 | `TG_NOTIFY` | `1` | Desktop notification on completion |
@@ -186,10 +186,11 @@ The file is re-read before each session. Overrides `--model` and `TG_MODEL` when
 
 ### Concurrent instances on one repo
 
-Allow more than one grind on the same repo by raising `TG_MAX_INSTANCES`:
+By default, taskgrind allows two concurrent grinds on the same repo. Raise
+`TG_MAX_INSTANCES` above `2` to allow more:
 
 ```bash
-TG_MAX_INSTANCES=2 taskgrind ~/apps/myrepo 8
+TG_MAX_INSTANCES=3 taskgrind ~/apps/myrepo 8
 ```
 
 Each running grind claims the lowest free slot (`0`, `1`, ...). Slot 0 remains the primary instance and owns the between-session git sync. Higher slots skip that sync and get extra prompt guidance to avoid overlapping file edits. `taskgrind --preflight` reports how many slots are active before you launch another grind.

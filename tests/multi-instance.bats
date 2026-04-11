@@ -55,20 +55,19 @@ _wait_for_slot_file() {
 
 # ── Slot basics ──────────────────────────────────────────────────────
 
-@test "default max_instances is 1 (single instance)" {
-  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
-  run "$DVB_GRIND" 1 "$TEST_REPO"
-  [ "$status" -eq 0 ]
-  # No multi-instance banner line when max_instances=1
-  ! [[ "$output" == *"Instance slot"* ]]
-}
-
-@test "TG_MAX_INSTANCES=2 shows slot in banner" {
-  export DVB_MAX_INSTANCES=2
+@test "default max_instances is 2" {
   export DVB_DEADLINE=$(( $(date +%s) + 5 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Instance slot: 0 of 2"* ]]
+}
+
+@test "TG_MAX_INSTANCES=3 shows slot in banner" {
+  export DVB_MAX_INSTANCES=3
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Instance slot: 0 of 3"* ]]
 }
 
 @test "DVB_SLOT=0 sets slot 0 in test mode" {
@@ -209,16 +208,16 @@ _wait_for_slot_file() {
 # ── Dry run with multi-instance ──────────────────────────────────────
 
 @test "--dry-run shows max_instances when set" {
-  export DVB_MAX_INSTANCES=2
+  export DVB_MAX_INSTANCES=3
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"max_instances: 3"* ]]
+}
+
+@test "--dry-run shows max_instances when default is 2" {
   run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
   [ "$status" -eq 0 ]
   [[ "$output" == *"max_instances: 2"* ]]
-}
-
-@test "--dry-run omits max_instances when default (1)" {
-  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
-  [ "$status" -eq 0 ]
-  ! [[ "$output" == *"max_instances"* ]]
 }
 
 # ── Preflight slot reporting ─────────────────────────────────────────
@@ -230,6 +229,31 @@ _wait_for_slot_file() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"slots:"* ]]
   [[ "$output" == *"active"* ]]
+}
+
+@test "two concurrent grinds on same repo acquire slots 0 and 1 by default" {
+  _setup_production_multi_instance_backend
+  unset DVB_MAX_INSTANCES
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
+  local first_output="$TEST_DIR/default-slot-0.out"
+  local second_output="$TEST_DIR/default-slot-1.out"
+
+  "$DVB_GRIND" 1 "$TEST_REPO" > "$first_output" 2>&1 &
+  local first_pid=$!
+  _wait_for_slot_file 0
+
+  "$DVB_GRIND" 1 "$TEST_REPO" > "$second_output" 2>&1 &
+  local second_pid=$!
+
+  wait "$first_pid"
+  local first_status=$?
+  wait "$second_pid"
+  local second_status=$?
+
+  [ "$first_status" -eq 0 ]
+  [ "$second_status" -eq 0 ]
+  grep -q 'Instance slot: 0 of 2' "$first_output"
+  grep -q 'Instance slot: 1 of 2' "$second_output"
 }
 
 @test "two concurrent grinds on same repo acquire slots 0 and 1" {
@@ -274,6 +298,7 @@ _wait_for_slot_file() {
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 1 ]
   [[ "$output" == *"all 2 instance slot(s) are in use"* ]]
+  [[ "$output" == *"hint: set TG_MAX_INSTANCES=3 to allow another instance"* ]]
 
   wait "$first_pid"
   wait "$second_pid"
@@ -305,9 +330,8 @@ _wait_for_slot_file() {
   [[ "$output" == *"sessions"* ]]
 }
 
-@test "lock error message suggests TG_MAX_INSTANCES when max=1" {
-  # structural: verify the hint text exists in the script
-  grep -q 'hint: set TG_MAX_INSTANCES=2' "$DVB_GRIND"
+@test "lock error message suggests increasing TG_MAX_INSTANCES" {
+  grep -q 'hint: set TG_MAX_INSTANCES=' "$DVB_GRIND"
 }
 
 @test "lock error says 'all N instance slot(s) are in use'" {

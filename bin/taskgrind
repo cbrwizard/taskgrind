@@ -45,7 +45,7 @@
 #        TG_SYNC_INTERVAL — git sync every N sessions (default: 5, 0=every session)
 #        TG_SHUTDOWN_GRACE — seconds to wait for current session on exit (default: 120)
 #        TG_EARLY_EXIT_ON_STALL — exit early on low throughput (default: 0)
-#        TG_MAX_INSTANCES — max concurrent instances per repo (default: 1)
+#        TG_MAX_INSTANCES — max concurrent instances per repo (default: 2)
 #
 #        DVB_ prefix is supported as a backward-compatible alias for all TG_ vars.
 #
@@ -175,7 +175,7 @@ max_fast="${DVB_MAX_FAST:-20}"
 max_session="${DVB_MAX_SESSION:-3600}"
 max_zero_ship="${DVB_MAX_ZERO_SHIP:-50}"
 sync_interval="${DVB_SYNC_INTERVAL:-5}"
-max_instances="${DVB_MAX_INSTANCES:-1}"
+max_instances="${DVB_MAX_INSTANCES:-2}"
 
 # Validate numeric env vars
 if ! [[ "$cooldown" =~ ^[0-9]+$ ]]; then
@@ -650,9 +650,7 @@ if [[ -z "${DVB_GRIND_CMD:-}" ]]; then
         echo "  slot $_slot: $_lock_info" >&2
       fi
     done
-    if [[ "$max_instances" -eq 1 ]]; then
-      echo "  hint: set TG_MAX_INSTANCES=2 to allow a second instance" >&2
-    fi
+    echo "  hint: set TG_MAX_INSTANCES=$((max_instances + 1)) to allow another instance" >&2
     exit 1
   fi
 
