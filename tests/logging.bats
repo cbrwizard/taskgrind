@@ -28,6 +28,14 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   grep -q 'session=1' "$TEST_LOG"
 }
 
+@test "session banner and log entry include active model" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [[ "$output" == *"Session 1"* ]]
+  [[ "$output" == *"tasks queued — model=gpt-5.4"* ]]
+  grep -q 'session=1 .*model=gpt-5.4' "$TEST_LOG"
+}
+
 @test "log file records session end entries" {
   export DVB_DEADLINE=$(( $(date +%s) + 5 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
@@ -113,6 +121,14 @@ TASKS
   export DVB_COOL=0
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [[ "$output" == *"Cooling down"* ]]
+}
+
+@test "live model log includes resolved model and raw alias" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  echo "sonnet" > "$TEST_REPO/.taskgrind-model"
+  run "$DVB_GRIND" --model gpt-5-4 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'live_model=claude-sonnet-4.6 (alias=sonnet, startup=gpt-5-4)' "$TEST_LOG"
 }
 
 # ── DVB_DEADLINE override ────────────────────────────────────────────

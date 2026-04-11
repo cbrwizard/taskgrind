@@ -299,8 +299,10 @@ _startup_model="$model"  # preserve original for revert on file deletion
 # Re-read model from file. Call before each session to pick up live edits.
 # Guards: skips files > 1KB (likely accidental), strips trailing whitespace.
 _model_file_max=1024  # 1KB — model names are short
+_model_alias=""
 _refresh_model() {
   local file_model=""
+  _model_alias=""
   if [[ -f "$_model_file" ]]; then
     local file_size
     file_size=$(wc -c < "$_model_file" 2>/dev/null) || file_size=0
@@ -317,6 +319,9 @@ _refresh_model() {
   fi
   if [[ -n "$file_model" ]]; then
     model="$(dvb_resolve_model_alias "$file_model")"
+    if [[ "$model" != "$file_model" ]]; then
+      _model_alias="$file_model"
+    fi
   else
     model="$_startup_model"
   fi
@@ -1249,7 +1254,11 @@ while [[ $(date +%s) -lt $deadline ]]; do
   log_write "[$(date '+%H:%M')] session=$session remaining=${remaining_min}m tasks=$tasks_before model=$model"
 
   if [[ "$model" != "$_startup_model" ]]; then
-    log_write "[$(date '+%H:%M')] live_model=$model (startup=$_startup_model)"
+    if [[ -n "$_model_alias" ]]; then
+      log_write "[$(date '+%H:%M')] live_model=$model (alias=$_model_alias, startup=$_startup_model)"
+    else
+      log_write "[$(date '+%H:%M')] live_model=$model (startup=$_startup_model)"
+    fi
   fi
 
   # Thin prompt — the skill handles task selection and execution.

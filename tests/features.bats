@@ -418,6 +418,15 @@ SCRIPT
   [[ "$output" == *"claude-sonnet-4.6"* ]]
 }
 
+@test "model file alias is shown in the session banner as the resolved model" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  echo "sonnet" > "$TEST_REPO/.taskgrind-model"
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [[ "$output" == *"Session 1"* ]]
+  [[ "$output" == *"tasks queued — model=claude-sonnet-4.6"* ]]
+  [[ "$output" != *"tasks queued — model=sonnet"* ]]
+}
+
 @test "--dry-run shows model from model file" {
   echo "gpt-5-4" > "$TEST_REPO/.taskgrind-model"
   run "$DVB_GRIND" --dry-run 1 "$TEST_REPO"
