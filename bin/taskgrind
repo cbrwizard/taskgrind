@@ -45,6 +45,7 @@
 #        TG_GIT_SYNC_TIMEOUT — max seconds for between-session git sync (default: 30)
 #        TG_SYNC_INTERVAL — git sync every N sessions (default: 5, 0=every session)
 #        TG_SHUTDOWN_GRACE — seconds to wait for current session on exit (default: 120)
+#        TG_SESSION_GRACE — seconds to wait after session SIGINT before SIGTERM (default: 15)
 #        TG_EARLY_EXIT_ON_STALL — exit early on low throughput (default: 0)
 #        TG_MAX_INSTANCES — max concurrent instances per repo (default: 2)
 #
@@ -97,7 +98,7 @@ for _tg_var in BACKEND BACKOFF_BASE BACKOFF_MAX COOL DEVIN_PATH \
                EARLY_EXIT_ON_STALL GIT_SYNC_TIMEOUT LOG MAX_FAST MAX_INSTANCES \
                MAX_SESSION MAX_ZERO_SHIP MIN_SESSION MODEL NET_MAX_WAIT \
                NET_RETRIES NET_RETRY_DELAY NET_WAIT NOTIFY PROMPT \
-               SHUTDOWN_GRACE SKILL STATUS_FILE SYNC_INTERVAL; do
+               SESSION_GRACE SHUTDOWN_GRACE SKILL STATUS_FILE SYNC_INTERVAL; do
   _tg_ref="TG_${_tg_var}"
   if [[ -n "${!_tg_ref:-}" ]]; then
     export "DVB_${_tg_var}"="${!_tg_ref}"
@@ -201,6 +202,9 @@ fi
 # and would crash with set -euo pipefail if non-numeric.
 if [[ -n "${DVB_SHUTDOWN_GRACE:-}" ]] && ! [[ "${DVB_SHUTDOWN_GRACE}" =~ ^[0-9]+$ ]]; then
   echo "Error: TG_SHUTDOWN_GRACE must be numeric, got '${DVB_SHUTDOWN_GRACE}'" >&2; exit 1
+fi
+if [[ -n "${DVB_SESSION_GRACE:-}" ]] && ! [[ "${DVB_SESSION_GRACE}" =~ ^[0-9]+$ ]]; then
+  echo "Error: TG_SESSION_GRACE must be numeric, got '${DVB_SESSION_GRACE}'" >&2; exit 1
 fi
 if [[ -n "${DVB_MIN_SESSION:-}" ]] && ! [[ "${DVB_MIN_SESSION}" =~ ^[0-9]+$ ]]; then
   echo "Error: TG_MIN_SESSION must be numeric, got '${DVB_MIN_SESSION}'" >&2; exit 1
@@ -1482,7 +1486,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
       log_write "[$(date '+%H:%M')] session_timeout session=$session max=${max_session}s"
       kill -INT "$_dvb_pid" 2>/dev/null || true
       # Grace period: let devin commit before force-killing
-      _grace=15
+      _grace="${DVB_SESSION_GRACE:-15}"
       sleep "$_grace" &
       wait $! 2>/dev/null || exit 0
       if kill -0 "$_dvb_pid" 2>/dev/null; then

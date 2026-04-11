@@ -633,7 +633,7 @@ SCRIPT
 
 @test "timeout watchdog has grace period before SIGTERM escalation" {
   # After SIGINT, wait a grace period then check if still alive
-  grep -q '_grace=15' "$DVB_GRIND"
+  grep -q 'DVB_SESSION_GRACE:-15' "$DVB_GRIND"
   grep -q 'sleep "$_grace"' "$DVB_GRIND"
   grep -q 'still alive after.*grace.*SIGTERM' "$DVB_GRIND"
 }
@@ -641,6 +641,26 @@ SCRIPT
 @test "timeout watchdog only sends SIGTERM if process survived SIGINT" {
   # kill -0 check before SIGTERM escalation
   grep -A2 'sleep "$_grace"' "$DVB_GRIND" | grep -q 'kill -0 "$_dvb_pid"'
+}
+
+@test "TG_SESSION_GRACE overrides DVB_SESSION_GRACE for timeout escalation" {
+  local stubborn_devin="$TEST_DIR/stubborn-devin"
+  cat > "$stubborn_devin" <<'SCRIPT'
+#!/bin/bash
+trap '' INT
+sleep 5
+SCRIPT
+  chmod +x "$stubborn_devin"
+
+  unset DVB_GRIND_CMD
+  export TG_DEVIN_PATH="$stubborn_devin"
+  export DVB_MAX_SESSION=1
+  export DVB_SESSION_GRACE=9
+  export TG_SESSION_GRACE=0
+  export DVB_DEADLINE=$(( $(date +%s) + 20 ))
+
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [[ "$output" == *"still alive after 0s grace"* ]]
 }
 
 # ── Diminishing returns / DVB_EARLY_EXIT_ON_STALL ─────────────────────

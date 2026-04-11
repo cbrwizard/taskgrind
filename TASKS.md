@@ -107,13 +107,3 @@
   - [ ] Documented in README, man page, and --help
   - [ ] Test verifies custom URL is used
 
-- [ ] Make watchdog SIGINT-to-SIGTERM grace configurable via TG_SESSION_GRACE
-  **ID**: configurable-session-grace
-  **Tags**: feature, config
-  **Details**: The 15-second grace period between SIGINT and SIGTERM in the session timeout watchdog (bin/taskgrind:1141) is hardcoded. This is distinct from `TG_SHUTDOWN_GRACE` (user Ctrl-C grace). Some backends need more time to commit.
-  **Files**: bin/taskgrind, README.md, man/taskgrind.1
-  **Acceptance**:
-  - [ ] `TG_SESSION_GRACE` overrides the 15s default
-  - [ ] Validated as numeric at startup
-  - [ ] Documented in README, man page, and --help
-  - [ ] Test verifies custom value is used

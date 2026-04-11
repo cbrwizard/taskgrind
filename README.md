@@ -153,6 +153,7 @@ Before deploying, ensure:
 | `TG_LOG` | auto | Override log file path |
 | `TG_NOTIFY` | `1` | Desktop notification on completion |
 | `TG_SHUTDOWN_GRACE` | `120` | Seconds to wait for current session on exit |
+| `TG_SESSION_GRACE` | `15` | Seconds to wait after session SIGINT before SIGTERM |
 
 ## Monitoring
 

@@ -216,6 +216,19 @@ SCRIPT
   [[ "$output" == *"TG_SHUTDOWN_GRACE must be numeric"* ]]
 }
 
+@test "DVB_SESSION_GRACE=abc exits with must be numeric error" {
+  export DVB_SESSION_GRACE=abc
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"TG_SESSION_GRACE must be numeric"* ]]
+}
+
+@test "--help shows TG_SESSION_GRACE" {
+  run "$DVB_GRIND" --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"TG_SESSION_GRACE"* ]]
+}
+
 @test "DVB_MIN_SESSION=abc exits with must be numeric error" {
   export DVB_MIN_SESSION=abc
   run "$DVB_GRIND" 1 "$TEST_REPO"
