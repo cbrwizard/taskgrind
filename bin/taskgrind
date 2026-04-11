@@ -759,11 +759,14 @@ run_test_backend() {
   # Avoid process-substitution helpers in test mode. Parallel bats can tear down
   # its temp tree before those child tee processes fully exit, which makes the
   # full suite end with signal 15 after every test has already passed.
-  "$@" > "$session_output" 2>&1
-  _test_backend_status=$?
+  "$@" > "$session_output" 2>&1 &
+  _dvb_pid=$!
+  wait "$_dvb_pid" 2>/dev/null || _test_backend_status=$?
+  _test_backend_status=${_test_backend_status:-0}
   if [[ -s "$session_output" ]]; then
     cat "$session_output"
   fi
+  _dvb_pid=0
   return "$_test_backend_status"
 }
 

@@ -6,6 +6,20 @@ load test_helper
 
 DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
+_wait_for_file_pattern() {
+  local file="$1"
+  local pattern="$2"
+  local attempts=0
+  while true; do
+    if [ -f "$file" ] && grep -q -- "$pattern" "$file"; then
+      return 0
+    fi
+    attempts=$((attempts + 1))
+    [ "$attempts" -ge 100 ] && return 1
+    sleep 0.1
+  done
+}
+
 # ── Signal handling ──────────────────────────────────────────────────
 
 @test "taskgrind traps INT signal for cleanup" {
@@ -18,9 +32,11 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
 @test "taskgrind prints summary on interrupt (INT/TERM)" {
   export DVB_DEADLINE=$(( $(date +%s) + 30 ))
+  local started_file="$TEST_DIR/session-started"
   local slow_devin="$TEST_DIR/slow-devin"
-  cat > "$slow_devin" <<'SCRIPT'
+  cat > "$slow_devin" <<SCRIPT
 #!/bin/bash
+printf '%s\n' started > "$started_file"
 sleep 10
 SCRIPT
   chmod +x "$slow_devin"
@@ -28,7 +44,7 @@ SCRIPT
 
   "$DVB_GRIND" 1 "$TEST_REPO" > "$TEST_DIR/signal-output.txt" 2>&1 &
   local grind_pid=$!
-  sleep 2
+  _wait_for_file_pattern "$started_file" 'started'
   kill -INT "$grind_pid" 2>/dev/null || true
   wait "$grind_pid" 2>/dev/null || true
   grep -q "Grind complete\|sessions" "$TEST_DIR/signal-output.txt"
@@ -53,7 +69,7 @@ SCRIPT
 
   "$DVB_GRIND" 1 "$TEST_REPO" > "$TEST_DIR/graceful-output.txt" 2>&1 &
   local grind_pid=$!
-  sleep 1
+  _wait_for_file_pattern "$TEST_DIR/session-lifecycle.log" 'session_started'
   # Send INT while session is running
   kill -INT "$grind_pid" 2>/dev/null || true
   wait "$grind_pid" 2>/dev/null || true
@@ -279,31 +295,96 @@ TASKS
 }
 
 @test "stall warning appears in prompt after 3 zero-ship sessions" {
+  local counter_file="$TEST_DIR/stall-counter"
+  echo "0" > "$counter_file"
+  local prompt_devin="$TEST_DIR/prompt-devin"
+  cat > "$prompt_devin" <<SCRIPT
+#!/bin/bash
+n=\$(cat "$counter_file")
+n=\$((n + 1))
+echo "\$n" > "$counter_file"
+prompt=""
+prev=""
+for arg in "\$@"; do
+  if [ "\$prev" = "-p" ]; then
+    prompt="\$arg"
+    break
+  fi
+  case "\$arg" in
+    -p=*)
+      prompt="\${arg#-p=}"
+      break
+      ;;
+  esac
+  prev="\$arg"
+done
+printf '%s' "\$prompt" > "$TEST_DIR/prompt-\$n.txt"
+if [ "\$n" -eq 4 ]; then
+  cat > "$TEST_REPO/TASKS.md" <<'EOF'
+# Tasks
+## P0
+EOF
+fi
+SCRIPT
+  chmod +x "$prompt_devin"
+  export DVB_GRIND_CMD="$prompt_devin"
   cat > "$TEST_REPO/TASKS.md" <<'TASKS'
 # Tasks
 ## P0
 - [ ] Stubborn task
 TASKS
-  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 20 ))
   export DVB_MAX_ZERO_SHIP=5
+  export DVB_SKIP_SWEEP_ON_EMPTY=1
   run "$DVB_GRIND" 1 "$TEST_REPO"
-  # Session 4's prompt should contain the stall warning
-  grep -q 'WARNING.*shipped nothing' "$DVB_GRIND_INVOKE_LOG"
+  grep -q 'WARNING.*shipped nothing' "$TEST_DIR/prompt-4.txt"
 }
 
 @test "stall warning tells agent to decompose" {
+  local counter_file="$TEST_DIR/decompose-counter"
+  echo "0" > "$counter_file"
+  local prompt_devin="$TEST_DIR/decompose-prompt-devin"
+  cat > "$prompt_devin" <<SCRIPT
+#!/bin/bash
+n=\$(cat "$counter_file")
+n=\$((n + 1))
+echo "\$n" > "$counter_file"
+prompt=""
+prev=""
+for arg in "\$@"; do
+  if [ "\$prev" = "-p" ]; then
+    prompt="\$arg"
+    break
+  fi
+  case "\$arg" in
+    -p=*)
+      prompt="\${arg#-p=}"
+      break
+      ;;
+  esac
+  prev="\$arg"
+done
+printf '%s' "\$prompt" > "$TEST_DIR/prompt-\$n.txt"
+if [ "\$n" -eq 4 ]; then
+  cat > "$TEST_REPO/TASKS.md" <<'EOF'
+# Tasks
+## P0
+EOF
+fi
+SCRIPT
+  chmod +x "$prompt_devin"
+  export DVB_GRIND_CMD="$prompt_devin"
   cat > "$TEST_REPO/TASKS.md" <<'TASKS'
 # Tasks
 ## P0
 - [ ] Large task
 TASKS
-  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 20 ))
   export DVB_MAX_ZERO_SHIP=5
+  export DVB_SKIP_SWEEP_ON_EMPTY=1
   run "$DVB_GRIND" 1 "$TEST_REPO"
-  # Must mention decompose
-  grep -q 'decompose' "$DVB_GRIND_INVOKE_LOG"
-  # Should NOT mention sweep (removed from prompt)
-  ! grep -q 'sweep' "$DVB_GRIND_INVOKE_LOG"
+  grep -q 'decompose' "$TEST_DIR/prompt-4.txt"
+  ! grep -q 'sweep' "$TEST_DIR/prompt-4.txt"
 }
 
 @test "productive zero-ship detected when agent commits but does not remove task" {
@@ -345,13 +426,39 @@ TASKS
   git -C "$TEST_REPO" add TASKS.md
   git -C "$TEST_REPO" commit -q -m "initial"
 
+  local counter_file="$TEST_DIR/commit-counter"
+  echo "0" > "$counter_file"
   local commit_devin="$TEST_DIR/commit-devin"
   cat > "$commit_devin" <<SCRIPT
 #!/bin/bash
-echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+n=\$(cat "$counter_file")
+n=\$((n + 1))
+echo "\$n" > "$counter_file"
+prompt=""
+prev=""
+for arg in "\$@"; do
+  if [ "\$prev" = "-p" ]; then
+    prompt="\$arg"
+    break
+  fi
+  case "\$arg" in
+    -p=*)
+      prompt="\${arg#-p=}"
+      break
+      ;;
+  esac
+  prev="\$arg"
+done
+printf '%s' "\$prompt" > "$TEST_DIR/prompt-\$n.txt"
 echo "work" >> "$TEST_REPO/code.txt"
 git -C "$TEST_REPO" add -A
 git -C "$TEST_REPO" commit -q -m "fix: do work"
+if [ "\$n" -eq 3 ]; then
+  cat > "$TEST_REPO/TASKS.md" <<'EOF'
+# Tasks
+## P0
+EOF
+fi
 SCRIPT
   chmod +x "$commit_devin"
   export DVB_GRIND_CMD="$commit_devin"
@@ -362,11 +469,11 @@ SCRIPT
 - [ ] Persistent task
 TASKS
 
-  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 20 ))
   export DVB_MAX_ZERO_SHIP=5
+  export DVB_SKIP_SWEEP_ON_EMPTY=1
   run "$DVB_GRIND" 1 "$TEST_REPO"
-  # Session 3's prompt should contain the URGENT escalation
-  grep -q 'URGENT.*committed code.*did NOT remove' "$DVB_GRIND_INVOKE_LOG"
+  grep -q 'URGENT.*committed code.*did NOT remove' "$TEST_DIR/prompt-3.txt"
 }
 
 @test "no productive zero-ship when no commits and no ships" {

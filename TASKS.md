@@ -112,18 +112,17 @@
   - [ ] Test verifies model name appears in the session banner output
   - [ ] All existing tests pass
 
-- [ ] Speed up test suite 5x by splitting into parallel bats files
-  **ID**: parallel-test-suite
+- [ ] Reduce taskgrind test turnaround for local iteration
+  **ID**: improve-test-speed
   **Tags**: dx, test, performance
-  **Details**: `make test` takes ~21 minutes for the current monolithic single-file bats run. All tests are already isolated (each gets its own `mktemp -d` tmpdir in `setup()`), so they are safe to parallelize. bats 1.13 supports `--jobs N` with GNU parallel, which is already installed at `/usr/local/bin/parallel`. The blocker is that bats only parallelizes *across* files — the whole suite still lives in one monolithic `tests/taskgrind.bats`. The fix is to split by feature group into ~8 files (e.g. `tests/model.bats`, `tests/git-sync.bats`, `tests/network.bats`, `tests/prompt.bats`, `tests/session-loop.bats`, `tests/preflight.bats`, `tests/signals.bats`, `tests/misc.bats`), move `setup()`/`teardown()` + shared helpers into `tests/test_helper.bash` (it already exists but is nearly empty), update `Makefile` to run `bats --jobs 8 tests/` so all files run in parallel, and update CI (`.github/workflows/`) to match. Target: ≤5 minutes wall-clock on a MacBook with 8 cores. The `--no-parallelize-within-files` flag is fine to keep if needed for ordering-sensitive tests.
-  **Files**: tests/taskgrind.bats, tests/test_helper.bash, Makefile, .github/workflows/
+  **Details**: The suite is now parallelized, but local iteration is still too slow when contributors rerun `make check`, repeat a single bats file several times, or exercise timing-sensitive cases under load. Measure where wall-clock time is still going (fixed sleeps, repeated repo setup, duplicated fake-devin scaffolding, whole-suite startup overhead, and other hotspots) and make the fastest safe reductions without weakening coverage or disabling parallel execution.
+  **Files**: Makefile, tests/*.bats, tests/test_helper.bash, .github/workflows/check.yml, AGENTS.md
   **Acceptance**:
-  - [ ] Tests are split into ≥6 `.bats` files organized by feature group
-  - [ ] `setup()` and `teardown()` live in `test_helper.bash` and are loaded by all files
-  - [ ] `make test` runs `bats --jobs 8 tests/` and completes in ≤5 minutes
-  - [ ] All current tests still pass (same total count, no tests lost or duplicated)
-  - [ ] CI workflow updated to use `--jobs` flag
-  - [ ] No test relies on ordering between files (each is fully isolated)
+  - [ ] Baseline timings are captured for `make test`, `make check`, and at least one targeted bats-file rerun
+  - [ ] At least one real runtime reduction lands (for example shorter deterministic waits, shared helpers, lighter setup, or a faster targeted command path)
+  - [ ] Local whole-suite or targeted rerun wall-clock time measurably improves versus the baseline
+  - [ ] Parallel execution remains the primary verification path
+  - [ ] Any remaining slow or timing-sensitive paths are documented in `AGENTS.md`
 
 ## P1
 
@@ -137,21 +136,6 @@
   - [ ] `tests/session.bats` no longer intermittently misses `shipped=` or zero-ship assertions during parallel runs
   - [ ] The fix preserves the behavioral intent of the current session accounting tests
   - [ ] Targeted `tests/session.bats` runs still pass
-
-- [ ] Stabilize `tests/signals.bats` prompt-warning and graceful-shutdown assertions under parallel `make check` (@devin)
-  **ID**: stabilize-parallel-signal-tests
-  **Parent**: stabilize-parallel-check-suite
-  **Tags**: test, stability
-  **Details**: Recent parallel `make check` failures included `tests/signals.bats` prompt-warning assertions and graceful-shutdown timing paths. Make those signal-driven tests deterministic without weakening the behavior they cover.
-  **Files**: tests/signals.bats, tests/test_helper.bash
-  **Plan**:
-  - [ ] Reproduce the unstable `tests/signals.bats` cases and identify which assertions depend on whole-log greps or short deadlines
-  - [ ] Rewrite the flaky signal tests to use deterministic scripted backends or direct per-session assertions
-  - [ ] Run targeted `tests/signals.bats` verification and remove this task block once the file is stable
-  **Acceptance**:
-  - [ ] `tests/signals.bats` no longer intermittently fails prompt-warning or shutdown assertions during parallel runs
-  - [ ] The fix preserves SIGINT/SIGTERM behavioral coverage
-  - [ ] Targeted `tests/signals.bats` runs still pass
 
 - [ ] Stabilize the parallel bats verification harness and document any remaining limits
   **ID**: stabilize-parallel-check-harness
