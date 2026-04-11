@@ -145,6 +145,21 @@ By default, taskgrind allows two concurrent grinds on the same repo. Set
 .B TG_MAX_INSTANCES
 above 2 to allow more. Each running grind claims the lowest free slot. Slot 0 owns the between\-session git sync;
 higher slots skip that sync and receive conflict\-avoidance prompt guidance.
+.PP
+Example with three allowed slots:
+.RS
+.nf
+TG_MAX_INSTANCES=3 taskgrind ~/apps/myrepo 8
+TG_MAX_INSTANCES=3 taskgrind ~/apps/myrepo 8
+TG_MAX_INSTANCES=3 taskgrind \-\-preflight ~/apps/myrepo
+.fi
+.RE
+.PP
+When those first two grinds are already running, the preflight header reports
+\fBslots:    2/3 active\fR. Slot 0 is the only instance that performs the
+between\-session fetch/rebase sync. Higher slots should prefer non\-overlapping
+tasks such as audits, docs, or queue maintenance, and rebase immediately before
+committing to absorb slot\-0 changes.
 Use
 .B taskgrind \-\-preflight
 to see how many slots are currently active before starting another grind.

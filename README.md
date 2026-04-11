@@ -323,7 +323,37 @@ By default, taskgrind allows two concurrent grinds on the same repo. Raise
 TG_MAX_INSTANCES=3 taskgrind ~/apps/myrepo 8
 ```
 
-Each running grind claims the lowest free slot (`0`, `1`, ...). Slot 0 remains the primary instance and owns the between-session git sync. Higher slots skip that sync and get extra prompt guidance to avoid overlapping file edits. `taskgrind --preflight` reports how many slots are active before you launch another grind.
+Each running grind claims the lowest free slot (`0`, `1`, ...). Slot 0 remains the primary instance and owns the between-session git sync. Higher slots skip that sync and get extra prompt guidance to avoid overlapping file edits.
+
+Operator example for a three-slot run:
+
+```bash
+# Terminal 1: primary instance
+TG_MAX_INSTANCES=3 taskgrind ~/apps/myrepo 8
+
+# Terminal 2: second worker
+TG_MAX_INSTANCES=3 taskgrind ~/apps/myrepo 8
+
+# Inspect current ownership before launching a third worker
+TG_MAX_INSTANCES=3 taskgrind --preflight ~/apps/myrepo
+```
+
+Expected preflight header while two grinds are already active:
+
+```text
+taskgrind --preflight
+  repo:     /Users/you/apps/myrepo
+  backend:  devin
+  skill:    next-task
+  model:    claude-opus-4-6-thinking
+  slots:    2/3 active
+```
+
+Conflict-avoidance expectations by slot:
+
+- `slot 0` is the only instance that performs the between-session `git fetch` / `rebase` sync cycle
+- `slot 1+` skips that sync, rebases just before committing, and should prefer `TASKS.md` updates, audits, docs, or other non-overlapping files when slot 0 is editing code
+- If all slots are occupied, taskgrind prints which process owns each slot and tells you to raise `TG_MAX_INSTANCES` before starting another grind
 
 ### Resuming an interrupted grind
 

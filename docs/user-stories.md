@@ -63,7 +63,29 @@ What happens:
 - Each gets its own log file (includes repo name + PID)
 - Both use caffeinate to prevent system sleep
 
-## 4. Fleet-grind for pipeline management
+## 4. Concurrent grinds on one repo
+
+You want two or three sessions working the same repo, but you need to know who owns git sync and what the non-primary workers should avoid.
+
+```bash
+# Terminal 1
+TG_MAX_INSTANCES=3 taskgrind ~/apps/myproject 8
+
+# Terminal 2
+TG_MAX_INSTANCES=3 taskgrind ~/apps/myproject 8
+
+# Before opening Terminal 3, check slot usage
+TG_MAX_INSTANCES=3 taskgrind --preflight ~/apps/myproject
+```
+
+What happens:
+- The first grind claims slot `0`; the second claims slot `1`
+- `--preflight` prints `slots:    2/3 active`, so you can see one slot is still free before launching again
+- Slot `0` is the only instance that runs the between-session git sync
+- Slot `1` and above skip that sync and get prompt instructions to avoid overlapping edits, prefer audits/docs/queue work, and run `git pull --rebase` before committing
+- If all slots are busy, taskgrind prints the current slot owners instead of starting a conflicting fourth grind
+
+## 5. Fleet-grind for pipeline management
 
 You're managing an orchestrator that runs multiple AI pipelines. Use the `fleet-grind` skill to monitor and fix pipelines instead of picking tasks.
 
@@ -76,7 +98,7 @@ What happens:
 - The skill monitors pipelines, fixes failures, merges PRs
 - Sessions may be longer (productive timeouts auto-increase the timeout cap)
 
-## 5. Dry-run / preflight to check before committing
+## 6. Dry-run / preflight to check before committing
 
 Before starting an 8-hour grind, verify everything is set up correctly.
 
@@ -110,6 +132,7 @@ taskgrind --preflight
   backend:  devin
   skill:    next-task
   model:    claude-opus-4-6-thinking
+  slots:    0/2 active
 
 Preflight checks for: /Users/you/apps/myproject
 
@@ -125,7 +148,7 @@ Preflight checks for: /Users/you/apps/myproject
   ✓ Preflight passed — ready to grind.
 ```
 
-## 6. Switching models mid-grind
+## 7. Switching models mid-grind
 
 You start a long grind with a stronger model for ambiguous work, then switch to a faster one once the remaining tasks are mostly straightforward docs or tests.
 

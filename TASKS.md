@@ -45,13 +45,6 @@
   **Files**: `lib/fullpower.sh`, `tests/session.bats`, `tests/test_helper.bash`
   **Acceptance**: Tests demonstrate the boost path is invoked when `taskpolicy` exists and skipped cleanly otherwise, without introducing platform-specific flakes.
 
-- [ ] Close the doc gap around multi-instance conflict handling and git-sync ownership
-  **ID**: explain-multi-instance-conflict-rules
-  **Tags**: docs, concurrency, git
-  **Details**: README explains slot ownership at a high level, but it does not show what higher-slot sessions are told to do differently or when slot 0 alone performs git sync. Add an operator-focused example for `TG_MAX_INSTANCES` runs, including the preflight slot report and the conflict-avoidance expectations for nonzero slots.
-  **Files**: `README.md`, `docs/user-stories.md`, `man/taskgrind.1`
-  **Acceptance**: A reader can understand how slot assignment, preflight reporting, and slot-0-only git sync behave during concurrent grinds without reading the shell script.
-
 ## P3
 - [ ] Add a small audit helper target for repository sweeps
   **ID**: add-audit-helper-target
