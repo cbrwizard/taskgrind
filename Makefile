@@ -1,8 +1,9 @@
-.PHONY: lint test test-force check help install uninstall
+.PHONY: lint test test-force check audit help install uninstall
 
 PREFIX ?= /usr/local
 TESTS ?= tests/*.bats
-TEST_JOBS ?= 9
+AUTO_TEST_JOBS = $(shell jobs=$$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4); expr "$$jobs" + 0 >/dev/null 2>&1 || jobs=4; if [ "$$jobs" -gt 6 ]; then jobs=6; fi; if [ "$$jobs" -lt 2 ]; then jobs=2; fi; echo "$$jobs")
+TEST_JOBS ?= $(AUTO_TEST_JOBS)
 TEST_CACHE_BASENAME = .test-cache
 
 # Files that affect test outcomes — used for git-based cache
@@ -13,9 +14,11 @@ RUN_BATS = run_tmp=$$(mktemp -d "$${TMPDIR:-/tmp}/taskgrind-bats.XXXXXX") || exi
 
 help:
 	@echo "Available targets:"
+	@echo "  make audit      — run the local repo audit workflow"
 	@echo "  make lint       — run shellcheck on all scripts"
 	@echo "  make test       — run tests (cached, skips if unchanged)"
 	@echo "                    set TESTS=<glob-or-file> for targeted reruns"
+	@echo "                    set TEST_JOBS=<n> to override the auto-capped parallelism ($(AUTO_TEST_JOBS) by default)"
 	@echo "  make test-force — run tests (ignore cache)"
 	@echo "  make check      — lint + test (run before committing)"
 	@echo "  make install    — symlink taskgrind to $(PREFIX)/bin and install man page"
@@ -48,6 +51,14 @@ test-force:
 	{ printf '%s\n' "$(TESTS)" "$(TEST_JOBS)"; cat $(TEST_SHARED_DEPS) $$* 2>/dev/null | shasum | cut -d' ' -f1; } | shasum | cut -d' ' -f1 > $(TEST_CACHE)
 
 check: lint test
+
+audit:
+	@echo "═══ Audit: TODO/FIXME scan ═══"
+	@grep -RIn 'TODO\|FIXME' bin lib tests docs README.md CONTRIBUTING.md Makefile 2>/dev/null || true
+	@echo "═══ Audit: shellcheck ═══"
+	@$(MAKE) lint
+	@echo "═══ Audit: docs review queue ═══"
+	@printf '%s\n' README.md CONTRIBUTING.md docs/architecture.md docs/user-stories.md
 
 install:
 	@echo "Installing taskgrind to $(PREFIX)..."

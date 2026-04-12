@@ -31,12 +31,6 @@
   **Details**: The README task-format example only shows `**ID**` and `**Details**`, even though this repo requires `**Tags**`, `**Files**`, and `**Acceptance**` metadata too. Update the docs so contributors can copy a valid task block without checking external rules first.
   **Files**: `README.md`, `CONTRIBUTING.md`, `man/taskgrind.1`
   **Acceptance**: The primary docs include a valid tasks.md example with the required metadata fields and explain optional `**Blocked by**` usage without contradicting the repo rules.
-- [ ] Make the local audit workflow match the advertised empty-queue sweep
-  **ID**: align-audit-target-with-sweep-contract
-  **Tags**: audit, docs, dx
-  **Details**: `README.md` and `CONTRIBUTING.md` describe `make audit` as the local version of the empty-queue audit, but the target only scans TODO/FIXME markers, runs shellcheck, and prints a docs queue. Either expand the target or narrow the docs so contributors know exactly which audit checks it reproduces.
-  **Files**: `Makefile`, `README.md`, `CONTRIBUTING.md`, `docs/architecture.md`
-  **Acceptance**: `make audit` output and repo docs describe the same checklist, and the documented local audit path is accurate for the empty-queue sweep behavior taskgrind advertises.
 - [ ] Log the concrete cause when `productive_zero_ship` is triggered by queue churn
   **ID**: log-productive-zero-ship-cause
   **Tags**: logging, queue, reliability

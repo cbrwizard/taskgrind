@@ -6,6 +6,8 @@
 git clone https://github.com/cbrwizard/taskgrind.git
 cd taskgrind
 make check   # runs shellcheck + bats test suite
+make audit   # runs the local repo audit workflow
+make test TESTS=tests/bash-compat.bats  # targeted rerun with its own cache key
 make install # symlink to /usr/local/bin + install man page
 ```
 
@@ -31,6 +33,16 @@ sudo dnf install -y bats ShellCheck
 4. **Commit on `main`** — this repo uses trunk-based development for small changes
 
 All tests use a fake devin stub via `DVB_GRIND_CMD` — they never invoke real AI backends.
+
+## Running a Repo Audit
+
+Use `make audit` when you want the same lightweight local audit loop that empty-queue sweeps rely on:
+
+- Scans the repo for `TODO` and `FIXME` markers
+- Runs shellcheck through `make lint`
+- Prints the core docs files to review (`README.md`, `CONTRIBUTING.md`, `docs/architecture.md`, `docs/user-stories.md`)
+
+The target is intentionally local-only, so it works offline and does not depend on external services.
 
 ## Commit Format
 
@@ -62,6 +74,7 @@ When adding a new env var:
 - Use `DVB_DEADLINE` to control loop duration — set in the past for immediate exit (tests that validate args), or a few seconds ahead to run 1-2 sessions
 - Use `DVB_GRIND_CMD` to point at a stub script (never the real binary)
 - Use `make test TESTS=tests/<file>.bats` for tight local reruns before falling back to the full suite
+- `make test` auto-caps `TEST_JOBS` at 6 to avoid local `bats --jobs 9` terminations; set `TEST_JOBS=<n>` when you need to probe a different level
 - Structural tests (`grep -q` on the script) are fine for verifying code patterns
 
 ## Known Issues

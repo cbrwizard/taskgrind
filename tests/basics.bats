@@ -99,6 +99,19 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [[ $(echo "$output" | wc -l) -le 1 ]]
 }
 
+@test "make help lists the audit target" {
+  run make -C "$BATS_TEST_DIRNAME/.." help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"make audit"* ]]
+}
+
+@test "make audit runs the local audit workflow" {
+  run make -C "$BATS_TEST_DIRNAME/.." audit
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Audit: TODO/FIXME scan"* ]]
+  [[ "$output" == *"Audit: docs review queue"* ]]
+}
+
 @test "man page synopsis includes --resume" {
   awk '
     /^\.SH SYNOPSIS$/ { in_synopsis=1; next }
