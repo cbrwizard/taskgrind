@@ -33,6 +33,7 @@ taskgrind/
 
 ```bash
 make install    # symlink to /usr/local/bin + install man page
+make audit      # run the local repo audit workflow
 make lint       # shellcheck (run from bin/ with -x for source resolution)
 make test       # bats suite across tests/*.bats (cached, skips when unchanged)
 make test-force # bats suite without cache

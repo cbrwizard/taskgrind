@@ -170,6 +170,11 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [ "$status" -eq 0 ]
 }
 
+@test "AGENTS development commands include make audit" {
+  run grep -nF 'make audit      # run the local repo audit workflow' "$BATS_TEST_DIRNAME/../AGENTS.md"
+  [ "$status" -eq 0 ]
+}
+
 @test "developer docs mention make test-force for uncached reruns" {
   run grep -nF 'make test-force' "$BATS_TEST_DIRNAME/../README.md"
   [ "$status" -eq 0 ]
