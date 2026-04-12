@@ -130,6 +130,14 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [ "$status" -eq 0 ]
 }
 
+@test ".gitignore covers local runtime state and split test cache artifacts" {
+  run grep -nF '.taskgrind-state' "$BATS_TEST_DIRNAME/../.gitignore"
+  [ "$status" -eq 0 ]
+
+  run grep -nF '.test-cache-*' "$BATS_TEST_DIRNAME/../.gitignore"
+  [ "$status" -eq 0 ]
+}
+
 @test "man page synopsis includes --resume" {
   awk '
     /^\.SH SYNOPSIS$/ { in_synopsis=1; next }

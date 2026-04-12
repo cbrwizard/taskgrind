@@ -6,4 +6,6 @@
 *~
 *.log
 .taskgrind-prompt
+.taskgrind-state
 .test-cache
+.test-cache-*
