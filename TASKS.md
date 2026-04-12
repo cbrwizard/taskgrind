@@ -24,6 +24,20 @@
   **Files**: `bin/taskgrind`, `tests/signals.bats`, `tests/git-sync.bats`, `README.md`
   **Acceptance**: Shutdown paths log at most one final-sync push for an unchanged commit set; tests cover both normal exit and signal-driven cleanup; misleading duplicate push failure/success pairs no longer appear in the log.
 
+- [ ] Classify git-sync rebase conflicts consistently in operator logs
+  **ID**: classify-git-sync-rebase-conflicts
+  **Tags**: git-sync, logging, reliability
+  **Details**: The 2026-04-12 `agentbrew` log (`taskgrind-2026-04-12-0806-agentbrew-19027.log`) shows `git_sync rebase_failed` on `docs/COMPETITION.md` with no machine-readable conflict class, while the later `oncall-hub-app` log (`taskgrind-2026-04-12-1109-oncall-hub-app-32431.log`) emits `class=queue_only paths=TASKS.md` for the same rebase-failure family. Make the conflict classification consistent across git-sync and pre-session recovery paths so operators can immediately tell whether a rebase failed on queue churn (`TASKS.md`) or a broader repo conflict that needs manual attention.
+  **Files**: `bin/taskgrind`, `tests/git-sync.bats`, `tests/session.bats`, `README.md`
+  **Acceptance**: Rebase-failure logs always include a stable conflict class plus the conflicting paths; tests cover both `TASKS.md`-only conflicts and non-queue file conflicts; pre-session recovery and regular git-sync reuse the same logging format.
+
+- [ ] Surface the root stash failure instead of only logging `stash_pop_failed`
+  **ID**: surface-git-stash-failures
+  **Tags**: git-sync, logging, reliability
+  **Details**: The 2026-04-12 `agentbrew` log (`taskgrind-2026-04-12-0806-agentbrew-19027.log`) and `bosun` log (`taskgrind-2026-04-12-0807-bosun-22061.log`) both hit repeated `git_sync stash_pop_failed (stash preserved)` lines without the original `git stash` error, so the operator cannot tell whether the stash command failed, the pop failed after a successful stash, or dirty-state bookkeeping was wrong. Teach git sync to log the actual stash failure reason and only attempt `stash pop` when a stash was created successfully.
+  **Files**: `bin/taskgrind`, `tests/git-sync.bats`, `README.md`
+  **Acceptance**: Git-sync logs the original stash failure stderr when stash creation fails; `stash pop` is skipped unless a stash was actually created; targeted tests cover both stash-create failure and stash-pop failure paths without regressing normal dirty-tree sync.
+
 - [ ] Stop test-mode session overrides from hard-coding a missing `/bin/true` backend
   **ID**: resolve-test-backend-command-portably
   **Tags**: test-mode, backend, portability, reliability
