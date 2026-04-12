@@ -140,8 +140,8 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [ "$status" -eq 0 ]
 }
 
-@test "README documents the current make audit repo-local skill queue" {
-  run grep -n 'Contributor audit shortcut:.*docs/architecture.md.*docs/user-stories.md' "$BATS_TEST_DIRNAME/../README.md"
+@test "README documents the full current make audit review queue" {
+  run grep -n 'Contributor audit shortcut:.*README.md.*CONTRIBUTING.md.*AGENTS.md.*Agentfile.yaml.*docs/architecture.md.*docs/resume-state.md.*docs/user-stories.md.*man/taskgrind.1' "$BATS_TEST_DIRNAME/../README.md"
   [ "$status" -eq 0 ]
 
   run grep -nF '.devin/skills/standing-audit-gap-loop/SKILL.md' "$BATS_TEST_DIRNAME/../README.md"
