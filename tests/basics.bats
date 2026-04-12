@@ -140,6 +140,14 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [ "$status" -eq 0 ]
 }
 
+@test "README documents the current make audit repo-local skill queue" {
+  run grep -nF '.devin/skills/standing-audit-gap-loop/SKILL.md' "$BATS_TEST_DIRNAME/../README.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF '.devin/skills/grind-log-analyze/SKILL.md' "$BATS_TEST_DIRNAME/../README.md"
+  [ "$status" -eq 0 ]
+}
+
 @test "man page documents the current make audit review queue" {
   run grep -nF '.devin/skills/standing-audit-gap-loop/SKILL.md' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
   [ "$status" -eq 0 ]
