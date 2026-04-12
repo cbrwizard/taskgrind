@@ -114,6 +114,12 @@ Taskgrind removes the file on clean completion, including:
 The file is intentionally left behind for interrupted runs so `--resume` can
 continue them.
 
+Separately from the resume file itself, taskgrind also repairs interrupted git
+state before the next session starts. If a prior run died during a rebase or
+merge, the next loop aborts that in-progress operation first; normal
+between-session sync also auto-resolves `TASKS.md`-only rebase conflicts so
+routine queue churn does not strand the repo in recovery mode.
+
 ## Operator flow
 
 Fresh run:

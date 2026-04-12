@@ -6,6 +6,8 @@ Autonomous multi-session grind — runs sequential AI coding sessions until a de
 
 Taskgrind works with any AI coding agent that accepts a prompt (Devin, Claude Code, Cursor, etc.) and any repo that uses the [tasks.md spec](https://tasks.md) for task management.
 
+For local tests and repo audit helpers, keep `DVB_GRIND_CMD` to a single executable path. If you need a compound shell command, wrap it in a helper script first so preflight and session launch can validate it correctly.
+
 ## Prerequisites
 
 Requires **macOS** or **Linux** (or WSL on Windows).
@@ -114,7 +116,7 @@ Use `**Blocked by**` only when another task or external dependency truly prevent
 - **Slot-based per-repo locking** — `TG_MAX_INSTANCES` allows multiple concurrent grinds on the same repo; slot 0 owns between-session git sync, higher slots get conflict-avoidance prompt guidance
 - **Blocked-queue detection** — exits early when all remaining tasks have `**Blocked by**:` metadata
 - **Caffeinate integration** — prevents system sleep on macOS (`caffeinate`) and Linux (`systemd-inhibit`)
-- **Git sync with stash/rebase** — between-session sync stashes dirty work, auto-detects the repo default branch from `origin/HEAD`, remote HEAD probes, upstream tracking, or local branch fallbacks, then rebases there and cleans merged branches; tests can force the branch with `DVB_DEFAULT_BRANCH`. If stash creation fails, taskgrind logs the original git error and skips `stash pop`; if `stash pop` fails after a successful stash, it leaves the stash intact for manual recovery.
+- **Git sync with stash/rebase** — between-session sync stashes dirty work, auto-detects the repo default branch from `origin/HEAD`, remote HEAD probes, upstream tracking, or local branch fallbacks, then rebases there and cleans merged branches; tests can force the branch with `DVB_DEFAULT_BRANCH`. If stash creation fails, taskgrind logs the original git error and skips `stash pop`; if `stash pop` fails after a successful stash, it leaves the stash intact for manual recovery. When a rebase conflict only touches `TASKS.md`, taskgrind now auto-resolves it by keeping the local queue edit so queue churn does not leave the repo stuck mid-rebase.
 - **Empty-queue sweep** — when `TASKS.md` is empty, launches a sweep session to find work, then waits for external task injection before exiting
 - **Network resilience** — pauses on network loss, extends deadline on recovery
 - **Stall detection** — bails after consecutive zero-ship sessions (configurable via `TG_MAX_ZERO_SHIP`)
@@ -362,7 +364,7 @@ taskgrind --preflight
   repo:     /Users/you/apps/myrepo
   backend:  devin
   skill:    next-task
-  model:    claude-opus-4-6-thinking
+  model:    claude-opus-4-6
   slots:    2/3 active
 ```
 

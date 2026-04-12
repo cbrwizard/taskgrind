@@ -447,7 +447,7 @@ EOF
   grep -q 'CONFLICT' "$TEST_LOG"
 }
 
-@test "TASKS-only rebase conflicts are labeled distinctly in logs" {
+@test "TASKS-only rebase conflicts auto-resolve and keep sync healthy" {
   git -C "$TEST_REPO" init -q -b main
   git -C "$TEST_REPO" config user.email "test@test.com"
   git -C "$TEST_REPO" config user.name "Test"
@@ -511,8 +511,13 @@ EOF
   export DVB_SYNC_INTERVAL=0
   run "$DVB_GRIND" 1 "$TEST_REPO"
   [ "$status" -eq 0 ]
-  grep -q 'git_sync rebase_conflicts class=queue_only paths=TASKS.md' "$TEST_LOG"
-  grep -q 'git_sync rebase_aborted class=queue_only' "$TEST_LOG"
+  grep -q 'git_sync rebase_autoresolved class=queue_only paths=TASKS.md strategy=local_theirs' "$TEST_LOG"
+  grep -q 'git_sync ok (auto-resolved TASKS.md rebase conflict)' "$TEST_LOG"
+  ! grep -q 'git_sync rebase_aborted class=queue_only' "$TEST_LOG"
+  git -C "$TEST_REPO" merge-base --is-ancestor origin/main HEAD
+  ! [ -d "$TEST_REPO/.git/rebase-merge" ]
+  ! [ -d "$TEST_REPO/.git/rebase-apply" ]
+  grep -q 'Local queue task' "$TEST_REPO/TASKS.md"
 }
 
 @test "general rebase conflicts log conflicted paths and class" {
