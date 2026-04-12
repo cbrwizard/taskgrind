@@ -32,4 +32,10 @@
   **Acceptance**: Git-sync logs the original stash failure stderr when stash creation fails; `stash pop` is skipped unless a stash was actually created; targeted tests cover both stash-create failure and stash-pop failure paths without regressing normal dirty-tree sync.
 
 ## P2
+- [ ] Document `make audit` in the main development command list (@instance-1)
+  **ID**: document-make-audit-in-dev-commands
+  **Tags**: docs, maintenance, audit
+  **Details**: The repo now has a local `make audit` workflow and multiple docs describe what it does, but the main development command list in `README.md` still skips that command. New contributors scanning the common dev commands can miss the fastest local audit entrypoint even though it is part of the supported maintenance workflow.
+  **Files**: `README.md`, `tests/basics.bats`
+  **Acceptance**: The README development command list includes `make audit`; a regression test fails before the doc change and passes after it.
 ## P3
