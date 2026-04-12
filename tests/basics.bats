@@ -124,6 +124,11 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [[ "$output" == *".devin/skills/grind-log-analyze/SKILL.md"* ]]
 }
 
+@test "make audit TODO/FIXME scan covers the docs review queue files" {
+  run grep -n 'grep -RIn.*SECURITY.md.*AGENTS.md.*Agentfile.yaml.*man/taskgrind.1.*standing-audit-gap-loop/SKILL.md.*grind-log-analyze/SKILL.md' "$BATS_TEST_DIRNAME/../Makefile"
+  [ "$status" -eq 0 ]
+}
+
 @test "CONTRIBUTING documents the current make audit review queue" {
   run grep -nF 'SECURITY.md' "$BATS_TEST_DIRNAME/../CONTRIBUTING.md"
   [ "$status" -eq 0 ]

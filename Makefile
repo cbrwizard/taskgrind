@@ -54,7 +54,7 @@ check: lint test
 
 audit:
 	@echo "═══ Audit: TODO/FIXME scan ═══"
-	@grep -RIn 'TODO\|FIXME' bin lib tests docs README.md CONTRIBUTING.md Makefile 2>/dev/null || true
+	@grep -RIn 'TODO\|FIXME' bin lib tests docs README.md CONTRIBUTING.md SECURITY.md AGENTS.md Agentfile.yaml man/taskgrind.1 .devin/skills/standing-audit-gap-loop/SKILL.md .devin/skills/grind-log-analyze/SKILL.md Makefile 2>/dev/null || true
 	@echo "═══ Audit: shellcheck ═══"
 	@$(MAKE) lint
 	@echo "═══ Audit: docs review queue ═══"
