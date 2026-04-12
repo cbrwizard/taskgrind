@@ -3,12 +3,6 @@
 ## P0
 
 ## P1
-- [ ] Align README audit shortcut with the full make audit review queue
-  **ID**: align-readme-audit-review-queue
-  **Tags**: docs, audit, tests
-  **Details**: `make audit` prints the full docs review queue, including `docs/architecture.md` and `docs/user-stories.md`, but the contributor shortcut in `README.md` only names a subset. Tighten the contract so operators can see the same queue in docs and lock it with a regression test.
-  **Files**: `README.md`, `tests/basics.bats`, `TASKS.md`
-  **Acceptance**: Add a failing test first; `README.md` lists the full current review queue called out by `make audit`; the focused bats coverage passes.
 ## P2
 - [ ] Drop stale skip-threshold history when task IDs disappear from the queue (@devin)
   **ID**: prune-stale-skipped-task-attempts

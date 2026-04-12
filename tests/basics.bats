@@ -141,6 +141,9 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 }
 
 @test "README documents the current make audit repo-local skill queue" {
+  run grep -n 'Contributor audit shortcut:.*docs/architecture.md.*docs/user-stories.md' "$BATS_TEST_DIRNAME/../README.md"
+  [ "$status" -eq 0 ]
+
   run grep -nF '.devin/skills/standing-audit-gap-loop/SKILL.md' "$BATS_TEST_DIRNAME/../README.md"
   [ "$status" -eq 0 ]
 
