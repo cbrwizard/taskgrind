@@ -394,6 +394,7 @@ Use `--resume` when the previous run was interrupted by a terminal crash, reboot
 
 ```bash
 make install    # symlink to /usr/local/bin + install man page
+make audit      # run the local repo audit workflow
 make lint       # shellcheck
 make test       # bats test suite (cached, auto-capped parallelism)
 make test-force # rerun the selected bats suite without cache
