@@ -474,9 +474,52 @@ EOF
   grep -q 'symbolic-ref refs/remotes/origin/HEAD' "$DVB_GRIND"
 }
 
-@test "git sync falls back to main when origin/HEAD is missing" {
-  # Structural: fallback assignment
-  grep -q '_default_branch="${_default_branch:-main}"' "$DVB_GRIND"
+@test "git sync falls back through remote HEAD probes before main" {
+  grep -q 'ls-remote --symref origin HEAD' "$DVB_GRIND"
+  grep -q 'show-ref --verify --quiet refs/remotes/origin/main' "$DVB_GRIND"
+  grep -q 'show-ref --verify --quiet refs/remotes/origin/master' "$DVB_GRIND"
+}
+
+@test "git sync falls back to the current branch when origin HEAD is missing" {
+  local real_git
+  real_git="$(command -v git)"
+  mkdir -p "$TEST_DIR/bin"
+  cat > "$TEST_DIR/bin/git" <<EOF
+#!/bin/bash
+if [ "\${1:-}" = "-C" ]; then
+  repo_path="\$2"
+  shift 2
+fi
+if [ "\${1:-}" = "symbolic-ref" ] && [ "\${2:-}" = "refs/remotes/origin/HEAD" ]; then
+  exit 1
+fi
+if [ -n "\${repo_path:-}" ]; then
+  exec "$real_git" -C "\$repo_path" "\$@"
+fi
+exec "$real_git" "\$@"
+EOF
+  chmod +x "$TEST_DIR/bin/git"
+  export PATH="$TEST_DIR/bin:$PATH"
+
+  init_test_repo "$TEST_REPO" master
+  echo "init" > "$TEST_REPO/README.md"
+  git -C "$TEST_REPO" add README.md
+  git -C "$TEST_REPO" commit -q --amend --no-edit
+
+  local bare="$TEST_DIR/bare.git"
+  git init -q --bare --initial-branch=master "$bare"
+  git -C "$TEST_REPO" remote add origin "$bare"
+  git -C "$TEST_REPO" push -q -u origin master 2>/dev/null
+
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
+  export DVB_SYNC_INTERVAL=0
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+
+  ! grep -q 'git_sync checkout_failed: .*pathspec .main.' "$TEST_LOG"
+  ! grep -q 'git_sync rebase_failed' "$TEST_LOG"
+  grep -q 'git_sync ok' "$TEST_LOG"
+  [ "$(git -C "$TEST_REPO" symbolic-ref --short HEAD 2>/dev/null)" = "master" ]
 }
 
 @test "git sync uses detected branch for checkout and rebase" {

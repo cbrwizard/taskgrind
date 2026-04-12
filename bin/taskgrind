@@ -864,7 +864,6 @@ fi
 session=0
 tasks_shipped=0
 tasks_starting=0
-tasks_remaining=0
 tasks_remaining_snapshot=0
 sessions_zero_ship=0
 _recent_shipped=()  # rolling window of per-session shipped counts
@@ -1045,8 +1044,7 @@ final_sync() {
   fi
   # Only push if there are local commits ahead of origin
   local _default_branch
-  _default_branch=$(git -C "$repo" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@.*/@@') || true
-  _default_branch="${_default_branch:-main}"
+  _default_branch=$(detect_default_branch "$repo")
   local ahead
   ahead=$(git -C "$repo" rev-list --count "origin/$_default_branch..HEAD" 2>/dev/null) || ahead=0
   if [[ "$ahead" -eq 0 ]]; then
@@ -1280,6 +1278,42 @@ extract_task_ids() {
     grep '^\s*\*\*ID\*\*:' "$tasks_file" 2>/dev/null \
       | sed 's/.*\*\*ID\*\*:[[:space:]]*//' | awk '{print $1}' | sort || true
   fi
+}
+
+detect_default_branch() {
+  local repo_path="$1"
+  local default_branch current_branch
+
+  default_branch=$(git -C "$repo_path" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@.*/@@') || true
+  if [[ -n "$default_branch" ]]; then
+    printf '%s\n' "$default_branch"
+    return 0
+  fi
+
+  default_branch=$(git -C "$repo_path" ls-remote --symref origin HEAD 2>/dev/null \
+    | awk '/^ref:/ { sub("refs/heads/", "", $2); print $2; exit }') || true
+  if [[ -n "$default_branch" ]]; then
+    printf '%s\n' "$default_branch"
+    return 0
+  fi
+
+  current_branch=$(git -C "$repo_path" symbolic-ref --short HEAD 2>/dev/null) || true
+  if [[ -n "$current_branch" ]] && git -C "$repo_path" show-ref --verify --quiet "refs/remotes/origin/$current_branch"; then
+    printf '%s\n' "$current_branch"
+    return 0
+  fi
+
+  if git -C "$repo_path" show-ref --verify --quiet refs/remotes/origin/main; then
+    printf 'main\n'
+    return 0
+  fi
+
+  if git -C "$repo_path" show-ref --verify --quiet refs/remotes/origin/master; then
+    printf 'master\n'
+    return 0
+  fi
+
+  printf '%s\n' "${current_branch:-main}"
 }
 
 # Check if all tasks in TASKS.md are blocked.
@@ -1786,7 +1820,6 @@ while [[ $(date +%s) -lt $deadline ]]; do
   fi
 
   tasks_after=$(count_tasks "$repo/TASKS.md")
-  tasks_remaining=$tasks_after
   tasks_remaining_snapshot=$tasks_after
   _ids_after=$(extract_task_ids "$repo/TASKS.md")
 
@@ -2020,8 +2053,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
       _git_out=$(mktemp "$_dvb_tmp/taskgrind-gsy-XXXXXX")
       _git_sync_timeout="${DVB_GIT_SYNC_TIMEOUT:-30}"
       # Detect default branch — don't hardcode "main"; repos may use master/develop/etc.
-      _default_branch=$(git -C "$repo" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@.*/@@') || true
-      _default_branch="${_default_branch:-main}"
+      _default_branch=$(detect_default_branch "$repo")
       (
         # Handle dirty working tree — stash uncommitted changes before switching
         _dirty=0

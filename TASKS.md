@@ -10,13 +10,6 @@
   **Reviewed 2026-04-12 session 7**: `taskgrind-2026-04-12-0806-bosun-18073.log` still captures the same duplicate shutdown pattern in a fresh one-session run: a single `graceful_shutdown session_finished` is followed by repeated `final_sync pushing commits=7` and `final_sync push_ok` pairs. The repro is still isolated to `taskgrind`'s shutdown/final-sync interaction, not repo-local Bosun behavior.
   **Files**: `bin/taskgrind`, `tests/git-sync.bats`, `tests/signals.bats`
   **Acceptance**: Add a failing test first; signal-driven shutdown emits at most one `final_sync` block per run; pending commits are still pushed before exit.
-- [ ] Sync repos whose primary branch is not named main
-  **ID**: support-nonmain-primary-branch-during-sync
-  **Tags**: bug, git, multi-repo
-  **Details**: Log review found `/Users/fivanishche/apps/ideas` hitting `git_sync checkout_failed: error: pathspec 'main' did not match any file(s) known to git` even though the session itself completed normally. The sync path should detect the repo's real primary branch (current branch, origin HEAD, or another safe fallback) instead of assuming `main`.
-  **Reviewed 2026-04-12 session 7**: The latest `ideas` fan-out still reproduces this verbatim. `taskgrind-2026-04-12-0806-ideas-17272.log` logged `git_sync checkout_failed: error: pathspec 'main' did not match any file(s) known to git` after session 5 and again after session 10, so the fix still belongs in centralized branch detection rather than in repo-local queue cleanup.
-  **Files**: `bin/taskgrind`, `tests/git-sync.bats`
-  **Acceptance**: Add a failing test first; git sync succeeds in a repo whose primary branch is `master` or another non-`main` name; logs no longer emit `checkout_failed ... pathspec 'main'` for that case.
 - [ ] Recover cleanly from TASKS.md-only rebase conflicts during git sync
   **ID**: recover-from-tasks-md-sync-conflicts
   **Tags**: bug, git, tasks, multi-agent
