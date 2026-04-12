@@ -112,6 +112,14 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [[ "$output" == *"Audit: docs review queue"* ]]
 }
 
+@test "GitHub Actions caches the active make test cache files" {
+  run grep -n 'path: \.test-cache-\*' "$BATS_TEST_DIRNAME/../.github/workflows/check.yml"
+  [ "$status" -eq 0 ]
+
+  run grep -n 'make test$' "$BATS_TEST_DIRNAME/../.github/workflows/check.yml"
+  [ "$status" -eq 0 ]
+}
+
 @test "man page synopsis includes --resume" {
   awk '
     /^\.SH SYNOPSIS$/ { in_synopsis=1; next }

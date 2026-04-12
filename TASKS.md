@@ -23,7 +23,6 @@
   **Details**: `.github/workflows/check.yml` still caches `.test-passed`, but `make test` now reads and writes per-target `.test-cache-*` files. Update CI so cache hits warm the files the Makefile actually uses and invalidate when shared test inputs change.
   **Files**: `.github/workflows/check.yml`, `Makefile`
   **Acceptance**: The workflow caches the active `.test-cache-*` files instead of stale paths, the cache key matches the current test inputs, and comments/docs reference only the live cache behavior.
-
 ## P2
 - [ ] Log the concrete cause when `productive_zero_ship` is triggered by queue churn
   **ID**: log-productive-zero-ship-cause
