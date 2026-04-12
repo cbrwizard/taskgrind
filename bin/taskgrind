@@ -1499,6 +1499,41 @@ extract_first_task_context() {
   ' "$tasks_file" 2>/dev/null || true
 }
 
+is_audit_only_focus_request() {
+  local skill_name="$1"
+  local focus_prompt="$2"
+  local combined
+
+  combined=$(printf '%s %s\n' "$skill_name" "$focus_prompt" | tr '[:upper:]' '[:lower:]')
+  [[ "$combined" =~ standing-audit-gap-loop|project-audit|full-sweep|(^|[[:space:]])sweep($|[[:space:]])|audit|analyze[[:space:]]+logs|update[[:space:]]+tasks|refresh[[:space:]]+tasks|queue[[:space:]]+refresh ]]
+}
+
+has_removable_audit_task() {
+  local tasks_file="$1"
+  [[ -f "$tasks_file" ]] || return 1
+
+  awk '
+    function flush_task() {
+      if (in_task && task_text ~ /(audit|log|queue|tasks\.md|sweep|refresh)/) {
+        found = 1
+      }
+    }
+    /^[[:space:]]*- \[ \]/ {
+      flush_task()
+      in_task = 1
+      task_text = tolower($0)
+      next
+    }
+    in_task {
+      task_text = task_text "\n" tolower($0)
+    }
+    END {
+      flush_task()
+      exit(found ? 0 : 1)
+    }
+  ' "$tasks_file" 2>/dev/null
+}
+
 detect_default_branch() {
   local repo_path="$1"
   local default_branch current_branch upstream_branch upstream_ref
@@ -1919,6 +1954,26 @@ while [[ $(date +%s) -lt $deadline ]]; do
     tasks_before=$(count_tasks "$repo/TASKS.md")
     tasks_remaining_snapshot=$tasks_before
     _ids_before=$(extract_task_ids "$repo/TASKS.md")
+  fi
+
+  if is_audit_only_focus_request "$skill" "$extra_prompt" && ! has_removable_audit_task "$repo/TASKS.md"; then
+    _blocked_session=$((session + 1))
+    _first_task_context=$(extract_first_task_context "$repo/TASKS.md")
+    _first_task_id=$(printf '%s\n' "$_first_task_context" | awk -F= '$1 == "task_id" { print $2; exit }')
+    _audit_guard_context=""
+    if [[ -n "$_first_task_id" ]]; then
+      _audit_guard_context=" task_id=$_first_task_id"
+    fi
+    log_write "[$(date '+%H:%M')] audit_focus_without_task session=$_blocked_session skill=$skill${_audit_guard_context} refusing_session=1"
+    echo "   ⚠ Audit-only focus requested but TASKS.md has no matching removable audit task — refusing to run a queue-maintenance-only session."
+    last_session_summary="session $_blocked_session refused audit-only focus without a removable audit task"
+    last_session_result="blocked"
+    last_session_exit=0
+    last_session_shipped=0
+    last_session_duration=0
+    last_session_completed_at="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+    set_phase "audit_focus_blocked"
+    break
   fi
 
   # ── Build the session prompt ──────────────────────────────────────

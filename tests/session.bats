@@ -270,6 +270,58 @@ TASKS
   ! find "$tmp_root" -maxdepth 1 -name 'taskgrind-*.task-attempts*' | grep -q .
 }
 
+@test "audit-only skills refuse to run without a removable audit task" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Ship product fix
+  **ID**: product-fix
+TASKS
+
+  local queue_refresh_devin="$TEST_DIR/queue-refresh-devin"
+  cat > "$queue_refresh_devin" <<'SCRIPT'
+#!/bin/bash
+echo "$@" >> "${DVB_GRIND_INVOKE_LOG:-/tmp/taskgrind-invocations}"
+cat > "$TEST_REPO/TASKS.md" <<'EOF'
+# Tasks
+## P0
+- [ ] Ship product fix
+  **ID**: product-fix
+- [ ] Fresh audit note
+  **ID**: audit-note
+EOF
+SCRIPT
+  chmod +x "$queue_refresh_devin"
+  export DVB_GRIND_CMD="$queue_refresh_devin"
+  export DVB_DEADLINE=$(( $(date +%s) + 40 ))
+
+  run "$DVB_GRIND" 1 "$TEST_REPO" --skill standing-audit-gap-loop
+
+  [ "$status" -eq 0 ]
+  ! [ -f "$DVB_GRIND_INVOKE_LOG" ]
+  grep -q 'audit_focus_without_task session=1 skill=standing-audit-gap-loop task_id=product-fix refusing_session=1' "$TEST_LOG"
+  [[ "$output" == *"Audit-only focus requested but TASKS.md has no matching removable audit task"* ]]
+}
+
+@test "audit-only skills still run when TASKS.md includes a removable audit task" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Refresh taskgrind audit notes
+  **ID**: refresh-audit-notes
+  **Tags**: audit, logs
+TASKS
+
+  export DVB_DEADLINE=$(( $(date +%s) + 40 ))
+
+  run "$DVB_GRIND" 1 "$TEST_REPO" --skill standing-audit-gap-loop
+
+  [ "$status" -eq 0 ]
+  [ -f "$DVB_GRIND_INVOKE_LOG" ]
+  ! grep -q 'audit_focus_without_task' "$TEST_LOG"
+  grep -q 'standing-audit-gap-loop' "$DVB_GRIND_INVOKE_LOG"
+}
+
 @test "--skill flag changes the skill in the prompt" {
   export DVB_DEADLINE=$(( $(date +%s) + 5 ))
   run "$DVB_GRIND" 1 "$TEST_REPO" --skill fleet-grind
