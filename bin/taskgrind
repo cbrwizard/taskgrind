@@ -1280,6 +1280,53 @@ extract_task_ids() {
   fi
 }
 
+# Print the first remaining task context as shell-safe assignments.
+# Output keys:
+#   task_id=<id>
+#   blocker=<blocked-by value>
+extract_first_task_context() {
+  local tasks_file="$1"
+  [[ -f "$tasks_file" ]] || return 0
+  awk '
+    BEGIN {
+      in_task = 0
+      task_index = 0
+      task_id = ""
+      blocker = ""
+    }
+    /^[[:space:]]*- \[ \]/ {
+      task_index++
+      if (task_index == 1) {
+        in_task = 1
+        next
+      }
+      exit
+    }
+    in_task && /\*\*ID\*\*:/ && task_id == "" {
+      line = $0
+      sub(/.*\*\*ID\*\*:[[:space:]]*/, "", line)
+      split(line, parts, /[[:space:]]+/)
+      task_id = parts[1]
+      next
+    }
+    in_task && /\*\*Blocked by\*\*:/ && blocker == "" {
+      line = $0
+      sub(/.*\*\*Blocked by\*\*:[[:space:]]*/, "", line)
+      blocker = line
+      sub(/[[:space:]]+$/, "", blocker)
+      next
+    }
+    END {
+      if (task_id != "") {
+        printf "task_id=%s\n", task_id
+      }
+      if (blocker != "") {
+        printf "blocker=%s\n", blocker
+      }
+    }
+  ' "$tasks_file" 2>/dev/null || true
+}
+
 detect_default_branch() {
   local repo_path="$1"
   local default_branch current_branch
@@ -1943,7 +1990,17 @@ while [[ $(date +%s) -lt $deadline ]]; do
         log_write "[$(date '+%H:%M')] productive_zero_ship session=$session commits=$_new_commits reason=$_productive_zero_ship_reason (committed code but temporary task churn restored the original queue)"
       else
         _productive_zero_ship_reason="no_local_task_removed"
-        log_write "[$(date '+%H:%M')] productive_zero_ship session=$session commits=$_new_commits reason=$_productive_zero_ship_reason (committed code but task count unchanged)"
+        _first_task_context=$(extract_first_task_context "$repo/TASKS.md")
+        _first_task_id=$(printf '%s\n' "$_first_task_context" | awk -F= '$1 == "task_id" { print $2; exit }')
+        _first_task_blocker=$(printf '%s\n' "$_first_task_context" | awk -F= '$1 == "blocker" { sub(/^[^=]*=/, "", $0); print $0; exit }')
+        _productive_zero_ship_context=""
+        if [[ -n "$_first_task_id" ]]; then
+          _productive_zero_ship_context+=" task_id=$_first_task_id"
+        fi
+        if [[ -n "$_first_task_blocker" ]]; then
+          _productive_zero_ship_context+=" blocker=$_first_task_blocker"
+        fi
+        log_write "[$(date '+%H:%M')] productive_zero_ship session=$session commits=$_new_commits reason=$_productive_zero_ship_reason${_productive_zero_ship_context} (committed code but task count unchanged)"
       fi
     fi
   fi
