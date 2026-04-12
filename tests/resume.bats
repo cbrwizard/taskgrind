@@ -128,3 +128,85 @@ EOF
   [[ "$output" == *"saved state is incompatible: deadline expired"* ]]
   [[ "$output" == *"start a fresh grind"* ]]
 }
+
+@test "--resume rejects non-running saved states" {
+  local state_file="$TEST_DIR/resume-state"
+  export DVB_STATE_FILE="$state_file"
+
+  write_resume_state_file "$state_file" \
+    "repo=$TEST_REPO" \
+    "status=done"
+
+  run "$DVB_GRIND" --resume "$TEST_REPO"
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"saved state is incompatible: state is not resumable (status=done)"* ]]
+}
+
+@test "--resume rejects malformed numeric fields" {
+  local state_file="$TEST_DIR/resume-state"
+  export DVB_STATE_FILE="$state_file"
+
+  write_resume_state_file "$state_file" \
+    "repo=$TEST_REPO" \
+    "deadline=not-a-number"
+
+  run "$DVB_GRIND" --resume "$TEST_REPO"
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"saved state is incompatible: state file is malformed"* ]]
+}
+
+@test "--resume rejects saved state from another repo" {
+  local state_file="$TEST_DIR/resume-state"
+  local other_repo="$TEST_DIR/other-repo"
+  export DVB_STATE_FILE="$state_file"
+
+  mkdir -p "$other_repo"
+  write_resume_state_file "$state_file" \
+    "repo=$other_repo"
+
+  run "$DVB_GRIND" --resume "$TEST_REPO"
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"saved state is incompatible: repo mismatch"* ]]
+}
+
+@test "--resume rejects backend override mismatches" {
+  local state_file="$TEST_DIR/resume-state"
+  export DVB_STATE_FILE="$state_file"
+
+  write_resume_state_file "$state_file" \
+    "repo=$TEST_REPO"
+
+  run "$DVB_GRIND" --resume "$TEST_REPO" --backend claude-code
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"saved state is incompatible: backend override does not match saved state"* ]]
+}
+
+@test "--resume rejects model override mismatches" {
+  local state_file="$TEST_DIR/resume-state"
+  export DVB_STATE_FILE="$state_file"
+
+  write_resume_state_file "$state_file" \
+    "repo=$TEST_REPO"
+
+  run "$DVB_GRIND" --resume "$TEST_REPO" --model claude-opus-4-6-thinking
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"saved state is incompatible: model override does not match saved state"* ]]
+}
+
+@test "--resume rejects skill override mismatches" {
+  local state_file="$TEST_DIR/resume-state"
+  export DVB_STATE_FILE="$state_file"
+
+  write_resume_state_file "$state_file" \
+    "repo=$TEST_REPO"
+
+  run "$DVB_GRIND" --resume "$TEST_REPO" --skill standing-audit-gap-loop
+
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"saved state is incompatible: skill does not match saved state"* ]]
+}

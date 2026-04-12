@@ -123,3 +123,49 @@ assert_session_log_has_shipped() {
   local expected_shipped="$1"
   grep -Eq "session=[0-9]+ ended .*shipped=${expected_shipped}([[:space:]]|\$)" "$TEST_LOG"
 }
+
+# Helper: write a resume-state file with sane defaults plus key=value overrides.
+write_resume_state_file() {
+  local state_file="$1"
+  shift
+  local deadline="${TEST_RESUME_DEADLINE:-$(( $(date +%s) + 300 ))}"
+
+  cat > "$state_file" <<EOF
+version=1
+repo=$TEST_REPO
+status=running
+deadline=$deadline
+session=1
+tasks_shipped=0
+sessions_zero_ship=0
+consecutive_zero_ship=0
+backend=devin
+skill=next-task
+model=gpt-5.4
+startup_model=gpt-5.4
+EOF
+
+  local entry key value
+  for entry in "$@"; do
+    key="${entry%%=*}"
+    value="${entry#*=}"
+    python3 - "$state_file" "$key" "$value" <<'PY'
+from pathlib import Path
+import sys
+
+state_path = Path(sys.argv[1])
+key = sys.argv[2]
+value = sys.argv[3]
+lines = state_path.read_text().splitlines()
+
+for index, line in enumerate(lines):
+    if line.startswith(f"{key}="):
+        lines[index] = f"{key}={value}"
+        break
+else:
+    lines.append(f"{key}={value}")
+
+state_path.write_text("\n".join(lines) + "\n")
+PY
+  done
+}
