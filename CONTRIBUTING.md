@@ -34,6 +34,28 @@ sudo dnf install -y bats ShellCheck
 
 All tests use a fake devin stub via `DVB_GRIND_CMD` — they never invoke real AI backends.
 
+## TASKS.md Format
+
+Taskgrind expects `TASKS.md` to follow the tasks.md spec exactly. Use checkbox
+tasks under the priority headings and include the required metadata fields:
+
+```markdown
+# Tasks
+
+## P1
+- [ ] Document the deployment handoff
+  **ID**: document-deployment-handoff
+  **Tags**: docs, onboarding
+  **Details**: Capture the exact post-merge checks operators still perform by hand.
+  **Files**: `README.md`, `docs/user-stories.md`
+  **Acceptance**: Contributors can follow the handoff checklist without tribal knowledge.
+  **Blocked by**: release-playbook-review
+```
+
+`**Blocked by**` is optional; include it only when another task or dependency
+actually blocks the work. When you finish a task, remove its entire block from
+`TASKS.md` instead of checking it off.
+
 ## Running a Repo Audit
 
 Use `make audit` when you want the same lightweight local audit loop that empty-queue sweeps rely on:

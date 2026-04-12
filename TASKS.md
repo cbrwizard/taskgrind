@@ -25,12 +25,6 @@
   **Acceptance**: The workflow caches the active `.test-cache-*` files instead of stale paths, the cache key matches the current test inputs, and comments/docs reference only the live cache behavior.
 
 ## P2
-- [ ] Bring the task-format docs up to the full tasks.md spec
-  **ID**: document-full-tasks-md-metadata
-  **Tags**: docs, onboarding, tasks
-  **Details**: The README task-format example only shows `**ID**` and `**Details**`, even though this repo requires `**Tags**`, `**Files**`, and `**Acceptance**` metadata too. Update the docs so contributors can copy a valid task block without checking external rules first.
-  **Files**: `README.md`, `CONTRIBUTING.md`, `man/taskgrind.1`
-  **Acceptance**: The primary docs include a valid tasks.md example with the required metadata fields and explain optional `**Blocked by**` usage without contradicting the repo rules.
 - [ ] Log the concrete cause when `productive_zero_ship` is triggered by queue churn
   **ID**: log-productive-zero-ship-cause
   **Tags**: logging, queue, reliability

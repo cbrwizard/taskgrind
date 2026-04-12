@@ -85,14 +85,22 @@ Taskgrind reads `TASKS.md` following the [tasks.md spec](https://github.com/task
 ## P0
 - [ ] Fix critical bug in auth flow
   **ID**: fix-auth-bug
+  **Tags**: bug, auth
   **Details**: The OAuth callback fails when...
+  **Files**: `src/auth.sh`, `tests/auth.bats`
+  **Acceptance**: Users can complete the OAuth callback without a retry loop.
 
 ## P1
 - [ ] Add retry logic to API calls
   **ID**: add-api-retry
+  **Tags**: reliability, api
+  **Details**: Retries should cover transient 502/503 responses only.
+  **Files**: `src/api.sh`, `tests/api.bats`
+  **Acceptance**: Transient upstream failures retry with backoff and permanent failures still exit fast.
+  **Blocked by**: backend-rate-limit-policy
 ```
 
-Completed tasks are removed (not checked off). History lives in git log. See the [tasks.md spec](https://github.com/tasksmd/tasks.md/blob/main/spec.md) for the full format.
+Use `**Blocked by**` only when another task or external dependency truly prevents progress. Completed tasks are removed (not checked off). History lives in git log. See the [tasks.md spec](https://github.com/tasksmd/tasks.md/blob/main/spec.md) for the full format.
 
 ## Features
 

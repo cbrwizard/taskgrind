@@ -128,7 +128,18 @@ Exit early on low throughput (default: 0, 1 to enable).
 .SH FILES
 .TP
 .I TASKS.md
-Task queue file in the target repo. Uses the tasks.md spec.
+Task queue file in the target repo. Uses the tasks.md spec: checkbox tasks
+under priority headings with required metadata such as
+.B ID ,
+.B Tags ,
+.B Details ,
+.B Files ,
+and
+.B Acceptance .
+Use
+.B Blocked by
+only for real dependencies. Completed tasks are removed from the file instead
+of being checked off.
 .TP
 .I .taskgrind\-prompt
 Optional file in the target repo. Content is injected into every session prompt.
