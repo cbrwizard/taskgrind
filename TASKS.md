@@ -17,12 +17,6 @@
   **Reviewed 2026-04-12 session 7**: `taskgrind-2026-04-12-0806-oncall-hub-app-21210.log` still shows the same queue-file failure mode during the 08:06 fan-out: session 5 hit `git_sync rebase_failed` on `TASKS.md CONFLICT (content)` immediately after an audit session that added and removed temporary task blocks. This remains a current multi-agent rebase recovery gap, not just a stale historical log.
   **Files**: `bin/taskgrind`, `tests/git-sync.bats`, `tests/resume.bats`
   **Acceptance**: Add a failing test first; a rebase conflict isolated to `TASKS.md` is either auto-resolved safely or aborted with a clean recovery path; later sessions start from a healthy git state and the logs explain what happened.
-- [ ] Align GitHub Actions test caching with the current Makefile cache files
-  **ID**: align-github-actions-test-cache
-  **Tags**: ci, performance, maintenance
-  **Details**: `.github/workflows/check.yml` still caches `.test-passed`, but `make test` now reads and writes per-target `.test-cache-*` files. Update CI so cache hits warm the files the Makefile actually uses and invalidate when shared test inputs change.
-  **Files**: `.github/workflows/check.yml`, `Makefile`
-  **Acceptance**: The workflow caches the active `.test-cache-*` files instead of stale paths, the cache key matches the current test inputs, and comments/docs reference only the live cache behavior.
 ## P2
 - [ ] Log the concrete cause when `productive_zero_ship` is triggered by queue churn
   **ID**: log-productive-zero-ship-cause
