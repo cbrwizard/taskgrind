@@ -683,6 +683,78 @@ TASKS
   grep -q 'sweep_empty' "$TEST_LOG"
 }
 
+@test "queue-empty sweep recovery uses the detected default branch" {
+  local real_git
+  real_git="$(command -v git)"
+  mkdir -p "$TEST_DIR/bin"
+  cat > "$TEST_DIR/bin/git" <<EOF
+#!/bin/bash
+if [ "\${1:-}" = "-C" ]; then
+  repo_path="\$2"
+  shift 2
+fi
+if [ "\${1:-}" = "symbolic-ref" ] && [ "\${2:-}" = "refs/remotes/origin/HEAD" ]; then
+  exit 1
+fi
+if [ "\${1:-}" = "ls-remote" ] && [ "\${2:-}" = "--symref" ] && [ "\${3:-}" = "origin" ] && [ "\${4:-}" = "HEAD" ]; then
+  exit 1
+fi
+if [ -n "\${repo_path:-}" ]; then
+  exec "$real_git" -C "\$repo_path" "\$@"
+fi
+exec "$real_git" "\$@"
+EOF
+  chmod +x "$TEST_DIR/bin/git"
+  export PATH="$TEST_DIR/bin:$PATH"
+
+  init_test_repo "$TEST_REPO" master
+  echo "init" > "$TEST_REPO/README.md"
+  git -C "$TEST_REPO" add README.md
+  git -C "$TEST_REPO" commit -q --amend --no-edit
+
+  local bare="$TEST_DIR/bare.git"
+  git init -q --bare --initial-branch=master "$bare"
+  git -C "$TEST_REPO" remote add origin "$bare"
+  git -C "$TEST_REPO" push -q -u origin master 2>/dev/null
+  rm -f "$TEST_REPO/.git/refs/remotes/origin/master"
+
+  local count_file="$TEST_DIR/session-count"
+  echo "0" > "$count_file"
+  export COUNT_FILE="$count_file"
+  export TEST_REPO
+
+  local empty_queue_devin="$TEST_DIR/empty-queue-devin"
+  cat > "$empty_queue_devin" <<'SCRIPT'
+#!/bin/bash
+count_file="${COUNT_FILE:?}"
+count=$(cat "$count_file")
+count=$((count + 1))
+echo "$count" > "$count_file"
+if [ "$count" -eq 1 ]; then
+  git -C "$TEST_REPO" checkout -q --detach
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+TASKS
+fi
+echo "$@" >> "${DVB_GRIND_INVOKE_LOG:-/tmp/taskgrind-invocations}"
+SCRIPT
+  chmod +x "$empty_queue_devin"
+  export DVB_GRIND_CMD="$empty_queue_devin"
+
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
+  export DVB_SYNC_INTERVAL=0
+  export DVB_EMPTY_QUEUE_WAIT=0
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+
+  ! grep -q "git_sync checkout_failed: .*pathspec 'main'" "$TEST_LOG"
+  grep -q 'queue_empty tasks=0 — launching sweep session' "$TEST_LOG"
+  grep -q 'sweep_empty tasks=0' "$TEST_LOG"
+  grep -q 'TASKS.md is empty' "$DVB_GRIND_INVOKE_LOG"
+  [ "$(git -C "$TEST_REPO" symbolic-ref --short HEAD 2>/dev/null)" = "master" ]
+}
+
 @test "all-blocked queue waits then exits" {
   cat > "$TEST_REPO/TASKS.md" <<'TASKS'
 # Tasks

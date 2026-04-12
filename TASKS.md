@@ -3,13 +3,6 @@
 ## P0
 
 ## P1
-- [ ] Use the repo's real default branch before queue-empty sweep recovery
-  **ID**: use-default-branch-for-empty-queue-recovery
-  **Tags**: bug, git, sweep, multi-repo
-  **Details**: Log review found queue-empty recovery still assumes a local `main` branch even in repos that only have `master`. `taskgrind-2026-04-12-0806-ideas-17272.log` session 15 shipped the final queued task (`tasks_after=0`) and then immediately logged `git_sync checkout_failed: error: pathspec 'main' did not match any file(s) known to git` before launching the sweep session. Taskgrind already learned how to detect non-`main` sync branches for regular git sync, but the empty-queue handoff path still hardcodes `main`, which adds noisy failure logs and risks skipping cleanup in repos whose default branch differs.
-  **Reviewed 2026-04-12 session 16**: The live fleet snapshot still backs this as a real follow-up, not just a stale `ideas` one-off. `taskgrind`, `agentbrew`, `bosun`, and `oncall-hub-app` all still resolve `origin/HEAD` to `main`, but `ideas` currently has no `origin/HEAD` at all and only exposes `standing-ideas-gap-loop` plus `audit/restore-ideas-delivery-remote` remote refs. With `ideas/.taskgrind-state` back to `consecutive_zero_ship=0`, the remaining risk is no longer a wedged session; it is the centralized empty-queue recovery path still assuming a local `main` checkout whenever a repo's default branch metadata differs or is missing.
-  **Files**: `bin/taskgrind`, `tests/git-sync.bats`, `tests/session.bats`
-  **Acceptance**: Add a failing test first; when the queue reaches zero in a repo whose default branch is not `main`, taskgrind switches back to the detected default branch without `checkout_failed`; the sweep session still launches normally afterward.
 - [ ] Avoid double final-sync pushes during signal shutdown
   **ID**: dedupe-final-sync-on-signal-shutdown
   **Tags**: bug, git, shutdown, logging

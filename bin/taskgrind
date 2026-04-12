@@ -1350,6 +1350,16 @@ detect_default_branch() {
     return 0
   fi
 
+  if git -C "$repo_path" show-ref --verify --quiet refs/heads/main; then
+    printf 'main\n'
+    return 0
+  fi
+
+  if git -C "$repo_path" show-ref --verify --quiet refs/heads/master; then
+    printf 'master\n'
+    return 0
+  fi
+
   if git -C "$repo_path" show-ref --verify --quiet refs/remotes/origin/main; then
     printf 'main\n'
     return 0
