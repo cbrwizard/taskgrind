@@ -595,8 +595,9 @@ TASKS
   git -C "$TEST_REPO" init -q
   git -C "$TEST_REPO" config user.email "test@test.com"
   git -C "$TEST_REPO" config user.name "Test"
-  git -C "$TEST_REPO" add TASKS.md
-  git -C "$TEST_REPO" commit -q -m "initial"
+  git -C "$TEST_REPO" config core.hooksPath /dev/null
+  git -C "$TEST_REPO" add -f TASKS.md
+  git -C "$TEST_REPO" commit -q -m "chore: initial"
 
   # Fake devin that commits code but never removes the task
   local commit_devin="$TEST_DIR/commit-devin"
@@ -617,6 +618,8 @@ SCRIPT
 - [ ] Task that never gets removed
   **ID**: stuck-task
 TASKS
+  git -C "$TEST_REPO" add -f TASKS.md
+  git -C "$TEST_REPO" commit -q -m "chore: seed stuck task"
 
   export DVB_DEADLINE=$(( $(date +%s) + 10 ))
   export DVB_MAX_ZERO_SHIP=5
@@ -630,8 +633,9 @@ TASKS
   git -C "$TEST_REPO" init -q
   git -C "$TEST_REPO" config user.email "test@test.com"
   git -C "$TEST_REPO" config user.name "Test"
-  git -C "$TEST_REPO" add TASKS.md
-  git -C "$TEST_REPO" commit -q -m "initial"
+  git -C "$TEST_REPO" config core.hooksPath /dev/null
+  git -C "$TEST_REPO" add -f TASKS.md
+  git -C "$TEST_REPO" commit -q -m "chore: initial"
 
   local commit_devin="$TEST_DIR/commit-devin"
   cat > "$commit_devin" <<SCRIPT
@@ -653,6 +657,8 @@ SCRIPT
 - [ ] Follow-up work
   **ID**: follow-up-task
 TASKS
+  git -C "$TEST_REPO" add -f TASKS.md
+  git -C "$TEST_REPO" commit -q -m "chore: seed blocked task"
 
   export DVB_DEADLINE=$(( $(date +%s) + 10 ))
   export DVB_MAX_ZERO_SHIP=5
@@ -787,6 +793,7 @@ SCRIPT
 
   [ "$status" -eq 0 ]
   grep -q 'productive_zero_ship session=1 commits=1 reason=local_task_churn' "$TEST_LOG"
+  grep -q 'shipped_inferred session=1 count=1 reason=local_task_churn' "$TEST_LOG"
   ! grep -q 'productive_zero_ship session=1 commits=1 reason=no_local_task_removed' "$TEST_LOG"
 }
 
@@ -830,7 +837,8 @@ SCRIPT
   export DVB_MAX_ZERO_SHIP=5
   run "$DVB_GRIND" 1 "$TEST_REPO"
   grep -q 'productive_zero_ship session=1 commits=1 reason=nonlocal_task_removed' "$TEST_LOG"
-  grep -q 'zero_ship_stall_ignored session=1 reason=nonlocal_task_removed' "$TEST_LOG"
+  grep -q 'shipped_inferred session=1 count=1 reason=nonlocal_task_removed' "$TEST_LOG"
+  ! grep -q 'zero_ship_stall_ignored session=1 reason=nonlocal_task_removed' "$TEST_LOG"
 }
 
 @test "productive zero-ship escalation appears in prompt after 2 zero-ship sessions with commits" {
