@@ -3,6 +3,13 @@
 ## P0
 
 ## P1
+- [ ] Detect each repo's real sync base instead of assuming `main`
+  **ID**: detect-sync-base-without-main
+  **Tags**: bug, git, branch, multi-agent
+  **Details**: Log review found repeated sync cleanup failures in `/Users/fivanishche/apps/ideas`, where `/var/folders/vp/xnc0myyn4dsb7trvmq61j4hw0000gp/T/taskgrind-2026-04-12-0806-ideas-17272.log` hit `git_sync checkout_failed: error: pathspec 'main' did not match any file(s) known to git` in sessions 5, 10, 15, 20, and 25. That repo currently tracks `standing-ideas-gap-loop`, and `git remote show origin` reports `HEAD branch: (unknown)`, so taskgrind cannot safely assume every repo has a local `main` branch when it returns to the base branch for sync or cleanup.
+  **Reviewed 2026-04-12 session 31**: Re-checking the live repo confirms the failure is still actionable, not just preserved log noise. `/Users/fivanishche/apps/ideas` is still on `standing-ideas-gap-loop`, its `origin` remote still reports `HEAD branch: (unknown)`, and the preserved log still shows five `pathspec 'main'` checkout failures spread across the 08:06 fan-out. Taskgrind needs a first-class fallback to the repo's configured upstream or current branch so non-`main` repos do not keep skipping sync cleanup.
+  **Files**: `bin/taskgrind`, `tests/git-sync.bats`, `tests/resume.bats`
+  **Acceptance**: Add a failing test first; git sync chooses a valid base branch in repos without a local `main`; cleanup no longer logs `pathspec 'main' did not match any file(s) known to git`; logs explain which branch taskgrind selected when the remote HEAD is unavailable.
 ## P2
 - [ ] Drop stale skip-threshold history when task IDs disappear from the queue
   **ID**: prune-stale-skipped-task-attempts
@@ -16,4 +23,10 @@
   **Reviewed 2026-04-12 session 26**: Another threshold audit keeps the stale-history repro narrow but still active. `/var/folders/vp/xnc0myyn4dsb7trvmq61j4hw0000gp/T/taskgrind-2026-04-12-0806-ideas-17272.log` still no longer qualifies as stale because its warned IDs (`control-tower-receipt-history` and `control-tower-refresh-node-types`) are still present in `/Users/fivanishche/apps/ideas/TASKS.md`, but both preserved `agentbrew` logs still emit removed `watch-skills-cli-mcp-may-2026`, and the preserved `taskgrind` logs still emit removed IDs including `align-audit-target-with-sweep-contract`, `document-full-tasks-md-metadata`, and `log-productive-zero-ship-cause`. The attempt ledger is still outliving queue reality in at least `agentbrew` and `taskgrind`.
   **Files**: `bin/taskgrind`, `tests/resume.bats`, `tests/logging.bats`
   **Acceptance**: Add a failing test first; removed task IDs stop contributing to future `task_skip_threshold` output; active long-lived skipped tasks still retain their attempt history; logs stay focused on currently actionable queue items.
+- [ ] Refresh CONTRIBUTING audit docs to match the current make audit queue (@instance-1)
+  **ID**: refresh-contributing-audit-docs
+  **Tags**: docs, audit, contributor-experience
+  **Details**: `CONTRIBUTING.md` still describes the older `make audit` docs review queue and omits `Agentfile.yaml`, `docs/resume-state.md`, and the repo-local `.devin` skills that the target now prints. Contributors using the docs as their audit checklist can miss files the command actually expects them to review.
+  **Files**: `CONTRIBUTING.md`, `tests/basics.bats`
+  **Acceptance**: Add a failing test first; `CONTRIBUTING.md` lists the current `make audit` review queue, including `Agentfile.yaml`, `docs/resume-state.md`, and the repo-local `.devin` skills; targeted tests pass.
 ## P3
