@@ -59,8 +59,30 @@
 # the marathon timer and polls every 30s until connectivity returns, then
 # extends the deadline by the wait duration. No sessions are wasted.
 set -euo pipefail
-[[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$0"; exit 0; }
-[[ "${1:-}" == "--version" || "${1:-}" == "-V" ]] && { echo "taskgrind $(git -C "$(cd "$(dirname "$0")/.." && pwd)" log -1 --format='%h %ci' 2>/dev/null || echo 'unknown')"; exit 0; }
+
+resolve_script_path() {
+  local source_path="$1"
+  local source_dir target_path
+
+  while [[ -L "$source_path" ]]; do
+    source_dir="$(cd -P "$(dirname "$source_path")" && pwd)"
+    target_path="$(readlink "$source_path")" || break
+    case "$target_path" in
+      /*) source_path="$target_path" ;;
+      *) source_path="$source_dir/$target_path" ;;
+    esac
+  done
+
+  source_dir="$(cd -P "$(dirname "$source_path")" && pwd)"
+  printf '%s/%s\n' "$source_dir" "$(basename "$source_path")"
+}
+
+TASKGRIND_SCRIPT_PATH="${TASKGRIND_SCRIPT_PATH:-$(resolve_script_path "$0")}"
+TASKGRIND_DIR="${TASKGRIND_DIR:-$(cd "$(dirname "$TASKGRIND_SCRIPT_PATH")/.." && pwd)}"
+export TASKGRIND_SCRIPT_PATH TASKGRIND_DIR
+
+[[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && { sed -n '/^#!/d; /^$/q; /^[^#]/q; /^# shellcheck/d; s/^# \{0,1\}//p' "$TASKGRIND_SCRIPT_PATH"; exit 0; }
+[[ "${1:-}" == "--version" || "${1:-}" == "-V" ]] && { echo "taskgrind $(git -C "$TASKGRIND_DIR" log -1 --format='%h %ci' 2>/dev/null || echo 'unknown')"; exit 0; }
 
 # Respect TMPDIR for all temp files (macOS default: /tmp)
 _dvb_tmp="${TMPDIR:-/tmp}"
@@ -74,11 +96,10 @@ _dvb_tmp="${_dvb_tmp%/}"
 # paths would resolve incorrectly instead of to the real repo dir.
 if [[ -z "${_DVB_SELF_COPY:-}" ]]; then
   _dvb_copy=$(mktemp "$_dvb_tmp/taskgrind-exec.XXXXXX")
-  cp "$0" "$_dvb_copy"
+  cp "$TASKGRIND_SCRIPT_PATH" "$_dvb_copy"
   chmod +x "$_dvb_copy"
   export _DVB_SELF_COPY="$_dvb_copy"
-  # Preserve TASKGRIND_DIR if already set (e.g. by tests); otherwise derive from $0
-  TASKGRIND_DIR="${TASKGRIND_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+  export TASKGRIND_SCRIPT_PATH
   export TASKGRIND_DIR
   exec "$_dvb_copy" "$@"
 fi
@@ -88,7 +109,6 @@ fi
 trap '[[ -n "${_DVB_SELF_COPY:-}" && -f "${_DVB_SELF_COPY}" ]] && rm -f "$_DVB_SELF_COPY"' EXIT
 
 # Shared constants (model, devin path, caffeinate flags, format_duration)
-TASKGRIND_DIR="${TASKGRIND_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 # shellcheck source=../lib/constants.sh
 source "$TASKGRIND_DIR/lib/constants.sh"
 _dvb_is_tty="${_dvb_is_tty:-0}"

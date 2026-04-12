@@ -73,3 +73,25 @@ SCRIPT
   [ -x "$INSTALL_TARGET/bin/taskgrind" ]
   [[ "$output" == *"Warning: $INSTALL_TARGET/bin/taskgrind is not executable"* ]]
 }
+
+@test "symlinked install path still resolves the real repo root" {
+  local install_bin="$TEST_DIR/prefix/bin"
+  local installed_taskgrind="$install_bin/taskgrind"
+
+  mkdir -p "$install_bin"
+  ln -s "$BATS_TEST_DIRNAME/../bin/taskgrind" "$installed_taskgrind"
+
+  run env -u TASKGRIND_DIR -u TASKGRIND_SCRIPT_PATH \
+    HOME="$HOME" \
+    PATH="$PATH" \
+    DVB_COOL=0 \
+    DVB_DEADLINE="$(( $(date +%s) - 1 ))" \
+    DVB_GRIND_CMD="$FAKE_DEVIN" \
+    DVB_GRIND_INVOKE_LOG="$DVB_GRIND_INVOKE_LOG" \
+    DVB_LOG="$TEST_LOG" \
+    "$installed_taskgrind" --dry-run 1 "$TEST_REPO"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"lib/constants.sh"* ]]
+  [[ "$output" == *"repo:     $TEST_REPO"* ]]
+}
