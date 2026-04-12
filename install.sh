@@ -15,7 +15,7 @@ fi
 if [ -d "$INSTALL_DIR" ]; then
   if [ -x "$INSTALL_DIR/bin/taskgrind" ] || [ -f "$INSTALL_DIR/bin/taskgrind" ]; then
     echo "taskgrind is already installed at $INSTALL_DIR"
-    echo "To update: cd \"$INSTALL_DIR\" && git pull"
+    echo "To update: cd \"$INSTALL_DIR\" && git pull --rebase"
     exit 0
   fi
 

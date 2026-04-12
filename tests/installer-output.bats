@@ -6,12 +6,13 @@ INSTALL_SCRIPT="$BATS_TEST_DIRNAME/../install.sh"
 
 @test "install.sh quotes the update command when install dir already exists" {
   local install_dir="$TEST_DIR/Applications With Spaces/taskgrind copy"
-  mkdir -p "$install_dir"
+  mkdir -p "$install_dir/bin"
+  touch "$install_dir/bin/taskgrind"
 
   TASKGRIND_INSTALL_DIR="$install_dir" run sh "$INSTALL_SCRIPT"
 
   [ "$status" -eq 0 ]
-  [[ "$output" == *"To update: cd \"$install_dir\" && git pull"* ]]
+  [[ "$output" == *"To update: cd \"$install_dir\" && git pull --rebase"* ]]
 }
 
 @test "install.sh quotes the make command when install dir contains spaces" {

@@ -29,7 +29,7 @@ setup() {
   run sh "$INSTALL_SCRIPT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"taskgrind is already installed at $INSTALL_TARGET"* ]]
-  [[ "$output" == *"To update: cd \"$INSTALL_TARGET\" && git pull"* ]]
+  [[ "$output" == *"To update: cd \"$INSTALL_TARGET\" && git pull --rebase"* ]]
 }
 
 @test "install.sh fails clearly when the destination already exists but is unrelated" {
