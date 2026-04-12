@@ -1292,6 +1292,72 @@ extract_task_ids() {
   fi
 }
 
+# Extract task signatures so before/after snapshots can detect local queue churn
+# even when git history becomes non-linear mid-session.
+extract_task_signatures() {
+  local tasks_file="$1"
+  [[ -f "$tasks_file" ]] || return 0
+  awk '
+    BEGIN {
+      task_line = ""
+      task_id = ""
+    }
+    function flush_task() {
+      if (task_line != "") {
+        print task_line "|||" task_id
+      }
+      task_line = ""
+      task_id = ""
+    }
+    /^[[:space:]]*- \[ \]/ {
+      flush_task()
+      task_line = $0
+      sub(/^[[:space:]]+/, "", task_line)
+      next
+    }
+    /^[[:space:]]+\*\*ID\*\*:/ {
+      task_id = $0
+      sub(/.*\*\*ID\*\*:[[:space:]]*/, "", task_id)
+      sub(/[[:space:]].*$/, "", task_id)
+      next
+    }
+    END {
+      flush_task()
+    }
+  ' "$tasks_file" | sort || true
+}
+
+# Detect whether a commit range removes and/or adds task checkboxes in one TASKS.md file.
+# Output keys:
+#   removed=0|1
+#   added=0|1
+extract_task_checkbox_changes() {
+  local repo="$1"
+  local before_ref="$2"
+  local after_ref="$3"
+  local tasks_path="$4"
+  local commit
+  local patch
+  local removed=0
+  local added=0
+
+  while IFS= read -r commit; do
+    [[ -z "$commit" ]] && continue
+    patch=$(git -C "$repo" show --root --format= --unified=0 "$commit" -- "$tasks_path" 2>/dev/null || true)
+    if [[ -n "$patch" ]]; then
+      if printf '%s\n' "$patch" | grep -Eq '^-[[:space:]]*- \[ \]'; then
+        removed=1
+      fi
+      if printf '%s\n' "$patch" | grep -Eq '^\+[[:space:]]*- \[ \]'; then
+        added=1
+      fi
+    fi
+  done < <(git -C "$repo" rev-list "${before_ref}..${after_ref}" 2>/dev/null || true)
+
+  echo "removed=$removed"
+  echo "added=$added"
+}
+
 prune_task_attempts_file() {
   local attempts_file="$1"
   local tasks_file="$2"
@@ -1587,6 +1653,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
   tasks_before=$(count_tasks "$repo/TASKS.md")
   tasks_remaining_snapshot=$tasks_before
   _ids_before=$(extract_task_ids "$repo/TASKS.md")
+  _task_signatures_before=$(extract_task_signatures "$repo/TASKS.md")
   # Capture git HEAD before session — used to detect commits during session
   _git_head_before=$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)
 
@@ -1988,6 +2055,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
   tasks_after=$(count_tasks "$repo/TASKS.md")
   tasks_remaining_snapshot=$tasks_after
   _ids_after=$(extract_task_ids "$repo/TASKS.md")
+  _task_signatures_after=$(extract_task_signatures "$repo/TASKS.md")
 
   # Tasks shipped = IDs that existed BEFORE the session and are now gone.
   # This is more accurate than count_tasks diff because it correctly handles
@@ -2007,6 +2075,8 @@ while [[ $(date +%s) -lt $deadline ]]; do
   fi
 
   _tasks_added_during_session=0
+  _local_task_signatures_removed=0
+  _local_task_signatures_added=0
 
   # Log when new tasks were injected during the session (ID-based detection)
   if [[ -n "$_ids_after" && -n "${_ids_before:-}" ]]; then
@@ -2021,6 +2091,15 @@ while [[ $(date +%s) -lt $deadline ]]; do
     _tasks_added=$(( tasks_after - tasks_before ))
     _tasks_added_during_session=$_tasks_added
     log_write "[$(date '+%H:%M')] tasks_added=$_tasks_added (external injection: ${tasks_before}→${tasks_after})"
+  fi
+
+  if [[ -n "${_task_signatures_before:-}" ]]; then
+    _local_task_signatures_removed=$(comm -23 <(printf '%s\n' "$_task_signatures_before") <(printf '%s\n' "$_task_signatures_after") | wc -l)
+    _local_task_signatures_removed=$(( _local_task_signatures_removed + 0 ))
+  fi
+  if [[ -n "${_task_signatures_after:-}" ]]; then
+    _local_task_signatures_added=$(comm -13 <(printf '%s\n' "$_task_signatures_before") <(printf '%s\n' "$_task_signatures_after") | wc -l)
+    _local_task_signatures_added=$(( _local_task_signatures_added + 0 ))
   fi
 
   # Auto-increase timeout after productive sessions that were killed by the watchdog.
@@ -2082,14 +2161,18 @@ while [[ $(date +%s) -lt $deadline ]]; do
       _touched_task_files=$(
         git -C "$repo" rev-list "${_git_head_before}..${_git_head_after}" 2>/dev/null |
           while IFS= read -r _commit; do
-            git -C "$repo" diff-tree --no-commit-id --name-only -r "$_commit" 2>/dev/null
+            git -C "$repo" diff-tree --root --no-commit-id --name-only -r "$_commit" 2>/dev/null
           done | grep 'TASKS\.md$' || true
       )
+      _local_task_checkbox_changes=$(extract_task_checkbox_changes "$repo" "$_git_head_before" "$_git_head_after" "TASKS.md")
+      _local_task_removed=$(printf '%s\n' "$_local_task_checkbox_changes" | awk -F= '$1 == "removed" { print $2; exit }')
+      _local_task_added=$(printf '%s\n' "$_local_task_checkbox_changes" | awk -F= '$1 == "added" { print $2; exit }')
       _nonlocal_removed_task_file=""
       if [[ -n "$_touched_task_files" ]]; then
         while IFS= read -r _task_file; do
           [[ -z "$_task_file" || "$_task_file" == "TASKS.md" ]] && continue
-          if git -C "$repo" log --format= --patch "${_git_head_before}..${_git_head_after}" -- "$_task_file" 2>/dev/null | grep -q '^-- \[ \]'; then
+          if printf '%s\n' "$(extract_task_checkbox_changes "$repo" "$_git_head_before" "$_git_head_after" "$_task_file")" \
+            | grep -q '^removed=1$'; then
             _nonlocal_removed_task_file="$_task_file"
             break
           fi
@@ -2103,6 +2186,15 @@ while [[ $(date +%s) -lt $deadline ]]; do
         _productive_zero_ship_reason="nonlocal_task_removed"
         _productive_zero_ship_stall_exempt=1
         log_write "[$(date '+%H:%M')] productive_zero_ship session=$session commits=$_new_commits reason=$_productive_zero_ship_reason task_file=$_nonlocal_removed_task_file (committed code and removed a task outside the active queue, so local TASKS.md stayed flat)"
+      elif [[ "${_local_task_removed:-0}" -eq 1 && "${_local_task_added:-0}" -eq 1 ]] \
+        || [[ "$_local_task_signatures_removed" -gt 0 && "$_local_task_signatures_added" -gt 0 ]]; then
+        _productive_zero_ship_reason="local_task_churn"
+        _productive_zero_ship_stall_exempt=1
+        log_write "[$(date '+%H:%M')] productive_zero_ship session=$session commits=$_new_commits reason=$_productive_zero_ship_reason (committed code but temporary task churn restored the original queue)"
+      elif [[ "${_local_task_removed:-0}" -eq 1 ]] || [[ "$_local_task_signatures_removed" -gt 0 ]]; then
+        _productive_zero_ship_reason="local_task_removed"
+        _productive_zero_ship_stall_exempt=1
+        log_write "[$(date '+%H:%M')] productive_zero_ship session=$session commits=$_new_commits reason=$_productive_zero_ship_reason (committed code and removed a local task, but the queue-delta accounting stayed flat)"
       elif echo "$_touched_task_files" | grep -q '^TASKS\.md$'; then
         _productive_zero_ship_reason="local_task_churn"
         _productive_zero_ship_stall_exempt=1

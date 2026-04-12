@@ -678,6 +678,47 @@ TASKS
   grep -q 'temporary task churn restored the original queue' "$TEST_LOG"
 }
 
+@test "productive zero-ship treats orphan-branch task refresh as local task churn" {
+  init_test_repo
+
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Refresh recurring audit task
+  **ID**: audit-task
+TASKS
+  git -C "$TEST_REPO" add -f TASKS.md
+  git -C "$TEST_REPO" commit -q -m "chore: seed queue"
+
+  local commit_devin="$TEST_DIR/commit-devin"
+  cat > "$commit_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+git -C "$TEST_REPO" checkout --orphan refreshed-queue >/dev/null 2>&1
+git -C "$TEST_REPO" reset >/dev/null 2>&1
+cat > "$TEST_REPO/TASKS.md" <<'EOF'
+# Tasks
+## P0
+- [ ] Refresh recurring audit task for next cycle
+  **ID**: audit-task
+EOF
+echo "audit refresh" > "$TEST_REPO/code.txt"
+git -C "$TEST_REPO" add -A
+git -C "$TEST_REPO" commit -q -m "chore: refresh audit queue"
+sleep 2
+SCRIPT
+  chmod +x "$commit_devin"
+  export DVB_GRIND_CMD="$commit_devin"
+
+  export DVB_DEADLINE=$(( $(date +%s) + 1 ))
+  export DVB_MAX_ZERO_SHIP=5
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+
+  [ "$status" -eq 0 ]
+  grep -q 'productive_zero_ship session=1 commits=1 reason=local_task_churn' "$TEST_LOG"
+  ! grep -q 'productive_zero_ship session=1 commits=1 reason=no_local_task_removed' "$TEST_LOG"
+}
+
 @test "productive zero-ship log explains non-local task removal" {
   git -C "$TEST_REPO" init -q
   git -C "$TEST_REPO" config user.email "test@test.com"
