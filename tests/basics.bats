@@ -140,6 +140,14 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [ "$status" -eq 0 ]
 }
 
+@test "man page documents the current make audit review queue" {
+  run grep -nF '.devin/skills/standing-audit-gap-loop/SKILL.md' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  [ "$status" -eq 0 ]
+
+  run grep -nF '.devin/skills/grind-log-analyze/SKILL.md' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  [ "$status" -eq 0 ]
+}
+
 @test "GitHub Actions caches the active make test cache files" {
   run grep -n 'path: \.test-cache-\*' "$BATS_TEST_DIRNAME/../.github/workflows/check.yml"
   [ "$status" -eq 0 ]
