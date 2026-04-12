@@ -62,7 +62,7 @@ Use `make audit` when you want the same lightweight local audit loop that empty-
 
 - Scans the repo for `TODO` and `FIXME` markers
 - Runs shellcheck through `make lint`
-- Prints the core docs files to review (`README.md`, `CONTRIBUTING.md`, `docs/architecture.md`, `docs/user-stories.md`)
+- Prints the core docs files to review (`README.md`, `CONTRIBUTING.md`, `docs/architecture.md`, `docs/user-stories.md`, `man/taskgrind.1`)
 
 The target is intentionally local-only, so it works offline and does not depend on external services.
 
