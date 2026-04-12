@@ -49,14 +49,6 @@
   **Reviewed 2026-04-12 session 1**: The current 08:06 fan-out no longer shows a downstream repo stuck in zero-ship drift: `taskgrind/.taskgrind-state` is already at `tasks_shipped=1` with `consecutive_zero_ship=0`, while `agentbrew`, `bosun`, and `ideas` also sit at `sessions_zero_ship=0`. That clears the old downstream queue-owner suspicion for now, but it does not explain the earlier stale `productive_zero_ship` logs, so keep the follow-up scoped to centralized reason logging until a fresh reproduction names a specific repo-local cause.
   **Files**: `bin/taskgrind`, `tests/diagnostics.bats`, `tests/session.bats`
   **Acceptance**: When `productive_zero_ship` fires, the log explains whether the session removed no local task, removed a task in another repo, or lost the task delta because concurrent queue changes offset it; the reason text is specific enough to explain long zero-ship streaks in `.taskgrind-state`; regression coverage locks the new reason text.
-- [ ] Stop launching repeated `remaining=0m` sessions after the deadline has already expired
-  **ID**: stop-expired-deadline-zero-minute-loop
-  **Tags**: deadline, runtime, reliability
-  **Details**: The temporary repo logs from the latest audit still show taskgrind burning multiple no-op sessions with `remaining=0m` before it finally bails out. Examples include `taskgrind-2026-04-11-1805-repo-60489.log` (five back-to-back zero-minute sessions), `taskgrind-2026-04-11-1824-repo-18279.log`, and `taskgrind-2026-04-11-1939-repo-31627.log`. Replace the old broad expired-deadline follow-up with a tighter startup/loop guard so taskgrind notices an already-expired deadline before launching another backend session.
-  **Reviewed 2026-04-12 session 27**: Re-reading the persisted temporary-repo logs still shows the same repeated launch pattern (`session=1..5 remaining=0m` in `repo-60489`, `session=1..3` in `repo-18279`, `session=1..4` in `repo-31627`). No newer downstream queue work displaced this fix; it remains a direct `taskgrind` runtime bug.
-  **Reviewed 2026-04-12 session 31**: The same three persisted temp logs still show pure startup churn with no intervening useful work — exactly five `remaining=0m` launches in `repo-60489`, three in `repo-18279`, and four in `repo-31627`. This remains a repo-local runtime bug, so no downstream queue changes were added.
-  **Files**: `bin/taskgrind`, `tests/session.bats`, `tests/diagnostics.bats`
-  **Acceptance**: If the deadline is already in the past when a session would start, taskgrind exits cleanly without launching the backend or incrementing the session counter, and tests cover both startup-time and post-session expiry edges.
 - [ ] Stop counting cross-repo task-only audit sessions as zero-ship stalls
   **ID**: stop-cross-repo-audit-zero-ship-stalls
   **Tags**: queue, audit, accounting, reliability
