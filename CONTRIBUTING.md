@@ -20,11 +20,15 @@ brew install bats-core shellcheck
 
 # Ubuntu / Debian
 sudo apt-get update
-sudo apt-get install -y bats shellcheck
+sudo apt-get install -y npm shellcheck
+sudo npm install -g bats
 
 # Fedora / RHEL
 sudo dnf install -y bats ShellCheck
 ```
+
+For Linux, the supported `bats` path is the npm install above because it
+matches the GitHub Actions CI path for Linux runs.
 
 ## Adding a Feature
 

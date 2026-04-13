@@ -58,12 +58,6 @@
   **Acceptance**: The README, user stories, and man page all explain the live override size limits and make it clear that oversized files are skipped with a warning.
 
 ## P2
-- [ ] Align Linux Bats installation guidance with the CI path and supported versions
-  **ID**: align-bats-install-docs-with-ci
-  **Tags**: docs, ci, dependencies
-  **Details**: Contributor docs tell Linux users to install distro `bats`, while GitHub Actions installs Bats through npm. Audit whether the distro package is still sufficient for this suite; then either pin/document the supported version or update the docs/CI so local Linux setup matches the test environment more closely.
-  **Files**: `CONTRIBUTING.md`, `README.md`, `.github/workflows/check.yml`
-  **Acceptance**: Linux setup guidance and CI use a consistent, documented Bats installation story, and contributors can tell which Bats version/source is supported for running `make check`.
 - [ ] Add canonical `TG_` precedence tests for wait and backoff env vars that only have validation coverage
   **ID**: expand-tg-precedence-coverage
   **Tags**: tests, env, compatibility

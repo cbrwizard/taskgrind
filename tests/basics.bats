@@ -149,6 +149,17 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [ "$status" -eq 0 ]
 }
 
+@test "CONTRIBUTING documents the supported Linux bats install path" {
+  run grep -nF 'sudo apt-get install -y npm shellcheck' "$BATS_TEST_DIRNAME/../CONTRIBUTING.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'sudo npm install -g bats' "$BATS_TEST_DIRNAME/../CONTRIBUTING.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'matches the GitHub Actions CI path for Linux runs' "$BATS_TEST_DIRNAME/../CONTRIBUTING.md"
+  [ "$status" -eq 0 ]
+}
+
 @test "README documents the full current make audit review queue" {
   run grep -n 'Contributor audit shortcut:.*README.md.*CONTRIBUTING.md.*SECURITY.md.*AGENTS.md.*Agentfile.yaml.*docs/architecture.md.*docs/resume-state.md.*docs/user-stories.md.*man/taskgrind.1' "$BATS_TEST_DIRNAME/../README.md"
   [ "$status" -eq 0 ]
@@ -167,6 +178,17 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
 @test "README development commands include make audit" {
   run grep -nF 'make audit      # run the local repo audit workflow' "$BATS_TEST_DIRNAME/../README.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "README documents the supported Linux bats install path" {
+  run grep -nF 'sudo apt-get install -y npm shellcheck' "$BATS_TEST_DIRNAME/../README.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'sudo npm install -g bats' "$BATS_TEST_DIRNAME/../README.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'match the GitHub Actions CI environment' "$BATS_TEST_DIRNAME/../README.md"
   [ "$status" -eq 0 ]
 }
 

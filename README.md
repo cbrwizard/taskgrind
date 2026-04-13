@@ -188,7 +188,7 @@ TG_STATUS_FILE=/tmp/taskgrind-status.json taskgrind ~/apps/myrepo 8
 cat /tmp/taskgrind-status.json
 ```
 
-The status file updates atomically on startup, before and after each session, during network waits, and on final completion or failure. It includes the repo, process ID, slot, backend, skill, model, current session, remaining minutes, current phase, and the most recent session result.
+The status file updates atomically on startup, before and after each session, during empty-queue sweeps and wait windows, during network waits, and on final completion or failure. It includes the repo, process ID, slot, backend, skill, model, current session, remaining minutes, current phase, and the most recent session result.
 
 Status payload fields:
 
@@ -305,7 +305,7 @@ Example lifecycle snapshots:
 }
 ```
 
-In practice, `current_phase` moves from startup and preflight into active work (`running_sweep` or `running_session`), then through transitional phases such as `session_complete`, `cooldown`, `git_sync`, `queue_empty_wait`, or `blocked_wait`. Temporary interruptions show up as `waiting_for_network` and then `network_restored`. Normal shutdown rewrites the file one last time as `complete`; argument or runtime failures finish as `failed`.
+In practice, `current_phase` moves from startup and preflight into active work (`running_sweep` or `running_session`), then through transitional phases such as `queue_refilled`, `session_complete`, `cooldown`, `git_sync`, `queue_empty_wait`, or `blocked_wait`. Temporary interruptions show up as `waiting_for_network` and then `network_restored`. Sweep-only runs still record the sweep as the latest completed session before normal shutdown rewrites the file one last time as `complete`; argument or runtime failures finish as `failed`.
 
 ### Live prompt injection
 
@@ -420,6 +420,9 @@ sudo npm install -g bats
 # Fedora / RHEL
 sudo dnf install -y bats ShellCheck
 ```
+
+On Linux, the supported `bats` install path is the npm flow above so local
+`make check` runs match the GitHub Actions CI environment.
 
 ## History
 
