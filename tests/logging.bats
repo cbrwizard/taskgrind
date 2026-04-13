@@ -89,6 +89,7 @@ with open(path, "r", encoding="utf-8") as handle:
 
 assert data["repo"] == expected_repo
 assert data["current_phase"] == "complete"
+assert data["terminal_reason"] is None
 assert data["session"] >= 1
 assert data["backend"] == "devin"
 assert data["skill"] == "next-task"
@@ -117,6 +118,7 @@ with open(path, "r", encoding="utf-8") as handle:
 
 assert data["repo"] == expected_repo
 assert data["current_phase"] == "complete"
+assert data["terminal_reason"] is None
 assert data["last_session"]["result"] == "success"
 PY
 }
