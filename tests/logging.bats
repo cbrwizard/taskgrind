@@ -29,6 +29,26 @@ PY
   return 1
 }
 
+_assert_status_values() {
+  local status_file="$1"
+  local expected_session="$2"
+  local expected_last_number="$3"
+  local expected_last_result="$4"
+  python3 - "$status_file" "$expected_session" "$expected_last_number" "$expected_last_result" <<'PY'
+import json
+import sys
+
+path, expected_session, expected_last_number, expected_last_result = sys.argv[1:5]
+with open(path, "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+
+assert data["session"] == int(expected_session)
+assert data["last_session"]["number"] == int(expected_last_number)
+assert data["last_session"]["result"] == expected_last_result
+assert data["last_session"]["completed_at"]
+PY
+}
+
 # ── Log file ─────────────────────────────────────────────────────────
 
 @test "creates log file" {
@@ -172,6 +192,43 @@ PY
 
   wait "$grind_pid"
   [ "$?" -eq 0 ]
+}
+
+@test "status file tracks empty-queue sweep phases and records the sweep result" {
+  local status_file="$TEST_DIR/empty-queue-status.json"
+  local slow_sweep_devin="$TEST_DIR/slow-sweep-devin"
+  cat > "$slow_sweep_devin" <<'SCRIPT'
+#!/bin/bash
+echo "$@" >> "${DVB_GRIND_INVOKE_LOG:-/tmp/taskgrind-invocations}"
+if echo "$@" | grep -q "TASKS.md is empty"; then
+  sleep 2
+fi
+SCRIPT
+  chmod +x "$slow_sweep_devin"
+  export DVB_GRIND_CMD="$slow_sweep_devin"
+  export DVB_STATUS_FILE="$status_file"
+  export DVB_EMPTY_QUEUE_WAIT=2
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
+  printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
+
+  "$DVB_GRIND" 1 "$TEST_REPO" > "$TEST_DIR/empty-queue-status.out" 2>&1 &
+  local grind_pid=$!
+
+  _wait_for_status_phase "$status_file" "queue_empty_wait"
+
+  wait "$grind_pid"
+  [ "$?" -eq 0 ]
+
+  python3 - "$status_file" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+
+assert data["current_phase"] == "complete"
+PY
+  _assert_status_values "$status_file" 1 1 "success"
 }
 
 @test "session banner and log entry include active model" {

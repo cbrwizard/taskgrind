@@ -803,6 +803,65 @@ SCRIPT
   grep -q 'queue_empty tasks=0 sweep=done — waiting 2s' "$TEST_LOG"
 }
 
+@test "tasks injected during empty-queue wait resume with a normal session" {
+  local refill_devin="$TEST_DIR/refill-devin"
+  local status_file="$TEST_DIR/refill-status.json"
+  cat > "$refill_devin" <<'SCRIPT'
+#!/bin/bash
+echo "$@" >> "${DVB_GRIND_INVOKE_LOG:-/tmp/taskgrind-invocations}"
+if echo "$@" | grep -q "TASKS.md is empty"; then
+  exit 0
+fi
+sleep 2
+cat > "$TEST_REPO/TASKS.md" <<'EOF'
+# Tasks
+## P0
+EOF
+SCRIPT
+  chmod +x "$refill_devin"
+  export DVB_GRIND_CMD="$refill_devin"
+  export DVB_STATUS_FILE="$status_file"
+  export DVB_EMPTY_QUEUE_WAIT=4
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
+  printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
+
+  "$DVB_GRIND" 1 "$TEST_REPO" > "$TEST_DIR/refill.out" 2>&1 &
+  local grind_pid=$!
+
+  local attempts=0
+  while [[ $attempts -lt 50 ]]; do
+    if [[ -f "$status_file" ]] && python3 - "$status_file" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+
+sys.exit(0 if data.get("current_phase") == "queue_empty_wait" else 1)
+PY
+    then
+      break
+    fi
+    sleep 0.1
+    attempts=$((attempts + 1))
+  done
+  [ "$attempts" -lt 50 ]
+
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Injected task
+  **ID**: injected-task
+TASKS
+
+  wait "$grind_pid"
+  [ "$?" -eq 0 ]
+
+  grep -q 'Run the next-task skill' "$DVB_GRIND_INVOKE_LOG"
+  [ "$(grep -c 'TASKS.md is empty' "$DVB_GRIND_INVOKE_LOG")" -eq 1 ]
+  [ "$(grep -c 'Run the next-task skill' "$DVB_GRIND_INVOKE_LOG")" -ge 2 ]
+}
+
 @test "non-empty queue launches a session" {
   cat > "$TEST_REPO/TASKS.md" <<'TASKS'
 # Tasks

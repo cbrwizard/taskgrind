@@ -1,12 +1,6 @@
 # Tasks
 
 ## P0
-- [ ] Harden the empty-queue sweep into a fully verified operator workflow
-  **ID**: harden-empty-queue-sweep-workflow
-  **Tags**: reliability, testing, core-loop
-  **Details**: The empty-queue sweep is taskgrind's differentiator when a repo has no queued work, but the current coverage is split across partial session/logging cases and does not fully exercise the one-time sweep, external-task injection wait window, exhausted exit path, and status-phase transitions together. Add end-to-end bats coverage so the audit loop is safe to trust in long unattended runs.
-  **Files**: `bin/taskgrind`, `tests/session.bats`, `tests/logging.bats`, `README.md`
-  **Acceptance**: A focused bats suite covers sweep launch, wait-for-work recovery, exhausted empty-queue exit, and the corresponding `TG_STATUS_FILE` phase changes; README examples match the verified behavior.
 - [ ] Close retry-cap blind spots in per-task attempt tracking
   **ID**: close-retry-attempt-tracking-gaps
   **Tags**: reliability, testing, anti-looping

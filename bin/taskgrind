@@ -1946,6 +1946,12 @@ while [[ $(date +%s) -lt $deadline ]]; do
     fi
     echo "🔍 Queue empty — running sweep to find work..."
     log_write "[$(date '+%H:%M')] queue_empty tasks=0 — launching sweep session"
+    last_session_number=$session
+    last_session_result="pending"
+    last_session_exit=""
+    last_session_shipped=0
+    last_session_duration=0
+    last_session_completed_at=""
     set_phase "running_sweep"
 
     _refresh_prompt
@@ -1996,6 +2002,15 @@ while [[ $(date +%s) -lt $deadline ]]; do
     _dvb_pid=0
     session_elapsed=$(( $(date +%s) - session_start ))
     log_write "[$(date '+%H:%M')] sweep_done exit=$session_exit elapsed=${session_elapsed}s"
+    last_session_exit="$session_exit"
+    last_session_shipped=0
+    last_session_duration="$session_elapsed"
+    if [[ "$session_exit" -eq 0 ]]; then
+      last_session_result="success"
+    else
+      last_session_result="failure"
+    fi
+    last_session_completed_at="$(date '+%Y-%m-%dT%H:%M:%S%z')"
 
     # Fast-failure recovery for sweep sessions — same logic as regular sessions.
     # Without this, a network drop during sweep permanently ends the marathon.
