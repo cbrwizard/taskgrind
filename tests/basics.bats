@@ -334,6 +334,22 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [ "$status" -eq 0 ]
 }
 
+@test "CONTRIBUTING mentions the Bash 3.2 compatibility guard only once" {
+  run python3 - "$BATS_TEST_DIRNAME/../CONTRIBUTING.md" <<'PY'
+import pathlib
+import sys
+
+text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+needle = "If you touch runtime shell code, keep it `/bin/bash` 3.2 compatible and use `tests/verify-bash32-compat.sh` plus `tests/bash-compat.bats` to catch Bash-4-only syntax before the full suite does"
+
+count = text.count(needle)
+if count != 1:
+    print(count)
+    raise SystemExit(1)
+PY
+  [ "$status" -eq 0 ]
+}
+
 @test "man page documents the current make audit review queue" {
   run grep -nF 'SECURITY.md' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
   [ "$status" -eq 0 ]
