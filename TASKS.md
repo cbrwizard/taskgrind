@@ -15,10 +15,4 @@
   **Details**: The repo migration to canonical `TG_` env vars is covered for many knobs, but some settings such as `TG_EMPTY_QUEUE_WAIT` still only have invalid-value tests. Add focused precedence coverage for the remaining wait/backoff-style knobs so future refactors do not silently prefer the legacy `DVB_` alias.
   **Files**: `tests/diagnostics.bats`, `tests/network.bats`, `tests/session.bats`
   **Acceptance**: The affected env vars have red/green coverage proving `TG_` overrides the matching `DVB_` value during a real run, not just in validation error paths.
-- [ ] Document the context-budget guard consistently across operator docs
-  **ID**: document-context-budget-guard
-  **Tags**: docs, safety, operations
-  **Details**: `taskgrind --help` warns that sessions must exit before context fills or they can crash and lose uncommitted work, but that operator guidance is easy to miss in the longer docs. Thread the same warning through the user-facing docs so long unattended runs keep the context-budget rule visible.
-  **Files**: `README.md`, `docs/user-stories.md`, `man/taskgrind.1`
-  **Acceptance**: The README, user stories, and man page all mention the context-budget guard in the places where operators learn how unattended sessions behave, using language that matches the CLI help.
 ## P3

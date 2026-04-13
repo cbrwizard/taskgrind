@@ -213,6 +213,26 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [ "$status" -eq 0 ]
 }
 
+@test "operator docs surface the context-budget guard from CLI help" {
+  run grep -nF 'Sessions should exit before context fills; context exhaustion can crash the' "$BATS_TEST_DIRNAME/../README.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'process and lose uncommitted work.' "$BATS_TEST_DIRNAME/../README.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'Sessions should exit before context fills; context exhaustion can crash the' "$BATS_TEST_DIRNAME/../docs/user-stories.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'process and lose uncommitted work.' "$BATS_TEST_DIRNAME/../docs/user-stories.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'Sessions should exit before context fills; context exhaustion can crash the' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'process and lose uncommitted work.' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  [ "$status" -eq 0 ]
+}
+
 @test "README documents the supported Linux bats install path" {
   run grep -nF 'sudo apt-get install -y npm shellcheck' "$BATS_TEST_DIRNAME/../README.md"
   [ "$status" -eq 0 ]

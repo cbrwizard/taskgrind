@@ -8,7 +8,10 @@ and status-file-based supervision. Read the story closest to your setup first,
 then copy its command pattern instead of reverse-engineering behavior from the
 full README.
 
-Real usage patterns for taskgrind. Each story shows the context, command, what happens, and sample log output.
+Sessions should exit before context fills; context exhaustion can crash the
+process and lose uncommitted work.
+
+Real usage patterns for taskgrind. Each story shows the context, command, what happens, and sample log output. In every case, keep sessions short enough to exit and commit before the model context fills up, because a context-exhausted crash loses that session's uncommitted work.
 
 ## 1. Overnight grind on a repo with tasks
 
@@ -21,6 +24,7 @@ taskgrind ~/apps/myproject 8
 What happens:
 - Taskgrind launches AI sessions in a loop, each picking the highest-priority task from `TASKS.md`
 - Each session implements a task, commits, removes it from `TASKS.md`, and exits
+- The safe operating rule is "finish before context fills": if one session grows too large and crashes from context exhaustion, any uncommitted work from that run is lost even though the next session can resume from git + `TASKS.md`
 - Between sessions: 5s cooldown, git sync every 5 sessions
 - After 8 hours (or when the queue empties), taskgrind exits with a summary
 
@@ -149,6 +153,7 @@ TG_STATUS_FILE=/tmp/taskgrind-status.json taskgrind ~/apps/myproject 8
 What happens:
 - Taskgrind updates `/tmp/taskgrind-status.json` atomically at every important state change
 - A wrapper can poll `current_phase` to decide whether to wait, alert, or start a fresh run later
+- The status file complements, but does not replace, the context-budget guard: if prompts or tasks are too large, a session can still crash before it reaches a clean `complete` or `failed` handoff, so keep the work scoped to fit one session
 - `queue_empty_wait` means "the queue is empty, keep watching for refills", not "the grind is broken"
 - `waiting_for_network` means "pause and keep the deadline alive", so alert only if that phase outlives your expected outage budget
 - `failed` means the wrapper should inspect the log immediately, while `complete` usually means the run ended cleanly and only needs a restart if new work arrived

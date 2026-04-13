@@ -11,6 +11,12 @@ it, commits, removes it from TASKS.md, and exits. Between sessions: cooldown,
 optional git sync. Exits when the queue empties, the deadline is reached, or
 stall is detected.
 .PP
+Sessions should exit before context fills; context exhaustion can crash the
+process and lose uncommitted work.
+.PP
+If a session crashes from context exhaustion, the next run can resume from git
+and TASKS.md, but any uncommitted work from the crashed session is lost.
+.PP
 Arguments can appear in any order. Hours is any bare integer (1\-24, default: 10).
 .SH OPTIONS
 .TP

@@ -10,7 +10,10 @@ run is done. Use `taskgrind --preflight` to verify the backend and repo before a
 long run, then steer later sessions with repo-local prompt or model overrides
 instead of restarting the whole grind.
 
-Autonomous multi-session grind — runs sequential AI coding sessions until a deadline. Each session starts with full context. State lives in [`TASKS.md`](https://github.com/tasksmd/tasks.md) + git, so sessions pick up seamlessly.
+Sessions should exit before context fills; context exhaustion can crash the
+process and lose uncommitted work.
+
+Autonomous multi-session grind — runs sequential AI coding sessions until a deadline. Each session starts with full context. State lives in [`TASKS.md`](https://github.com/tasksmd/tasks.md) + git, so sessions pick up seamlessly. Sessions still need to exit before the model context fills up; a context-exhausted crash can drop any uncommitted work from that session.
 
 Taskgrind works with any AI coding agent that accepts a prompt (Devin, Claude Code, Cursor, etc.) and any repo that uses the [tasks.md spec](https://tasks.md) for task management.
 
@@ -105,6 +108,8 @@ Arguments can appear in any order. Hours is any bare integer 1-24.
 2. Session picks a task from `TASKS.md`, implements it, commits, and exits
 3. Between sessions: cooldown, optional git sync (every N sessions)
 4. Exits when: queue empty, all remaining tasks blocked, deadline reached, or stall detected
+
+That session boundary is also the context-budget guard: keep prompts, plans, and scope small enough that each agent run can finish and commit before its context window fills. If a session crashes from context exhaustion, taskgrind can resume from git and `TASKS.md`, but any uncommitted edits from the crashed run are gone.
 
 ### Task format
 
