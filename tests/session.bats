@@ -370,7 +370,7 @@ SCRIPT
   [[ "$output" == *"Audit-only focus requested but TASKS.md has no matching discovery-lane task"* ]]
 }
 
-@test "audit-only skills still run when TASKS.md includes a removable audit task" {
+@test "audit-only skills still run when TASKS.md includes a supported discovery-lane task" {
   cat > "$TEST_REPO/TASKS.md" <<'TASKS'
 # Tasks
 ## P0
