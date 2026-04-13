@@ -596,10 +596,6 @@ Taskgrind runtime files must stay compatible with `/bin/bash` 3.2, and
 `tests/verify-bash32-compat.sh` is the guard that enforces that contract during
 the bats suite.
 
-Taskgrind runtime files must stay compatible with `/bin/bash` 3.2, and
-`tests/verify-bash32-compat.sh` is the guard that enforces that contract during
-the bats suite.
-
 ```bash
 # macOS
 brew install bats-core shellcheck

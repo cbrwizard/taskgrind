@@ -350,6 +350,22 @@ PY
   [ "$status" -eq 0 ]
 }
 
+@test "README mentions the Bash 3.2 compatibility guard only once" {
+  run python3 - "$BATS_TEST_DIRNAME/../README.md" <<'PY'
+import pathlib
+import sys
+
+text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+needle = "Taskgrind runtime files must stay compatible with `/bin/bash` 3.2, and\n`tests/verify-bash32-compat.sh` is the guard that enforces that contract during\nthe bats suite."
+
+count = text.count(needle)
+if count != 1:
+    print(count)
+    raise SystemExit(1)
+PY
+  [ "$status" -eq 0 ]
+}
+
 @test "man page documents the current make audit review queue" {
   run grep -nF 'SECURITY.md' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
   [ "$status" -eq 0 ]
