@@ -100,6 +100,8 @@ that disappears as soon as it is "completed".
   **ID**: discovery-standing-loop
   **Tags**: standing-loop, audit, queue
   **Details**: Continuously discover high-value follow-up work for slot 0 to ship.
+  **Files**: `TASKS.md`, `docs/user-stories.md`
+  **Acceptance**: The discovery lane keeps adding normal removable tasks while this standing-loop definition remains available for the next pass.
 ```
 
 ```bash
