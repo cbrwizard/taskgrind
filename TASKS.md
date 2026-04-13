@@ -8,7 +8,6 @@
   **Files**: `bin/taskgrind`, `tests/signals.bats`, `tests/git-sync.bats`
   **Acceptance**: Bats tests exercise real final-sync outcomes for duplicate attempts, zero-ahead shutdowns, and rejected pushes, and the resulting log/output expectations are locked in.
 ## P1
-
 ## P2
 - [ ] Add canonical `TG_` precedence tests for wait and backoff env vars that only have validation coverage
   **ID**: expand-tg-precedence-coverage

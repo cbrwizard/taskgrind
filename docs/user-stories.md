@@ -62,7 +62,7 @@ What happens:
 - Each repo gets its own lock namespace, so the two repos run independently without cross-repo contention
 - Each gets its own log file (includes repo name + PID)
 - Both use caffeinate to prevent system sleep
-- If you want multiple grinds on one repo, use the slot-based workflow in story `4`
+- Same-repo concurrency is handled separately by the slot-based workflow in story `4`
 
 ## 4. Concurrent grinds on one repo
 
