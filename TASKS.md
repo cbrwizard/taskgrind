@@ -1,13 +1,6 @@
 # Tasks
 
 ## P0
-- [ ] Close retry-cap blind spots in per-task attempt tracking
-  **ID**: close-retry-attempt-tracking-gaps
-  **Tags**: reliability, testing, anti-looping
-  **Details**: `tests/task-attempts.bats` currently has only two tests even though per-task retry caps are one of the main safeguards against wasted sessions. Add behavior-level coverage for shipped tasks clearing attempt debt, successor-task churn not inheriting old counts, and skip-list prompts staying scoped to still-live task IDs.
-  **Files**: `bin/taskgrind`, `tests/task-attempts.bats`, `tests/session.bats`, `docs/architecture.md`
-  **Acceptance**: New bats coverage proves attempt counters reset or prune correctly after shipped work and queue churn, and skip-list prompts only mention active task IDs that truly crossed the retry threshold.
-
 - [ ] Publish a troubleshooting playbook for stuck, blocked, or conflicting grinds
   **ID**: document-operator-troubleshooting-playbook
   **Tags**: docs, operations, ux

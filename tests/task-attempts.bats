@@ -4,6 +4,22 @@ load test_helper
 
 DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
+extract_attempt_functions() {
+  local function_file="$1"
+
+  python3 - <<'PY' "$DVB_GRIND" "$function_file"
+from pathlib import Path
+import sys
+
+source_path = Path(sys.argv[1])
+target_path = Path(sys.argv[2])
+source = source_path.read_text()
+start = source.index("extract_task_ids() {")
+end = source.index("# Print the first remaining task context as shell-safe assignments.")
+target_path.write_text(source[start:end])
+PY
+}
+
 @test "attempt write failures are logged and later sessions still reach skip threshold" {
   local real_mv shim_dir state_file
 
@@ -46,17 +62,7 @@ SCRIPT
   local attempts_file="$TEST_DIR/task-attempts"
   local tasks_file="$TEST_DIR/TASKS.md"
 
-  python3 - <<'PY' "$DVB_GRIND" "$function_file"
-from pathlib import Path
-import sys
-
-source_path = Path(sys.argv[1])
-target_path = Path(sys.argv[2])
-source = source_path.read_text()
-start = source.index("extract_task_ids() {")
-end = source.index("# Print the first remaining task context as shell-safe assignments.")
-target_path.write_text(source[start:end])
-PY
+  extract_attempt_functions "$function_file"
 
   cat > "$attempts_file" <<'ATTEMPTS'
 stale-task 4
@@ -73,4 +79,93 @@ TASKS
   run bash -lc "source '$function_file'; prune_task_attempts_file '$attempts_file' '$tasks_file'; cat '$attempts_file'"
   [ "$status" -eq 0 ]
   [[ "$output" == "live-task 3" ]]
+}
+
+@test "shipping a stuck task clears its attempt debt before the ID returns" {
+  local function_file="$TEST_DIR/prune-functions.sh"
+  local attempts_file="$TEST_DIR/task-attempts"
+  local shipped_tasks_file="$TEST_DIR/shipped-tasks.md"
+  local returned_tasks_file="$TEST_DIR/returned-tasks.md"
+
+  extract_attempt_functions "$function_file"
+
+  cat > "$attempts_file" <<'ATTEMPTS'
+stubborn-task 3
+steady-task 1
+ATTEMPTS
+
+  cat > "$shipped_tasks_file" <<'TASKS'
+# Tasks
+## P0
+- [ ] Replacement task
+  **ID**: replacement-task
+- [ ] Steady task
+  **ID**: steady-task
+TASKS
+
+  cat > "$returned_tasks_file" <<'TASKS'
+# Tasks
+## P0
+- [ ] Stubborn task returns
+  **ID**: stubborn-task
+- [ ] Steady task
+  **ID**: steady-task
+TASKS
+
+  run bash -lc "source '$function_file'; prune_task_attempts_file '$attempts_file' '$shipped_tasks_file'; prune_task_attempts_file '$attempts_file' '$returned_tasks_file'; cat '$attempts_file'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "steady-task 1" ]]
+}
+
+@test "successor task churn does not inherit retry counts from shipped work" {
+  local function_file="$TEST_DIR/prune-functions.sh"
+  local attempts_file="$TEST_DIR/task-attempts"
+  local tasks_file="$TEST_DIR/TASKS.md"
+
+  extract_attempt_functions "$function_file"
+
+  cat > "$attempts_file" <<'ATTEMPTS'
+original-task 4
+shared-task 2
+ATTEMPTS
+
+  cat > "$tasks_file" <<'TASKS'
+# Tasks
+## P0
+- [ ] Successor task
+  **ID**: successor-task
+- [ ] Shared task
+  **ID**: shared-task
+TASKS
+
+  run bash -lc "source '$function_file'; prune_task_attempts_file '$attempts_file' '$tasks_file'; cat '$attempts_file'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "shared-task 2" ]]
+}
+
+@test "skip-list prompt only mentions still-live IDs that crossed the threshold" {
+  local function_file="$TEST_DIR/prune-functions.sh"
+  local attempts_file="$TEST_DIR/task-attempts"
+  local tasks_file="$TEST_DIR/TASKS.md"
+
+  extract_attempt_functions "$function_file"
+
+  cat > "$attempts_file" <<'ATTEMPTS'
+stale-task 4
+live-task 3
+warm-task 2
+ATTEMPTS
+
+  cat > "$tasks_file" <<'TASKS'
+# Tasks
+## P0
+- [ ] Live task
+  **ID**: live-task
+- [ ] Warm task
+  **ID**: warm-task
+TASKS
+
+  run bash -lc "source '$function_file'; prune_task_attempts_file '$attempts_file' '$tasks_file'; awk '\$2 >= 3 { printf \"%s \", \$1 }' '$attempts_file'"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "live-task " ]]
 }
