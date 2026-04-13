@@ -25,12 +25,6 @@
   **Details**: Taskgrind supports Devin, Claude Code, and Codex, but contributors still have to infer which preflight checks and probe failures are backend-specific. Add a backend matrix that explains binary detection, model validation behavior, and the most actionable setup failures for each backend so new users can get from install to first productive grind faster.
   **Files**: `README.md`, `CONTRIBUTING.md`, `man/taskgrind.1`
   **Acceptance**: Documentation clearly differentiates backend setup expectations and common preflight failures for each supported backend, with examples aligned to current CLI behavior.
-- [ ] Add regression coverage for empty-queue recovery when new tasks appear during the wait window
-  **ID**: test-empty-queue-wait-task-injection
-  **Tags**: tests, queue, reliability
-  **Details**: `bin/taskgrind` already waits after an empty sweep so another agent or human can inject work, but the suite only covers the wait itself. Add a targeted bats test that creates tasks during `queue_empty_wait` and proves the grind resumes with the refilled queue instead of exiting.
-  **Files**: `tests/session.bats`, `tests/test_helper.bash`
-  **Acceptance**: A focused test reproduces the "tasks appear during empty-queue wait" path, asserts the resume log/output, and fails if taskgrind exits instead of continuing.
 - [ ] Document live override file size guards in the user-facing docs
   **ID**: document-live-override-size-limits
   **Tags**: docs, usability, prompts
