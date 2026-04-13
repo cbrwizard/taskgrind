@@ -205,6 +205,14 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [ "$status" -eq 0 ]
 }
 
+@test "discovery-lane guard docs explain why audit-only sessions can be refused" {
+  run grep -nF 'Audit-only sessions are refused unless `TASKS.md` includes a supported discovery-lane standing-loop task' "$BATS_TEST_DIRNAME/../docs/architecture.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'taskgrind refuses audit-only sessions unless `TASKS.md` already contains a supported discovery-lane standing-loop task' "$BATS_TEST_DIRNAME/../README.md"
+  [ "$status" -eq 0 ]
+}
+
 @test "README documents the supported Linux bats install path" {
   run grep -nF 'sudo apt-get install -y npm shellcheck' "$BATS_TEST_DIRNAME/../README.md"
   [ "$status" -eq 0 ]

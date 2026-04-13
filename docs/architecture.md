@@ -30,6 +30,8 @@ When TASKS.md is empty, taskgrind runs a single sweep session that audits the re
 
 The `_sweep_done` flag tracks that control flow. `0` means no empty-queue sweep has run yet, `1` means the sweep already ran and the grind is in its one-time wait-for-work window, and `2` means the empty-queue path is exhausted so the next loop exits cleanly. The flag resets whenever a session ships work, which lets a grind that empties the queue sweep again later instead of getting stuck in a permanent "already swept" state.
 
+There is a separate guard for audit-only skills such as standing discovery loops. Audit-only sessions are refused unless `TASKS.md` includes a supported discovery-lane standing-loop task, because otherwise the lane can spend a whole session doing queue maintenance without any durable marker that explains why it is allowed to keep running. That safeguard keeps the normal empty-queue sweep available for autonomous backlog discovery while still forcing deliberate setup for long-lived discovery lanes.
+
 ## Why next-task over custom grind skill
 
 Taskgrind orchestrates the marathon: deadline management, network resilience, git sync, stall detection, task tracking. It deliberately does not understand task prioritization, decomposition, or implementation — that's the skill's job. The default `next-task` skill is a general-purpose task picker that reads TASKS.md, selects the highest-priority unblocked task, and implements it. By keeping the prompt thin (`"Run the $skill skill."`) and delegating everything to the skill, taskgrind stays composable. Users can swap in `--skill fleet-grind` for pipeline management or any custom skill without changing taskgrind itself.

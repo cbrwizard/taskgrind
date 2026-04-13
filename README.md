@@ -451,6 +451,7 @@ Supported two-stream workflow for one repo:
 - Put `slot 1` on a discovery skill such as `standing-audit-gap-loop`, but back it with the reusable standing-loop pattern instead of a sacrificial repo-local audit task
 - Define that discovery lane task in `TASKS.md` with durable metadata such as `**ID**: discovery-standing-loop` and `**Tags**: standing-loop, audit, queue`; taskgrind treats that as a valid queue-maintenance lane even though the task definition itself is meant to persist
 - Let the discovery lane add normal tasks back into `TASKS.md`; `slot 0` then picks them up and removes only the shipped work items, while the standing-loop definition remains available for the next discovery pass
+- If you point taskgrind at an audit-only skill without that standing-loop marker, taskgrind refuses audit-only sessions unless `TASKS.md` already contains a supported discovery-lane standing-loop task
 
 Example standing-loop definition:
 
