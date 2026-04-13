@@ -305,6 +305,7 @@ What happens:
 - Taskgrind checks `.taskgrind-prompt` between sessions, so the new focus applies at the next session start
 - Future sessions prepend that prompt to the skill instructions until you edit or remove the file
 - This is useful when production issues or new priorities show up during a long grind
+- If `.taskgrind-prompt` grows past 10 KB, taskgrind skips it and logs a warning instead of injecting a huge blob by accident
 - Delete `.taskgrind-prompt` to stop injecting the extra focus text and return to the startup prompt only
 
 Sample log:
@@ -314,3 +315,14 @@ Sample log:
 [pid=38291] [14:41] live_prompt=.taskgrind-prompt loaded bytes=58
 [pid=38291] [14:41] session=4 remaining=199m tasks=6 model=claude-sonnet-4.6
 ```
+
+If the file is too large, the log instead shows a warning such as:
+
+```
+   ⚠ .taskgrind-prompt too large (12345B > 10240B) — skipping
+```
+
+The same live-session rules apply to `.taskgrind-model`: taskgrind re-reads it
+between sessions, ignores files larger than 1 KB, and logs a warning like
+`⚠ .taskgrind-model too large (2048B > 1024B) — skipping` when the override is
+rejected.

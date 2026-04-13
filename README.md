@@ -129,8 +129,8 @@ Use `**Blocked by**` only when another task or external dependency truly prevent
 
 - **Multi-backend support** — works with Devin, Claude Code, and Codex via `--backend`
 - **Model selection** — `--model gpt-5-4` or `TG_MODEL=gpt-5-4` to use any model the backend supports; quote multi-word model names such as `--model "gpt-5-4 XHigh thinking fast"`; short aliases like `opus` and `sonnet` resolve to the current preferred model IDs
-- **Live model switching** — create/edit `.taskgrind-model` in the repo while running; changes take effect at the next session, including short alias resolution. Delete the file to revert to the startup model.
-- **Live prompt injection** — create/edit `.taskgrind-prompt` in the repo while running; changes take effect at the next session
+- **Live model switching** — create/edit `.taskgrind-model` in the repo while running; changes take effect at the next session, including short alias resolution. Delete the file to revert to the startup model. Files larger than 1 KB are ignored with a warning.
+- **Live prompt injection** — create/edit `.taskgrind-prompt` in the repo while running; changes take effect at the next session. Files larger than 10 KB are ignored with a warning.
 - **Preflight checks** — 8 health checks plus active slot reporting before launch. `network-watchdog` is optional; if missing, taskgrind falls back to `curl` for connectivity checks.
 - **Self-copy protection** — copies itself to `$TMPDIR` before running, survives script edits mid-grind
 - **Slot-based per-repo locking** — `TG_MAX_INSTANCES` allows multiple concurrent grinds on the same repo; slot 0 owns between-session git sync, higher slots get conflict-avoidance prompt guidance
@@ -385,8 +385,10 @@ echo "focus on test coverage" > ~/apps/myrepo/.taskgrind-prompt
 ```
 
 The file is re-read before each session. Combined with `--prompt` if both are set. Delete the file to stop injecting.
-Files larger than 10KB are skipped as a safety guard to avoid accidentally
-injecting generated output or other large blobs.
+Files larger than 10 KB are skipped as a safety guard to avoid accidentally
+injecting generated output or other large blobs, and taskgrind logs a warning
+like `⚠ .taskgrind-prompt too large (12345B > 10240B) — skipping` so operators
+can see why the override did not apply.
 
 ### Live model switching
 
@@ -396,7 +398,7 @@ Switch models mid-grind without restarting — useful for switching from a power
 echo "gpt-5-4" > ~/apps/myrepo/.taskgrind-model
 ```
 
-The file is re-read before each session. Overrides `--model` and `TG_MODEL` when present. Short aliases such as `opus`, `sonnet`, `haiku`, `codex`, `gpt`, and `swe` resolve to the current preferred model IDs. Delete the file to revert to the original startup model. Files larger than 1KB are skipped (safety guard).
+The file is re-read before each session. Overrides `--model` and `TG_MODEL` when present. Short aliases such as `opus`, `sonnet`, `haiku`, `codex`, `gpt`, and `swe` resolve to the current preferred model IDs. Delete the file to revert to the original startup model. Files larger than 1 KB are skipped as a safety guard, and taskgrind logs a warning like `⚠ .taskgrind-model too large (2048B > 1024B) — skipping`.
 
 Both override files are only applied between sessions. The current in-flight
 session keeps its original prompt and model, and the next session picks up the

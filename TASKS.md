@@ -7,19 +7,6 @@
   **Details**: Final push protection is critical for unattended runs, but some `final_sync` paths are still mostly covered structurally instead of by realistic git behavior. Add bats coverage for duplicate-push suppression, nothing-to-push exits, and push-failure diagnostics so taskgrind can be trusted to shut down cleanly without extra operator babysitting.
   **Files**: `bin/taskgrind`, `tests/signals.bats`, `tests/git-sync.bats`
   **Acceptance**: Bats tests exercise real final-sync outcomes for duplicate attempts, zero-ahead shutdowns, and rejected pushes, and the resulting log/output expectations are locked in.
-- [ ] Benchmark and document backend-specific preflight probe expectations
-  **ID**: document-backend-probe-expectations
-  **Tags**: docs, backends, onboarding
-  **Details**: Taskgrind supports Devin, Claude Code, and Codex, but contributors still have to infer which preflight checks and probe failures are backend-specific. Add a backend matrix that explains binary detection, model validation behavior, and the most actionable setup failures for each backend so new users can get from install to first productive grind faster.
-  **Files**: `README.md`, `CONTRIBUTING.md`, `man/taskgrind.1`
-  **Acceptance**: Documentation clearly differentiates backend setup expectations and common preflight failures for each supported backend, with examples aligned to current CLI behavior.
-- [ ] Document live override file size guards in the user-facing docs
-  **ID**: document-live-override-size-limits
-  **Tags**: docs, usability, prompts
-  **Details**: `bin/taskgrind` enforces a 10 KB limit for `.taskgrind-prompt` and a 1 KB limit for `.taskgrind-model`, and the tests cover those guards, but the README and user stories do not tell operators about the limits. Document the caps and the warning behavior so users know why oversized override files are ignored.
-  **Files**: `README.md`, `docs/user-stories.md`, `man/taskgrind.1`
-  **Acceptance**: The README, user stories, and man page all explain the live override size limits and make it clear that oversized files are skipped with a warning.
-
 ## P1
 - [ ] Support paired execution and discovery lanes without a sacrificial audit task
   **ID**: paired-execution-discovery-lanes

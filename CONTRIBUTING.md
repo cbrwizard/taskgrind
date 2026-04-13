@@ -39,6 +39,28 @@ matches the GitHub Actions CI path for Linux runs.
 
 All tests use a fake devin stub via `DVB_GRIND_CMD` — they never invoke real AI backends.
 
+## Backend Expectations
+
+When you touch backend selection, preflight, or setup docs, keep the user-facing
+guidance aligned with the actual runtime checks in `bin/taskgrind`.
+
+| Backend | Binary resolution | Preflight model check | Failure text contributors should preserve |
+|---------|-------------------|-----------------------|-------------------------------------------|
+| `devin` | `devin` from `PATH`, unless `TG_DEVIN_PATH` overrides it | `devin --model <name> --help` | `Backend binary not found (devin)` and `Model rejected by devin before starting` |
+| `claude-code` | `claude` from `PATH` | `claude --model <name> --help` | `Backend binary not found (claude-code)` and `Model rejected by claude-code before starting` |
+| `codex` | `codex` from `PATH` | `codex --model <name> --help` | `Backend binary not found (codex)` and `Model rejected by codex before starting` |
+
+Notes:
+
+- Codex is the only backend with an extra compatibility warning: if the chosen
+  model name still looks like a Claude model, taskgrind warns before launch and
+  tells the operator to switch to an OpenAI model such as `o3` or `gpt-5.4`.
+- The optional startup backend probe uses `--version` to catch stubbed or broken
+  backend binaries before session 1. If you change that probe, update the docs
+  when the remediation text changes.
+- In tests, model validation is skipped unless the suite opts into it, so doc
+  changes should be verified against production-path behavior in `tests/preflight.bats`.
+
 ## TASKS.md Format
 
 Taskgrind expects `TASKS.md` to follow the tasks.md spec exactly. Use checkbox

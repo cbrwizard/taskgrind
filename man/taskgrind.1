@@ -207,6 +207,8 @@ of being checked off.
 Optional file in the target repo. Content is injected into every session prompt.
 Re\-read before each session, so changes take effect live. Combine with \-\-prompt.
 Files larger than 10KB are skipped.
+Oversize prompt files emit a warning and do not affect the current or next
+session prompt.
 .TP
 .I .taskgrind\-model
 Optional file in the target repo. Content overrides the model for subsequent
@@ -214,6 +216,7 @@ sessions. Re\-read before each session. Overrides \-\-model and TG_MODEL when
 present. Short aliases resolve the same way they do for \-\-model and TG_MODEL.
 Delete the file to revert to the original startup model. Files larger than 1KB
 are skipped.
+Oversize model files emit a warning and leave the startup model in place.
 .SS LIVE OVERRIDE FILES
 Both repo-local override files are checked between sessions, not during an
 active session. The current session keeps running with its original prompt and
@@ -224,12 +227,13 @@ extends the startup \-\-prompt text for later sessions. Use it for temporary
 focus shifts such as a flaky test, production issue, or audit note without
 restarting the grind. Delete the file to stop injecting those extra
 instructions.
+If the file exceeds 10KB, taskgrind logs a warning and skips it.
 .PP
 .B .taskgrind\-model
 overrides the startup model chosen by \-\-model or TG_MODEL for later sessions.
 This lets operators start with a stronger model, then switch to a faster one as
 the remaining work gets simpler. Delete the file to fall back to the startup
-model.
+model. If the file exceeds 1KB, taskgrind logs a warning and skips it.
 .PP
 By default, taskgrind allows two concurrent grinds on the same repo. Set
 .B TG_MAX_INSTANCES
