@@ -406,7 +406,7 @@ are terminal states for the current process.
 taskgrind                           # 10h grind, current dir
 taskgrind 10 ~/apps/myrepo         # 10h grind in specific repo
 taskgrind \-\-model gpt\-5\-4 8       # use specific model
-taskgrind \-\-model opus 8          # resolves to claude-opus-4-6
+taskgrind \-\-model opus 8          # alias resolves to claude-opus-4-6
 taskgrind \-\-skill fleet\-grind 10  # custom skill
 taskgrind \-\-backend claude\-code 8  # use Claude Code backend
 taskgrind \-\-prompt "test coverage" 8
@@ -415,7 +415,7 @@ taskgrind \-\-preflight             # health checks only
 taskgrind \-\-version               # print version
 TG_MAX_INSTANCES=3 taskgrind 8     # allow three concurrent grinds per repo
 TG_STATUS_FILE=/tmp/taskgrind-status.json taskgrind 8
-TG_MODEL=sonnet taskgrind 8        # resolves to claude-sonnet-4.6
+TG_MODEL=sonnet taskgrind 8        # alias resolves to claude-sonnet-4.6
 echo "gpt\-5.4" > .taskgrind\-model  # switch model mid\-grind
 .fi
 .SH EXIT STATUS

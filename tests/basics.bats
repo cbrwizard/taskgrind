@@ -233,6 +233,20 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [ "$status" -eq 0 ]
 }
 
+@test "operator docs keep sample model examples aligned with current defaults" {
+  run grep -nF 'model:    gpt-5.4' "$BATS_TEST_DIRNAME/../README.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'model:    gpt-5.4' "$BATS_TEST_DIRNAME/../docs/user-stories.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'alias resolves to claude-opus-4-6' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'alias resolves to claude-sonnet-4.6' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  [ "$status" -eq 0 ]
+}
+
 @test "README documents the supported Linux bats install path" {
   run grep -nF 'sudo apt-get install -y npm shellcheck' "$BATS_TEST_DIRNAME/../README.md"
   [ "$status" -eq 0 ]

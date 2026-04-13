@@ -463,7 +463,7 @@ taskgrind --preflight
   repo:     /Users/you/apps/myrepo
   backend:  devin
   skill:    next-task
-  model:    claude-opus-4-6
+  model:    gpt-5.4
   slots:    2/3 active
 ```
 

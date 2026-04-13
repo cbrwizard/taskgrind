@@ -52,7 +52,7 @@ What happens:
 
 Sample banner:
 ```
-☕ taskgrind: 4h (until 13:00) — backend=devin, skill=next-task, model=claude-opus-4-6, repo=/Users/you/apps/myproject
+☕ taskgrind: 4h (until 13:00) — backend=devin, skill=next-task, model=gpt-5.4, repo=/Users/you/apps/myproject
    Each session runs next-task. Git sync every 5 sessions.
    Focus: focus on test coverage
    Log: ${TMPDIR:-/tmp}/taskgrind-2025-01-15-0900-myproject-38291.log
@@ -224,7 +224,7 @@ taskgrind --dry-run
   repo:     /Users/you/apps/myproject
   backend:  devin
   skill:    next-task
-  model:    claude-opus-4-6
+  model:    gpt-5.4
   cooldown: 5s
   log:      ${TMPDIR:-/tmp}/taskgrind-2025-01-15-0900-myproject-38291.log
   notify:   1
@@ -238,7 +238,7 @@ taskgrind --preflight
   repo:     /Users/you/apps/myproject
   backend:  devin
   skill:    next-task
-  model:    claude-opus-4-6
+  model:    gpt-5.4
   slots:    0/2 active
 
 Preflight checks for: /Users/you/apps/myproject
@@ -323,14 +323,14 @@ You start a long grind with a stronger model for ambiguous work, then switch to 
 
 ```bash
 # Start with a stronger model for harder tasks
-taskgrind --model claude-opus-4-6 ~/apps/myproject 6
+taskgrind --model opus ~/apps/myproject 6
 
 # Later, switch future sessions to a faster model
 echo "claude-sonnet-4.6" > ~/apps/myproject/.taskgrind-model
 ```
 
 What happens:
-- Session 1 starts with the model passed via `--model`
+- Session 1 starts with the alias-resolved model passed via `--model`
 - Taskgrind checks `.taskgrind-model` between sessions, so the change applies at the next session start
 - The current in-flight session keeps running on its original model
 - When the next session picks up the change, taskgrind writes a live model log entry before the next session banner
