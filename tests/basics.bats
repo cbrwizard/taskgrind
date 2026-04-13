@@ -78,6 +78,13 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [[ "$output" == *"Usage"* ]]
 }
 
+@test "--help documents the short -h and -V aliases" {
+  run "$DVB_GRIND" --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--help / -h"* ]]
+  [[ "$output" == *"--version / -V"* ]]
+}
+
 @test "--version prints commit hash and exits 0" {
   run "$DVB_GRIND" --version
   [ "$status" -eq 0 ]

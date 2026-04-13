@@ -17,8 +17,8 @@
 #        taskgrind --dry-run 8 ~/apps/myrepo  → print config without running
 #        taskgrind --preflight ~/apps/myrepo  → run health checks only
 #        taskgrind --resume ~/apps/myrepo     → resume an interrupted grind
-#        taskgrind --help                     → show this help and exit
-#        taskgrind --version                   → print version (commit hash + date)
+#        taskgrind --help / -h                → show this help and exit
+#        taskgrind --version / -V             → print version (commit hash + date)
 #        TG_MODEL=sonnet taskgrind 8           → 8h grind, sonnet model
 #        TG_BACKEND=codex taskgrind 8          → 8h grind with Codex
 #
