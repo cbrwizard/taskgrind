@@ -361,6 +361,22 @@ PY
   [ "$status" -eq 0 ]
 }
 
+@test "man page keeps the TG_MAX_INSTANCES example deduplicated" {
+  run python3 - "$BATS_TEST_DIRNAME/../man/taskgrind.1" <<'PY'
+import pathlib
+import sys
+
+text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+needle = "TG_MAX_INSTANCES=3 taskgrind ~/apps/myrepo 8"
+
+count = text.count(needle)
+if count != 1:
+    print(count)
+    raise SystemExit(1)
+PY
+  [ "$status" -eq 0 ]
+}
+
 @test "GitHub Actions caches the active make test cache files" {
   run grep -n 'path: \.test-cache-\*' "$BATS_TEST_DIRNAME/../.github/workflows/check.yml"
   [ "$status" -eq 0 ]
