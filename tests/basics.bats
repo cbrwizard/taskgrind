@@ -221,6 +221,14 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [ "$status" -eq 0 ]
 }
 
+@test "man page model option prose keeps the dotted XHigh example" {
+  run grep -nF '\fB\-\-model "gpt\-5.4 XHigh thinking fast"\fR.' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'gpt\-5\-4 XHigh thinking fast' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  [ "$status" -eq 1 ]
+}
+
 @test "man page documents the standardized discovery standing-loop lane" {
   run grep -nF 'standing\-loop' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
   [ "$status" -eq 0 ]
