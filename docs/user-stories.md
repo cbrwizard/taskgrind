@@ -154,7 +154,10 @@ What happens:
 - Taskgrind updates `/tmp/taskgrind-status.json` atomically at every important state change
 - A wrapper can poll `current_phase` to decide whether to wait, alert, or start a fresh run later
 - The status file complements, but does not replace, the context-budget guard: if prompts or tasks are too large, a session can still crash before it reaches a clean `complete` or `failed` handoff, so keep the work scoped to fit one session
+- `startup`, `preflight`, `session_complete`, `queue_refilled`, and `network_restored` are short-lived transition phases, so treat them as healthy unless they stick around unexpectedly
+- `queue_empty`, `all_tasks_blocked`, `deadline_expired`, and `audit_focus_blocked` are short-lived explanation phases that usually roll straight into `complete` after taskgrind decides to stop
 - `queue_empty_wait` means "the queue is empty, keep watching for refills", not "the grind is broken"
+- `git_sync_skipped` means a higher slot intentionally skipped the slot-0-only sync, so do not page just because slot `1+` reports it
 - `waiting_for_network` means "pause and keep the deadline alive", so alert only if that phase outlives your expected outage budget
 - `failed` means the wrapper should inspect the log immediately, while `complete` usually means the run ended cleanly and only needs a restart if new work arrived
 
@@ -168,12 +171,25 @@ from pathlib import Path
 payload = json.loads(Path("/tmp/taskgrind-status.json").read_text())
 phase = payload["current_phase"]
 
-if phase in {"running_session", "running_sweep", "cooldown", "git_sync"}:
+if phase in {
+    "startup",
+    "preflight",
+    "running_session",
+    "running_sweep",
+    "queue_refilled",
+    "session_complete",
+    "cooldown",
+    "git_sync",
+    "git_sync_skipped",
+    "network_restored",
+}:
     print("healthy: keep waiting")
 elif phase in {"queue_empty_wait", "blocked_wait"}:
     print("idle: wait for new tasks or an unblock")
 elif phase == "waiting_for_network":
     print("degraded: alert only if the outage lasts too long")
+elif phase in {"queue_empty", "all_tasks_blocked", "deadline_expired", "audit_focus_blocked"}:
+    print("ending soon: inspect the reason, but do not page unless the stop was unexpected")
 elif phase == "failed":
     print("page now and inspect the log")
 elif phase == "complete":

@@ -275,7 +275,8 @@ Session logs (one per grind invocation).
 .TP
 .I path set by TG_STATUS_FILE
 Optional JSON status file updated atomically on startup, before and after each
-session, during network waits, and on final completion or failure.
+session, during empty-queue waits and sweeps, around git sync decisions, during
+network waits, and on final completion or failure.
 .PP
 Payload fields:
 .RS
@@ -306,7 +307,10 @@ Whole minutes remaining until the deadline, floored at 0.
 .TP
 .B current_phase
 Lifecycle phase such as startup, preflight, running_session,
-waiting_for_network, queue_empty_wait, git_sync, complete, or failed.
+running_sweep, queue_refilled, session_complete, cooldown, git_sync,
+git_sync_skipped, queue_empty_wait, queue_empty, blocked_wait,
+all_tasks_blocked, waiting_for_network, network_restored,
+deadline_expired, audit_focus_blocked, complete, or failed.
 .TP
 .B updated_at
 Last write timestamp in the local %Y\-%m\-%dT%H:%M:%S%z format.
@@ -358,10 +362,45 @@ Lifecycle example:
 .fi
 .PP
 The file starts at startup/preflight, moves through active phases such as
-running_sweep or running_session, then transitions through cooldown, git_sync,
-queue_empty_wait, blocked_wait, or waiting_for_network as needed. A successful
-shutdown writes one final complete state; startup or runtime errors finish as
-failed.
+running_sweep or running_session, then transitions through queue_refilled,
+session_complete, cooldown, git_sync, git_sync_skipped, queue_empty_wait,
+queue_empty, blocked_wait, all_tasks_blocked, waiting_for_network,
+network_restored, deadline_expired, or audit_focus_blocked as needed. A
+successful shutdown writes one final complete state; startup or runtime errors
+finish as failed.
+.PP
+Supervisors should treat
+.BR startup ,
+.BR preflight ,
+.BR running_session ,
+.BR running_sweep ,
+.BR queue_refilled ,
+.BR session_complete ,
+.BR cooldown ,
+.BR git_sync ,
+.BR git_sync_skipped ,
+and
+.BR network_restored
+as healthy progress states.
+.BR queue_empty_wait
+and
+.BR blocked_wait
+mean the process is intentionally idle while it waits for queue changes.
+.BR queue_empty ,
+.BR all_tasks_blocked ,
+.BR deadline_expired ,
+and
+.BR audit_focus_blocked
+are short-lived explanation states that usually roll into
+.BR complete
+after taskgrind decides to stop.
+.BR waiting_for_network
+means degraded-but-recoverable operation with the deadline held open.
+Only
+.BR complete
+and
+.BR failed
+are terminal states for the current process.
 .SH EXAMPLES
 .nf
 taskgrind                           # 10h grind, current dir

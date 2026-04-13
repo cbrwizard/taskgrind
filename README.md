@@ -221,7 +221,7 @@ TG_STATUS_FILE=/tmp/taskgrind-status.json taskgrind ~/apps/myrepo 8
 cat /tmp/taskgrind-status.json
 ```
 
-The status file updates atomically on startup, before and after each session, during empty-queue sweeps and wait windows, during network waits, and on final completion or failure. It includes the repo, process ID, slot, backend, skill, model, current session, remaining minutes, current phase, and the most recent session result.
+The status file updates atomically on startup, before and after each session, during empty-queue sweeps and wait windows, during network waits, around git-sync decisions, and on final completion or failure. It includes the repo, process ID, slot, backend, skill, model, current session, remaining minutes, current phase, and the most recent session result.
 
 Supervisor example:
 
@@ -243,7 +243,7 @@ current_phase=$(printf '%s\n' "$phase" | sed -n '1p')
 last_result=$(printf '%s\n' "$phase" | sed -n '2p')
 
 case "$current_phase" in
-  running_session|running_sweep|preflight|cooldown|git_sync|queue_refilled|session_complete)
+  startup|preflight|running_session|running_sweep|session_complete|cooldown|git_sync|git_sync_skipped|queue_refilled|network_restored)
     echo "healthy: let the grind keep running"
     ;;
   queue_empty_wait|blocked_wait)
@@ -284,7 +284,7 @@ Status payload fields:
 | `model` | string | Resolved model name currently in use |
 | `session` | number | Session counter for the current grind run |
 | `remaining_minutes` | number | Whole minutes left until the current deadline, floored at `0` |
-| `current_phase` | string | Current lifecycle phase such as `startup`, `preflight`, `running_session`, `cooldown`, `waiting_for_network`, `queue_empty_wait`, `git_sync`, `complete`, or `failed` |
+| `current_phase` | string | Current lifecycle phase such as `startup`, `preflight`, `running_session`, `running_sweep`, `queue_refilled`, `session_complete`, `cooldown`, `git_sync`, `git_sync_skipped`, `queue_empty_wait`, `queue_empty`, `blocked_wait`, `all_tasks_blocked`, `waiting_for_network`, `network_restored`, `deadline_expired`, `audit_focus_blocked`, `complete`, or `failed` |
 | `updated_at` | string | Last write time in local ISO-like timestamp format (`%Y-%m-%dT%H:%M:%S%z`) |
 | `last_session.number` | number | Most recently finished session number, or `0` before any session completes |
 | `last_session.result` | string | Result label for the most recent session, such as `completed`, `timeout`, `network_wait`, or `none` before the first session |
@@ -387,7 +387,22 @@ Example lifecycle snapshots:
 }
 ```
 
-In practice, `current_phase` moves from startup and preflight into active work (`running_sweep` or `running_session`), then through transitional phases such as `queue_refilled`, `session_complete`, `cooldown`, `git_sync`, `queue_empty_wait`, or `blocked_wait`. Temporary interruptions show up as `waiting_for_network` and then `network_restored`. Sweep-only runs still record the sweep as the latest completed session before normal shutdown rewrites the file one last time as `complete`; argument or runtime failures finish as `failed`.
+In practice, `current_phase` moves from startup and preflight into active work (`running_sweep` or `running_session`), then through transitional phases such as `queue_refilled`, `session_complete`, `cooldown`, `git_sync`, `git_sync_skipped`, `queue_empty_wait`, or `blocked_wait`. Temporary interruptions show up as `waiting_for_network` and then `network_restored`. Sweep-only runs still record the sweep as the latest completed session before normal shutdown rewrites the file one last time as `complete`; argument or runtime failures finish as `failed`.
+
+Watchdog mapping for the less obvious phases:
+
+- `startup` / `preflight`: process is initializing, validating inputs, and claiming a slot
+- `running_session` / `running_sweep`: active work is in progress
+- `queue_refilled`: an empty-queue wait saw new work; let the process continue into the next session
+- `session_complete`: a session just ended and taskgrind is about to decide between cooldown, waits, or shutdown
+- `cooldown`: healthy pause between sessions
+- `git_sync`: slot `0` is running the between-session fetch/rebase cycle
+- `git_sync_skipped`: a higher slot intentionally skipped git sync; this is healthy for multi-instance runs
+- `queue_empty_wait` / `blocked_wait`: intentionally idle; wait for queue changes instead of restarting
+- `queue_empty`, `all_tasks_blocked`, `deadline_expired`, and `audit_focus_blocked`: short-lived decision phases that explain why taskgrind is about to exit or hand off into another terminal state
+- `waiting_for_network`: degraded but recoverable; taskgrind is extending the deadline while connectivity is down
+- `network_restored`: connectivity recovered and the process is about to resume normal work
+- `complete` / `failed`: terminal states for the current process
 
 ### Live prompt injection
 
