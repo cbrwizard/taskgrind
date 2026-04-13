@@ -15,7 +15,7 @@ process and lose uncommitted work.
 
 Autonomous multi-session grind — runs sequential AI coding sessions until a deadline. Each session starts with full context. State lives in [`TASKS.md`](https://github.com/tasksmd/tasks.md) + git, so sessions pick up seamlessly. Sessions still need to exit before the model context fills up; a context-exhausted crash can drop any uncommitted work from that session.
 
-Taskgrind works with any AI coding agent that accepts a prompt (Devin, Claude Code, Cursor, etc.) and any repo that uses the [tasks.md spec](https://tasks.md) for task management.
+Taskgrind ships built-in backends for Devin, Claude Code, and Codex, and it works with any repo that uses the [tasks.md spec](https://tasks.md) for task management.
 
 For local tests and repo audit helpers, keep `DVB_GRIND_CMD` to a single executable path. If you need a compound shell command, wrap it in a helper script first so preflight and session launch can validate it correctly.
 
