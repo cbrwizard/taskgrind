@@ -254,6 +254,12 @@ When those first two grinds are already running, the preflight header reports
 between\-session fetch/rebase sync. Higher slots should prefer non\-overlapping
 tasks such as audits, docs, or queue maintenance, and rebase immediately before
 committing to absorb slot\-0 changes.
+For a durable discovery lane, back the higher slot with a standardized
+\fBstanding\-loop\fR task in
+\fITASKS.md\fR instead of a sacrificial one-off audit item. The recommended
+shape is a task such as \fBdiscovery\-standing\-loop\fR tagged with
+\fBstanding\-loop, audit, queue\fR so the lane can keep replenishing normal
+removable work while its own definition stays in the queue for the next pass.
 Use
 .B taskgrind \-\-preflight
 to see how many slots are currently active before starting another grind.

@@ -197,6 +197,14 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [ "$status" -eq 0 ]
 }
 
+@test "man page documents the standardized discovery standing-loop lane" {
+  run grep -nF 'standing\-loop' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'discovery\-standing\-loop' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  [ "$status" -eq 0 ]
+}
+
 @test "README documents the supported Linux bats install path" {
   run grep -nF 'sudo apt-get install -y npm shellcheck' "$BATS_TEST_DIRNAME/../README.md"
   [ "$status" -eq 0 ]
