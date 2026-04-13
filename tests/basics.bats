@@ -312,6 +312,17 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   [ "$status" -eq 0 ]
 }
 
+@test "AGENTS repo layout names the focused preflight and installer-output suites" {
+  run grep -nF 'tests/preflight.bats' "$BATS_TEST_DIRNAME/../AGENTS.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'tests/installer-output.bats' "$BATS_TEST_DIRNAME/../AGENTS.md"
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'tests/test_helper.bash' "$BATS_TEST_DIRNAME/../AGENTS.md"
+  [ "$status" -eq 0 ]
+}
+
 @test "developer docs mention make test-force for uncached reruns" {
   run grep -nF 'make test-force' "$BATS_TEST_DIRNAME/../README.md"
   [ "$status" -eq 0 ]
@@ -374,6 +385,30 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
     in_options && /^\.BR \\-\\-resume/ { found=1 }
     END { exit !found }
   ' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  [ "$status" -eq 0 ]
+}
+
+@test "README resume troubleshooting warns when original overrides must be reused" {
+  run python3 - "$BATS_TEST_DIRNAME/../README.md" <<'PY'
+import pathlib
+import sys
+
+text = pathlib.Path(sys.argv[1]).read_text()
+text = " ".join(text.split())
+needle = "Plain `taskgrind --resume ~/apps/myrepo` is enough only when the interrupted run used the same startup defaults you are using now."
+raise SystemExit(0 if needle in text else 1)
+PY
+  [ "$status" -eq 0 ]
+
+  run python3 - "$BATS_TEST_DIRNAME/../README.md" <<'PY'
+import pathlib
+import sys
+
+text = pathlib.Path(sys.argv[1]).read_text()
+text = " ".join(text.split())
+needle = "If the interrupted run started with explicit `--backend`, `--model`, `--skill`, or baseline `--prompt` / `TG_PROMPT` overrides, repeat those same choices on the resume command."
+raise SystemExit(0 if needle in text else 1)
+PY
   [ "$status" -eq 0 ]
 }
 

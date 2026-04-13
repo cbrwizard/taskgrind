@@ -15,10 +15,4 @@
   **Details**: README and operator guidance currently suggest `taskgrind --resume <repo>` as the generic recovery command after crashes, network waits, or shutdown git failures. That misses the strict resume contract: interrupted runs that started with explicit backend/model/skill/prompt overrides must reuse the same baseline choices. Tighten the troubleshooting guidance and examples so operators do not hit avoidable resume rejections.
   **Files**: `README.md`, `docs/user-stories.md`, `docs/resume-state.md`, `tests/basics.bats`
   **Acceptance**: The resume docs explicitly say when a plain `--resume <repo>` is enough versus when the original overrides must be repeated, and tests pin the updated README guidance.
-- [ ] Refresh AGENTS.md repo layout for the focused docs bats suites and helper scripts (@instance-1)
-  **ID**: refresh-agents-repo-layout
-  **Tags**: docs, agents, audit
-  **Details**: The repo guide still summarizes the test tree generically even though the focused docs coverage now lives in concrete suites such as `tests/preflight.bats` and `tests/installer-output.bats`. Update the layout and local test notes so agents can find the right files quickly during docs and preflight work.
-  **Files**: `AGENTS.md`, `tests/basics.bats`
-  **Acceptance**: `AGENTS.md` names the focused preflight and installer-output bats suites plus the helper scripts they rely on, and a docs test fails if those references disappear again.
 ## P3

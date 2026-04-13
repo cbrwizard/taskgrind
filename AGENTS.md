@@ -11,8 +11,10 @@ taskgrind/
 ├── bin/taskgrind           Main script (runs AI sessions in a loop)
 ├── lib/constants.sh        Shared constants (model, backend path, caffeinate flags)
 ├── lib/fullpower.sh        Priority boosting (taskpolicy for macOS)
-├── tests/*.bats            Focused bats suites by subsystem (session, git-sync, logging, network, ...)
-├── tests/test_helper.bash  Shared test helpers
+├── tests/*.bats            Focused bats suites by subsystem (basics, preflight, session, git-sync, logging, network, ...)
+├── tests/preflight.bats    Preflight coverage for backend, repo, slot, and startup validation
+├── tests/installer-output.bats  Install-script output coverage for local and PATH guidance
+├── tests/test_helper.bash  Shared test helpers and fake backend/session fixtures
 ├── tests/verify-bash32-compat.sh  Bash 3.2 compatibility guard used by the bats suite
 ├── docs/user-stories.md    Core usage patterns
 ├── docs/resume-state.md    Resume-file lifecycle and stale-state notes
@@ -58,6 +60,7 @@ make uninstall  # remove symlink and man page
 ## Local Test Notes
 
 - The suite now lives in many focused `tests/*.bats` files instead of a single monolithic bats file; when you touch one subsystem, prefer `make test TESTS=tests/<file>.bats` before the full `make check` gate.
+- Docs and startup work usually land in `tests/basics.bats`, `tests/preflight.bats`, or `tests/installer-output.bats`; start with the narrowest one before rerunning the whole suite.
 - Avoid hardcoding suite counts in docs. The total bats count changes as focused files land, so agents should treat `tests/*.bats` plus the current `make test` output as the source of truth.
 - `make test` caches passing results per `TESTS` target and `TEST_JOBS` value, while `make test-force` always reruns the selected suite from scratch.
 - `make test` and `make check` auto-cap `TEST_JOBS` at 6 unless you override it explicitly for diagnostics.
