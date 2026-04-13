@@ -100,7 +100,7 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
   git -C "$TEST_REPO" remote add origin "$bare"
   git -C "$TEST_REPO" push -q origin main 2>/dev/null
 
-  export DVB_DEADLINE=$(( $(date +%s) + 10 ))
+  export DVB_DEADLINE=$(( $(date +%s) + 40 ))
   export DVB_SYNC_INTERVAL=3
 
   run "$DVB_GRIND" 1 "$TEST_REPO"
@@ -108,6 +108,27 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 
   grep -q 'git_sync skipped (interval=3, session=1)' "$TEST_LOG"
   grep -q 'git_sync skipped (interval=3, session=2)' "$TEST_LOG"
+  grep -q 'git_sync ok' "$TEST_LOG"
+}
+
+@test "TG_SYNC_INTERVAL takes precedence over DVB_SYNC_INTERVAL during a real run" {
+  init_test_repo "$TEST_REPO"
+  echo "init" > "$TEST_REPO/README.md"
+  git -C "$TEST_REPO" add README.md
+  git -C "$TEST_REPO" commit -q --amend --no-edit
+  local bare="$TEST_DIR/bare.git"
+  git init -q --bare "$bare"
+  git -C "$TEST_REPO" remote add origin "$bare"
+  git -C "$TEST_REPO" push -q origin main 2>/dev/null
+
+  export TG_SYNC_INTERVAL=2
+  export DVB_SYNC_INTERVAL=0
+  export DVB_DEADLINE=$(( $(date +%s) + 20 ))
+
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+
+  grep -q 'git_sync skipped (interval=2, session=1)' "$TEST_LOG"
   grep -q 'git_sync ok' "$TEST_LOG"
 }
 
@@ -762,6 +783,48 @@ EOF
 @test "DVB_GIT_SYNC_TIMEOUT controls git sync timeout" {
   # Structural: the variable is read from env
   grep -q 'DVB_GIT_SYNC_TIMEOUT:-30' "$DVB_GRIND"
+}
+
+@test "TG_GIT_SYNC_TIMEOUT takes precedence over DVB_GIT_SYNC_TIMEOUT during a real sync timeout" {
+  local real_git
+  real_git="$(command -v git)"
+  mkdir -p "$TEST_DIR/bin"
+  cat > "$TEST_DIR/bin/git" <<EOF
+#!/bin/bash
+if [ "\${1:-}" = "-C" ]; then
+  repo_path="\$2"
+  shift 2
+fi
+if [ "\${1:-}" = "fetch" ] && [ "\${2:-}" = "origin" ] && [ "\${3:-}" = "--prune" ]; then
+  sleep 2
+fi
+if [ -n "\${repo_path:-}" ]; then
+  exec "$real_git" -C "\$repo_path" "\$@"
+fi
+exec "$real_git" "\$@"
+EOF
+  chmod +x "$TEST_DIR/bin/git"
+
+  init_test_repo "$TEST_REPO"
+  echo "init" > "$TEST_REPO/README.md"
+  git -C "$TEST_REPO" add README.md
+  git -C "$TEST_REPO" commit -q --amend --no-edit
+  local bare="$TEST_DIR/bare.git"
+  git init -q --bare "$bare"
+  git -C "$TEST_REPO" remote add origin "$bare"
+  git -C "$TEST_REPO" push -q origin main 2>/dev/null
+
+  export PATH="$TEST_DIR/bin:$PATH"
+  export TG_GIT_SYNC_TIMEOUT=1
+  export DVB_GIT_SYNC_TIMEOUT=5
+  export DVB_SYNC_INTERVAL=0
+  export DVB_DEADLINE=$(( $(date +%s) + 20 ))
+
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -ne 0 ]
+
+  grep -q 'git_sync failed:' "$TEST_LOG"
+  ! grep -q 'git_sync ok' "$TEST_LOG"
 }
 
 # ── Git sync timer leak fix ────────────────────────────────────────────
