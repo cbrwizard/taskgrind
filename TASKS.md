@@ -8,12 +8,6 @@
   **Files**: `bin/taskgrind`, `tests/signals.bats`, `tests/git-sync.bats`
   **Acceptance**: Bats tests exercise real final-sync outcomes for duplicate attempts, zero-ahead shutdowns, and rejected pushes, and the resulting log/output expectations are locked in.
 ## P1
-- [ ] Refresh dry-run user-story output to match the current default stall guard (@devin)
-  **ID**: refresh-dry-run-user-story-output
-  **Tags**: docs, audit
-  **Details**: `docs/user-stories.md` still shows `early_exit_on_stall: 1` in the dry-run sample even though taskgrind now defaults that setting to `0` unless the operator opts in. Update the sample so the user story mirrors live output and does not imply that stall exits are enabled by default.
-  **Files**: `docs/user-stories.md`
-  **Acceptance**: The dry-run sample in `docs/user-stories.md` matches current default output for the stall guard, and a fresh `taskgrind --dry-run` check confirms the documented value.
 ## P2
 - [ ] Add canonical `TG_` precedence tests for wait and backoff env vars that only have validation coverage
   **ID**: expand-tg-precedence-coverage
