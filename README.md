@@ -2,6 +2,14 @@
 
 [![check](https://github.com/cbrwizard/taskgrind/actions/workflows/check.yml/badge.svg)](https://github.com/cbrwizard/taskgrind/actions/workflows/check.yml)
 
+## TL;DR
+
+Taskgrind runs repeated AI coding sessions against any repo that keeps its queue
+in `TASKS.md`, stopping when the deadline, queue state, or stall guard says the
+run is done. Use `taskgrind --preflight` to verify the backend and repo before a
+long run, then steer later sessions with repo-local prompt or model overrides
+instead of restarting the whole grind.
+
 Autonomous multi-session grind — runs sequential AI coding sessions until a deadline. Each session starts with full context. State lives in [`TASKS.md`](https://github.com/tasksmd/tasks.md) + git, so sessions pick up seamlessly.
 
 Taskgrind works with any AI coding agent that accepts a prompt (Devin, Claude Code, Cursor, etc.) and any repo that uses the [tasks.md spec](https://tasks.md) for task management.

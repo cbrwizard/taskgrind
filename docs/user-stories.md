@@ -1,5 +1,13 @@
 # User Stories
 
+## TL;DR
+
+These stories show how operators actually run taskgrind: a single overnight
+lane, multiple concurrent lanes on one repo, live prompt and model steering,
+and status-file-based supervision. Read the story closest to your setup first,
+then copy its command pattern instead of reverse-engineering behavior from the
+full README.
+
 Real usage patterns for taskgrind. Each story shows the context, command, what happens, and sample log output.
 
 ## 1. Overnight grind on a repo with tasks

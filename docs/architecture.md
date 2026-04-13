@@ -1,5 +1,13 @@
 # Architecture — Design Decisions
 
+## TL;DR
+
+Taskgrind stays small on purpose: the script handles marathon orchestration
+such as deadlines, sync, retries, and safety guards, while the AI skill handles
+task selection and implementation. The sections below explain the trade-offs
+behind the shell-only architecture so contributors can extend behavior without
+reintroducing the failure modes earlier versions hit.
+
 Why taskgrind works the way it does. One paragraph per decision — not a tutorial, but a "why" doc for contributors.
 
 ## Why self-copy (bash lazy reading)

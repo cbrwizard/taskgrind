@@ -1,5 +1,12 @@
 # Resumable Grind State
 
+## TL;DR
+
+Taskgrind persists a small `key=value` snapshot in the repo so `--resume` can
+continue the same grind instead of starting over after a crash or reboot. The
+resume contract is deliberately strict: if the repo, deadline, or schema does
+not match, taskgrind refuses to resume rather than blending two different runs.
+
 This document describes the resume contract that `bin/taskgrind` implements
 today. The goal is to keep the on-disk format small, human-readable, and easy
 to validate in tests.
