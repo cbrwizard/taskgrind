@@ -155,13 +155,13 @@ while [[ $# -gt 0 ]]; do
     --dry-run) dry_run=1; shift ;;
     --preflight) preflight_only=1; shift ;;
     --resume) resume_run=1; shift ;;
-    --model=*) _cli_model="${1#--model=}"; [[ -z "$_cli_model" ]] && { echo "Error: --model requires a non-empty name" >&2; exit 1; }; shift ;;
+    --model=*) _cli_model="${1#--model=}"; [[ -z "$_cli_model" ]] && { echo "Error: --model requires a non-empty name (example: --model claude-opus-4-7-max). See 'taskgrind --help'." >&2; exit 1; }; shift ;;
     --model)
       if [[ $# -lt 2 ]]; then
-        echo "Error: --model requires a name" >&2; exit 1
+        echo "Error: --model requires a name (example: --model claude-opus-4-7-max). See 'taskgrind --help'." >&2; exit 1
       fi
       _cli_model="$2"
-      [[ -z "$_cli_model" ]] && { echo "Error: --model requires a non-empty name" >&2; exit 1; }
+      [[ -z "$_cli_model" ]] && { echo "Error: --model requires a non-empty name (example: --model claude-opus-4-7-max). See 'taskgrind --help'." >&2; exit 1; }
       shift 2
       ;;
     --skill=*) skill="${1#--skill=}"; [[ -z "$skill" ]] && { echo "Error: --skill requires a non-empty name" >&2; exit 1; }; shift ;;
@@ -214,7 +214,7 @@ max_instances="${DVB_MAX_INSTANCES:-2}"
 
 # Validate numeric env vars
 if ! [[ "$cooldown" =~ ^[0-9]+$ ]]; then
-  echo "Error: TG_COOL must be numeric, got '$cooldown'" >&2; exit 1
+  echo "Error: TG_COOL must be numeric (seconds between sessions, e.g. TG_COOL=5), got '$cooldown'. See 'taskgrind --help'." >&2; exit 1
 fi
 if ! [[ "$max_fast" =~ ^[0-9]+$ ]]; then
   echo "Error: TG_MAX_FAST must be numeric, got '$max_fast'" >&2; exit 1
@@ -282,7 +282,7 @@ fi
 # Validate backend
 case "$backend" in
   devin|claude-code|codex) ;;
-  *) echo "Error: unknown backend '$backend'. Supported: devin, claude-code, codex" >&2; exit 1 ;;
+  *) echo "Error: unknown backend '$backend'. Supported: devin, claude-code, codex (example: --backend devin or TG_BACKEND=claude-code). See 'taskgrind --help'." >&2; exit 1 ;;
 esac
 
 # Warn when codex backend uses default Anthropic model
@@ -301,7 +301,7 @@ fi
 
 # Validate repo exists
 if [[ ! -d "$repo" ]]; then
-  echo "Error: repo path does not exist: $repo" >&2; exit 1
+  echo "Error: repo path does not exist: $repo. Pass a valid directory (example: 'taskgrind ~/apps/myrepo 8'). See 'taskgrind --help'." >&2; exit 1
 fi
 
 repo="$(cd "$repo" && pwd)"
@@ -670,7 +670,7 @@ preflight_check() {
     if [[ -x "$_backend_binary" ]]; then
       preflight_pass "Backend binary ($backend): $_backend_binary"
     else
-      preflight_fail "Backend binary not found ($backend): ${_backend_binary:-not in PATH}"
+      preflight_fail "Backend binary not found ($backend): ${_backend_binary:-not in PATH}. Install the $backend CLI and ensure it is on PATH; see README.md 'Install' section or set TG_DEVIN_PATH to an explicit path."
       backend_available=0
     fi
   fi

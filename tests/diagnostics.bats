@@ -391,6 +391,93 @@ SCRIPT
   done
 }
 
+# ── Error message quality (5+ paths) ──────────────────────────────────
+# Every user-facing error path in this repo should tell the operator
+# (a) what went wrong, (b) what to do next (example or fix action), and
+# (c) where to find more info (doc link or 'taskgrind --help' pointer).
+# These tests codify that spec — adding a new error message that does
+# not meet this bar will silently ship a bad UX unless it's added here.
+
+@test "error quality: --model without value suggests example + help" {
+  # --model as the final arg with no value following → 'requires a name'
+  run "$DVB_GRIND" --model
+  [ "$status" -ne 0 ]
+  # (a) what: says --model requires a name
+  [[ "$output" == *"--model requires a name"* ]]
+  # (b) next step: shows an example model
+  [[ "$output" == *"example:"* ]]
+  [[ "$output" == *"--model claude-opus-4-7-max"* ]]
+  # (c) doc pointer
+  [[ "$output" == *"'taskgrind --help'"* ]]
+}
+
+@test "error quality: --model= empty suggests example + help" {
+  # --model=<empty> also needs the spec's three fields
+  run "$DVB_GRIND" --model= 1 "$TEST_REPO"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"--model requires a non-empty name"* ]]
+  [[ "$output" == *"example:"* ]]
+  [[ "$output" == *"--model claude-opus-4-7-max"* ]]
+  [[ "$output" == *"'taskgrind --help'"* ]]
+}
+
+@test "error quality: TG_COOL=abc names the var, gives an example, links help" {
+  export DVB_COOL=abc
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  # (a) what
+  [[ "$output" == *"TG_COOL must be numeric"* ]]
+  # (a) what exactly was rejected
+  [[ "$output" == *"got 'abc'"* ]]
+  # (b) next step: valid example inline
+  [[ "$output" == *"TG_COOL=5"* ]]
+  # (c) doc pointer
+  [[ "$output" == *"'taskgrind --help'"* ]]
+}
+
+@test "error quality: repo path missing shows usage example + help" {
+  run "$DVB_GRIND" /this/path/absolutely/does/not/exist 1
+  [ "$status" -ne 0 ]
+  # (a) what
+  [[ "$output" == *"repo path does not exist"* ]]
+  # (b) next step: a working invocation
+  [[ "$output" == *"'taskgrind ~/apps/myrepo 8'"* ]]
+  # (c) doc pointer
+  [[ "$output" == *"'taskgrind --help'"* ]]
+}
+
+@test "error quality: unknown backend lists supported values + example" {
+  run "$DVB_GRIND" --dry-run --backend frontier 1 "$TEST_REPO"
+  [ "$status" -ne 0 ]
+  # (a) what
+  [[ "$output" == *"unknown backend 'frontier'"* ]]
+  # (b) next step: full supported list
+  [[ "$output" == *"Supported: devin, claude-code, codex"* ]]
+  # (b) concrete example
+  [[ "$output" == *"example:"* ]]
+  [[ "$output" == *"--backend devin"* || "$output" == *"TG_BACKEND=claude-code"* ]]
+  # (c) doc pointer
+  [[ "$output" == *"'taskgrind --help'"* ]]
+}
+
+@test "error quality: backend-not-found preflight includes install guidance" {
+  unset DVB_GRIND_CMD
+  # Point TG_DEVIN_PATH at something that cannot exist so preflight finds
+  # nothing. This bypasses the operator's real devin install.
+  export TG_DEVIN_PATH="/this/path/does/not/exist/devin"
+  init_test_repo "$TEST_REPO"
+  echo "# Tasks" > "$TEST_REPO/TASKS.md"
+  run "$DVB_GRIND" --preflight "$TEST_REPO"
+  # (a) what
+  [[ "$output" == *"Backend binary not found"* ]]
+  # (b) next step: install + PATH guidance
+  [[ "$output" == *"Install the"* ]]
+  [[ "$output" == *"on PATH"* ]]
+  # (c) doc pointer: README install section or TG_DEVIN_PATH override
+  [[ "$output" == *"README.md"* ]]
+  [[ "$output" == *"TG_DEVIN_PATH"* ]]
+}
+
 @test "numeric directory name treated as repo path not hours" {
   local num_dir="$TEST_DIR/42"
   mkdir -p "$num_dir"
