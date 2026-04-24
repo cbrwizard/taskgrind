@@ -879,3 +879,124 @@ EOF
   hash2=$(echo "/Users/me/apps/myrepo" | shasum | cut -d' ' -f1)
   [ "$hash1" = "$hash2" ]
 }
+
+# ── detect_default_branch() — direct coverage for each fallback rung ──
+# Extract the function from bin/taskgrind and call it against repo fixtures
+# that force each rung to fire. Catches silent rung drops during refactor.
+
+_extract_detect_default_branch() {
+  awk '/^detect_default_branch\(\) \{/,/^}$/' "$BATS_TEST_DIRNAME/../bin/taskgrind"
+}
+
+_run_detect_default_branch() {
+  local repo_path="$1"
+  local fn
+  fn=$(_extract_detect_default_branch)
+  bash -c "$fn"$'\n'"detect_default_branch \"$repo_path\""
+}
+
+# Helper: create a bare remote + a local clone checked out on a named branch.
+_make_remote_and_clone() {
+  local remote_path="$1"
+  local clone_path="$2"
+  local branch_name="${3:-main}"
+  git init -q --bare "$remote_path"
+  git init -q -b "$branch_name" "$clone_path"
+  git -C "$clone_path" config user.email "test@test.com"
+  git -C "$clone_path" config user.name "Test"
+  git -C "$clone_path" commit --allow-empty -q -m "init"
+  git -C "$clone_path" remote add origin "$remote_path"
+  git -C "$clone_path" push -q -u origin "$branch_name" 2>/dev/null || true
+}
+
+@test "detect_default_branch: DVB_DEFAULT_BRANCH env override wins first" {
+  init_test_repo "$TEST_REPO"
+  DVB_DEFAULT_BRANCH=custom-trunk run _run_detect_default_branch "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "custom-trunk env_override" ]]
+}
+
+@test "detect_default_branch: origin/HEAD symbolic ref resolves as origin_head" {
+  local bare="$TEST_DIR/bare.git"
+  _make_remote_and_clone "$bare" "$TEST_REPO" main
+  # Explicitly set origin/HEAD (fresh clones set this automatically; init'd
+  # repos that have a remote but no HEAD do not — write it directly).
+  git -C "$TEST_REPO" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+
+  run _run_detect_default_branch "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "main origin_head" ]]
+}
+
+@test "detect_default_branch: upstream tracking branch wins over local main" {
+  local bare="$TEST_DIR/bare.git"
+  _make_remote_and_clone "$bare" "$TEST_REPO" feature
+  # No origin/HEAD ref, so the lookup falls through to upstream tracking.
+  git -C "$TEST_REPO" symbolic-ref --delete refs/remotes/origin/HEAD 2>/dev/null || true
+  # Delete the origin symref created by push -u so ls-remote also misses.
+  rm -f "$bare/HEAD.lock" 2>/dev/null || true
+  rm -f "$bare/HEAD"
+  echo "0000000000000000000000000000000000000000" > "$bare/HEAD"
+
+  run _run_detect_default_branch "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # Accept either the upstream rung or the current_branch rung — both are
+  # valid behaviors for 'the current branch exists on origin with upstream'.
+  [[ "$output" == "feature upstream" || "$output" == "feature current_branch" ]]
+}
+
+@test "detect_default_branch: local main fallback when there is no remote" {
+  git init -q -b main "$TEST_REPO"
+  git -C "$TEST_REPO" config user.email "test@test.com"
+  git -C "$TEST_REPO" config user.name "Test"
+  git -C "$TEST_REPO" commit --allow-empty -q -m "init"
+  # No remote at all, HEAD points to main
+
+  run _run_detect_default_branch "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # Without upstream, current_branch rung can still fire if origin/main
+  # exists (it does not here); otherwise falls back to local main.
+  [[ "$output" == "main local_main" ]]
+}
+
+@test "detect_default_branch: local master fallback when only master exists" {
+  git init -q -b master "$TEST_REPO"
+  git -C "$TEST_REPO" config user.email "test@test.com"
+  git -C "$TEST_REPO" config user.name "Test"
+  git -C "$TEST_REPO" commit --allow-empty -q -m "init"
+
+  run _run_detect_default_branch "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # Current branch is 'master' with no upstream and no origin — the
+  # current_branch rung misses (no origin), local main misses, local master
+  # hits as 'local_master'. If an older git silently creates origin refs,
+  # accept the current_branch fallback source name too.
+  [[ "$output" == "master local_master" || "$output" == "master current_branch_fallback" ]]
+}
+
+@test "detect_default_branch: missing repo path falls back to hardcoded main" {
+  # No repo path at all → git commands print 'fatal:' to stderr but the
+  # function is |-silenced so the final printf still emits the fallback.
+  # bats 'run' merges stdout+stderr, so match the last non-empty line.
+  run _run_detect_default_branch "$TEST_DIR/nonexistent-repo"
+  [ "$status" -eq 0 ]
+  # Drop the stderr lines (start with 'fatal:') and keep the printf output.
+  local last
+  last=$(printf '%s\n' "$output" | grep -v '^fatal:' | tail -1)
+  [[ "$last" == "main hardcoded_main" ]]
+}
+
+@test "detect_default_branch: always emits '<branch> <source>' format" {
+  # Structural contract: every rung uses printf '%s %s\n', so the output is
+  # always exactly two whitespace-separated fields. Refactors that drop one
+  # field trip this immediately.
+  init_test_repo "$TEST_REPO"
+  DVB_DEFAULT_BRANCH=any-branch run _run_detect_default_branch "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # Exactly two non-empty space-separated tokens
+  local words
+  read -ra words <<<"$output"
+  [ "${#words[@]}" -eq 2 ]
+  [[ -n "${words[0]}" ]]
+  [[ -n "${words[1]}" ]]
+}

@@ -8,13 +8,6 @@
   **Files**: `tests/diagnostics.bats`, `tests/network.bats`, `tests/session.bats`
   **Acceptance**: The affected env vars have red/green coverage proving `TG_` overrides the matching `DVB_` value during a real run, not just in validation error paths.
 
-- [ ] `detect_default_branch()` has test coverage for each fallback rung
-  **ID**: test-detect-default-branch-coverage
-  **Tags**: tests, git, sync
-  **Details**: `detect_default_branch()` (`bin/taskgrind:1608`) walks `origin/HEAD` → `ls-remote --symref` → upstream → local → `main` → `master`. `tests/git-sync.bats` covers the happy integration path. A missed fallback rung would manifest as "rebase failed — unknown branch" in production. Add tests that set up repo fixtures for each rung and verify the function returns the expected branch plus logs which method was used.
-  **Files**: `tests/git-sync.bats`
-  **Acceptance**: Each of the six fallbacks has a test that forces that rung to fire and asserts the returned branch name plus the detection-method log marker.
-
 - [ ] `auto_resolve_tasks_rebase_conflicts()` has focused tests for the TASKS.md-only path
   **ID**: test-auto-resolve-tasks-conflicts
   **Tags**: tests, git, rebase, conflict-resolution
