@@ -208,6 +208,41 @@ SCRIPT
   grep -q 'backoff=4s' "$TEST_LOG"
 }
 
+@test "TG_BACKOFF_BASE takes precedence over DVB_BACKOFF_BASE" {
+  setup_network_sentinel "$TEST_DIR/net-up"
+  export DVB_MIN_SESSION=999
+  # DVB_ says base=20 (would give backoff=60s on consecutive=3). If TG_
+  # wins, base=1 and backoff=3s.
+  export DVB_BACKOFF_BASE=20
+  export TG_BACKOFF_BASE=1
+  export DVB_BACKOFF_MAX=10
+  export DVB_COOL=0
+  export DVB_MAX_ZERO_SHIP=10
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # TG_BACKOFF_BASE=1 → backoff=3s on consecutive=3 (3 * 1, capped at 10)
+  grep -q 'backoff=3s' "$TEST_LOG"
+  ! grep -Eq 'backoff=([2-9][0-9]+|60)s' "$TEST_LOG"
+}
+
+@test "TG_BACKOFF_MAX takes precedence over DVB_BACKOFF_MAX" {
+  setup_network_sentinel "$TEST_DIR/net-up"
+  export DVB_MIN_SESSION=999
+  export DVB_BACKOFF_BASE=1
+  # DVB_ says cap=100 but TG_ says cap=3. With BASE=1, the cap only matters
+  # at consecutive>=4 (where 4*1=4 would exceed 3).
+  export DVB_BACKOFF_MAX=100
+  export TG_BACKOFF_MAX=3
+  export DVB_COOL=0
+  export DVB_MAX_ZERO_SHIP=10
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # At consecutive=4+, backoff should be capped at 3, not ramping to 4+.
+  ! grep -Eq 'backoff=([4-9]|[1-9][0-9]+)s' "$TEST_LOG"
+}
+
 @test "backoff caps at DVB_BACKOFF_MAX" {
   setup_network_sentinel "$TEST_DIR/net-up"
   export DVB_MIN_SESSION=999

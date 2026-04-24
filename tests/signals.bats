@@ -609,6 +609,25 @@ TASKS
   [ "$count" -eq 5 ]
 }
 
+@test "TG_MAX_ZERO_SHIP takes precedence over DVB_MAX_ZERO_SHIP" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Stubborn task
+TASKS
+  export DVB_DEADLINE=$(( $(date +%s) + 30 ))
+  # If DVB_ won, bail would need 20 zero-ship sessions. TG_ should force the
+  # bail to fire at 3, proving the mirror works for this knob.
+  export DVB_MAX_ZERO_SHIP=20
+  export TG_MAX_ZERO_SHIP=3
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'stall_bail consecutive_zero_ship=3' "$TEST_LOG"
+  local count
+  count=$(wc -l < "$DVB_GRIND_INVOKE_LOG" | tr -d ' ')
+  [ "$count" -eq 3 ]
+}
+
 @test "3 consecutive zero-ship sessions adds stall warning to log" {
   cat > "$TEST_REPO/TASKS.md" <<'TASKS'
 # Tasks

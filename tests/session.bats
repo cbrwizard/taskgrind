@@ -823,6 +823,19 @@ SCRIPT
   grep -q 'queue_empty tasks=0 sweep=done — waiting 2s' "$TEST_LOG"
 }
 
+@test "TG_EMPTY_QUEUE_WAIT takes precedence over DVB_EMPTY_QUEUE_WAIT" {
+  printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
+  export DVB_EMPTY_QUEUE_WAIT=10
+  export TG_EMPTY_QUEUE_WAIT=2
+  export DVB_DEADLINE=$(( $(date +%s) + 6 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # TG_ value (2) wins over DVB_ value (10) — deadline (6s) caps below both
+  # anyway in this short test, but the emitted log line must still show the
+  # mirrored TG_ value landed in DVB_EMPTY_QUEUE_WAIT before the cap.
+  grep -q 'queue_empty tasks=0 sweep=done — waiting 2s' "$TEST_LOG"
+}
+
 @test "tasks injected during empty-queue wait resume with a normal session" {
   local refill_devin="$TEST_DIR/refill-devin"
   local status_file="$TEST_DIR/refill-status.json"

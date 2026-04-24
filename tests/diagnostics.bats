@@ -373,6 +373,24 @@ SCRIPT
   [[ "$output" == *"TG_NOTIFY must be 0 or 1"* ]]
 }
 
+# ── TG_ → DVB_ mirror coverage (structural) ──────────────────────────
+# Guarantee the alias list includes every wait/backoff-style knob so a
+# refactor cannot silently drop one. Paired with the behavior tests in
+# session.bats (EMPTY_QUEUE_WAIT), network.bats (BACKOFF_BASE/MAX), and
+# signals.bats (MAX_ZERO_SHIP) that prove TG_ actually overrides at runtime.
+
+@test "structural: TG_ mirror loop covers all wait/backoff knobs" {
+  # Extract the _tg_var loop body from bin/taskgrind. The list spans lines
+  # due to line continuations, so join first and then assert membership.
+  local mirrored
+  mirrored=$(awk '/^for _tg_var in/,/; do$/' "$DVB_GRIND" | tr -d '\\' | tr -s ' \t\n' ' ')
+  for knob in EMPTY_QUEUE_WAIT NET_WAIT NET_MAX_WAIT NET_RETRIES NET_RETRY_DELAY \
+              BACKOFF_BASE BACKOFF_MAX MIN_SESSION MAX_FAST MAX_ZERO_SHIP \
+              SHUTDOWN_GRACE SESSION_GRACE GIT_SYNC_TIMEOUT; do
+    [[ "$mirrored" == *" $knob "* ]]
+  done
+}
+
 @test "numeric directory name treated as repo path not hours" {
   local num_dir="$TEST_DIR/42"
   mkdir -p "$num_dir"
