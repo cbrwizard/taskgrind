@@ -1,13 +1,6 @@
 # Tasks
 
 ## P0
-- [ ] Correct the README blocked-queue feature bullet to describe the wait-and-retry behavior
-  **ID**: doc-blocked-queue-wait-behavior
-  **Tags**: docs, accuracy, operator-facing
-  **Details**: The README Features list says "**Blocked-queue detection** — exits early when all remaining tasks have `**Blocked by**:` metadata" but the implementation actually waits 600 s (10 min, capped at remaining deadline) for an external unblock, extends the deadline by the wait duration so no time budget is lost, re-checks the queue, and only then exits if still blocked. The wait, deadline extension, `blocked_wait` status phase, and re-check are all omitted. Update the feature bullet and add a brief mention in the troubleshooting table so operators know the grind will pause before giving up.
-  **Files**: `README.md`
-  **Acceptance**: The README blocked-queue bullet and troubleshooting table reflect the wait duration, deadline extension, and re-check behavior. The `blocked_wait` phase is mentioned as a healthy-idle state consistent with the status-file docs.
-
 - [ ] Document the 3-attempt per-task retry cap and skip-list behavior so operators can predict when stuck tasks get skipped
   **ID**: doc-per-task-retry-cap
   **Tags**: docs, accuracy, operator-facing, task-attempts
