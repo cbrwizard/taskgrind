@@ -368,3 +368,138 @@ TASKS
 @test "slot-based lock uses per-slot file descriptors" {
   grep -q '_lock_fd=$(( 9 + _slot ))' "$DVB_GRIND"
 }
+
+# ── has_supported_audit_lane_task() — direct unit-style coverage ──────
+# Extract the function from bin/taskgrind via awk and call it in a clean
+# subshell against fixture TASKS.md files. Confirms the discovery-lane gate
+# accepts tasks tagged with standing-loop or any of the
+# audit|log|queue|tasks.md|sweep|refresh keywords, and rejects queues that
+# contain only normal execution-lane work. Without these, narrowing the
+# regex would break `audit_focus_blocked` only via integration paths.
+
+_extract_has_supported_audit_lane_task() {
+  awk '/^has_supported_audit_lane_task\(\) \{/,/^}$/' "$BATS_TEST_DIRNAME/../bin/taskgrind"
+}
+
+_run_has_supported_audit_lane_task() {
+  local tasks_file="$1"
+  local fn
+  fn=$(_extract_has_supported_audit_lane_task)
+  # shellcheck disable=SC2016  # $fn contains the literal function definition
+  bash -c "$fn"$'\n'"has_supported_audit_lane_task \"$tasks_file\""
+}
+
+@test "has_supported_audit_lane_task: missing file returns 1" {
+  run _run_has_supported_audit_lane_task "$TEST_REPO/no-such-file.md"
+  [ "$status" -eq 1 ]
+}
+
+@test "has_supported_audit_lane_task: empty file returns 1" {
+  printf '# Tasks\n' > "$TEST_REPO/TASKS.md"
+  run _run_has_supported_audit_lane_task "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 1 ]
+}
+
+@test "has_supported_audit_lane_task: task with standing-loop description is accepted" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Keep the discovery lane replenishing the queue
+  **ID**: discovery-standing-loop
+  **Tags**: standing-loop, audit, queue
+TASKS
+  run _run_has_supported_audit_lane_task "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "has_supported_audit_lane_task: task with 'audit' keyword is accepted" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Audit the codebase for stale references
+  **ID**: codebase-audit
+TASKS
+  run _run_has_supported_audit_lane_task "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "has_supported_audit_lane_task: task with 'log' keyword is accepted" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Surface unexpected log lines
+  **ID**: surface-logs
+TASKS
+  run _run_has_supported_audit_lane_task "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "has_supported_audit_lane_task: task with 'queue' keyword is accepted" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Refill the queue from upstream issues
+  **ID**: refill-queue
+TASKS
+  run _run_has_supported_audit_lane_task "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "has_supported_audit_lane_task: task with 'tasks.md' keyword is accepted" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Sweep tasks.md for outdated references
+  **ID**: tasks-md-sweep
+TASKS
+  run _run_has_supported_audit_lane_task "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "has_supported_audit_lane_task: task with 'sweep' keyword is accepted" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Run the full sweep across modules
+  **ID**: full-sweep
+TASKS
+  run _run_has_supported_audit_lane_task "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "has_supported_audit_lane_task: task with 'refresh' keyword is accepted" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Refresh the docs cache after each release
+  **ID**: refresh-docs
+TASKS
+  run _run_has_supported_audit_lane_task "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "has_supported_audit_lane_task: tasks with no audit keywords return 1" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Ship the feature
+  **ID**: ship-feature
+- [ ] Write the readme
+  **ID**: write-readme
+TASKS
+  run _run_has_supported_audit_lane_task "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 1 ]
+}
+
+@test "has_supported_audit_lane_task: completed [x] task with audit keywords does not satisfy the gate" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [x] Already audited the queue
+  **ID**: already-audited
+- [ ] Ship the feature
+  **ID**: ship-feature
+TASKS
+  run _run_has_supported_audit_lane_task "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 1 ]
+}

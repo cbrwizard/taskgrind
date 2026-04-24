@@ -9,13 +9,6 @@
   **Files**: `tests/logging.bats`, `tests/session.bats`, `tests/test_helper.bash`, `CONTRIBUTING.md`
   **Acceptance**: 10 consecutive `make test-force` runs at the default `TEST_JOBS=6` all pass. The `Known Issues` note in `CONTRIBUTING.md` loses the "flaky tests" bullet or references a new, tighter list that does not include tests 318 and 510.
 
-- [ ] `is_audit_only_focus_request()` and `has_supported_audit_lane_task()` have direct unit-style test coverage
-  **ID**: test-audit-focus-guards-coverage
-  **Tags**: tests, audit-focus, discovery-lane
-  **Details**: `is_audit_only_focus_request()` (`bin/taskgrind:1582`) classifies a skill + focus prompt combo as audit-only, and `has_supported_audit_lane_task()` (`bin/taskgrind:1591`) decides whether a repo's `TASKS.md` contains a discovery-lane standing-loop task. Together they gate the `audit_focus_blocked` terminal path and the "audit-only skills refuse to run without a supported discovery-lane task" flow. Today they are exercised indirectly through `tests/session.bats:484-486` and `tests/multi-instance.bats` (standing-loop discovery), so a regression such as accidentally narrowing the regex in `is_audit_only_focus_request` or dropping the `audit|log|queue|tasks\.md|sweep|refresh` alternation in `has_supported_audit_lane_task` would only surface via failure of the higher-level integration case. Add direct table-driven tests mirroring the `all_tasks_blocked` / `detect_default_branch` coverage pattern: sourcing the function via `awk` extract, feeding fixtures, and checking return code and logged markers.
-  **Files**: `tests/session.bats`, `tests/multi-instance.bats`
-  **Acceptance**: (1) `is_audit_only_focus_request` has tests for skill names `standing-audit-gap-loop`, `project-audit`, `full-sweep`, mixed-case `AUDIT`, prompts containing `analyze logs`, `refresh tasks`, `queue refresh`, `sweep`, plus negatives (`next-task`, empty prompt). (2) `has_supported_audit_lane_task` has tests for: missing file, empty file, task with `standing-loop` in description, task with the `audit|log|queue|tasks.md|sweep|refresh` keywords, and a task that mentions neither. (3) All tests extract the function from `bin/taskgrind` via `awk` (consistent with the existing `classify_rebase_conflicts` pattern).
-
 ## P2
 
 - [ ] `extract_task_signatures()` and `extract_task_checkbox_changes()` have direct unit-style test coverage

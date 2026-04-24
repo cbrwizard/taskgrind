@@ -1897,3 +1897,73 @@ SCRIPT
     ! grep -qE -- '-[0-9]+ minutes remaining' "$DVB_GRIND_INVOKE_LOG.full"
   fi
 }
+
+# ── is_audit_only_focus_request() — direct unit-style coverage ────────
+# Extract the function from bin/taskgrind via awk and call it in a clean
+# subshell against fixture (skill_name, focus_prompt) pairs. Catches regex
+# regressions (narrowed alternation, missing case-insensitive lowercase fold,
+# accidental loss of the `(^|space)sweep(end|space)` word boundary) that the
+# higher-level audit-focus integration tests would only detect indirectly.
+
+_extract_is_audit_only_focus_request() {
+  awk '/^is_audit_only_focus_request\(\) \{/,/^}$/' "$BATS_TEST_DIRNAME/../bin/taskgrind"
+}
+
+_run_is_audit_only_focus_request() {
+  local skill="$1"
+  local focus="$2"
+  local fn
+  fn=$(_extract_is_audit_only_focus_request)
+  # shellcheck disable=SC2016  # $fn contains the literal function definition
+  bash -c "$fn"$'\n'"is_audit_only_focus_request \"$skill\" \"$focus\""
+}
+
+@test "is_audit_only_focus_request: standing-audit-gap-loop skill is audit-only" {
+  run _run_is_audit_only_focus_request "standing-audit-gap-loop" ""
+  [ "$status" -eq 0 ]
+}
+
+@test "is_audit_only_focus_request: project-audit skill is audit-only" {
+  run _run_is_audit_only_focus_request "project-audit" ""
+  [ "$status" -eq 0 ]
+}
+
+@test "is_audit_only_focus_request: full-sweep skill is audit-only" {
+  run _run_is_audit_only_focus_request "full-sweep" ""
+  [ "$status" -eq 0 ]
+}
+
+@test "is_audit_only_focus_request: mixed-case AUDIT in focus prompt is audit-only" {
+  run _run_is_audit_only_focus_request "next-task" "Please AUDIT the docs before bedtime"
+  [ "$status" -eq 0 ]
+}
+
+@test "is_audit_only_focus_request: 'analyze logs' phrase is audit-only" {
+  run _run_is_audit_only_focus_request "next-task" "analyze logs from yesterday"
+  [ "$status" -eq 0 ]
+}
+
+@test "is_audit_only_focus_request: 'refresh tasks' phrase is audit-only" {
+  run _run_is_audit_only_focus_request "next-task" "please refresh tasks before stopping"
+  [ "$status" -eq 0 ]
+}
+
+@test "is_audit_only_focus_request: 'queue refresh' phrase is audit-only" {
+  run _run_is_audit_only_focus_request "next-task" "do a queue refresh first"
+  [ "$status" -eq 0 ]
+}
+
+@test "is_audit_only_focus_request: 'sweep' word matches with leading space" {
+  run _run_is_audit_only_focus_request "next-task" "run a sweep across the repo"
+  [ "$status" -eq 0 ]
+}
+
+@test "is_audit_only_focus_request: bare next-task skill with empty prompt is not audit-only" {
+  run _run_is_audit_only_focus_request "next-task" ""
+  [ "$status" -ne 0 ]
+}
+
+@test "is_audit_only_focus_request: ship-features focus is not audit-only" {
+  run _run_is_audit_only_focus_request "next-task" "ship features and write tests"
+  [ "$status" -ne 0 ]
+}
