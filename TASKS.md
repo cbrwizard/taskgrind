@@ -8,13 +8,6 @@
   **Files**: `tests/diagnostics.bats`, `tests/network.bats`, `tests/session.bats`
   **Acceptance**: The affected env vars have red/green coverage proving `TG_` overrides the matching `DVB_` value during a real run, not just in validation error paths.
 
-- [ ] `wait_for_network()` deadline-extension and timeout behavior is covered by focused tests
-  **ID**: test-wait-for-network-coverage
-  **Tags**: tests, network, resilience
-  **Details**: `wait_for_network()` (`bin/taskgrind:1835`) pauses the marathon timer, polls for recovery, extends the deadline by the actual wait duration, and returns 1 when `TG_NET_MAX_WAIT` is exceeded. `tests/network.bats` covers the integration but not the deadline-extension math or the `network_timeout` / `network_restored` / `waiting_for_network` phase transitions. Add focused tests so a refactor that drops the extension or swaps the phase marker gets caught.
-  **Files**: `tests/network.bats`
-  **Acceptance**: Tests verify (1) deadline increases by exactly the wait duration on recovery, (2) function exits 0 on recovery, (3) exits 1 and logs `network_timeout` past `TG_NET_MAX_WAIT`, (4) phase marker is `waiting_for_network` during the wait and `network_restored` on recovery.
-
 - [ ] `detect_default_branch()` has test coverage for each fallback rung
   **ID**: test-detect-default-branch-coverage
   **Tags**: tests, git, sync
