@@ -435,3 +435,46 @@ The same live-session rules apply to `.taskgrind-model`: taskgrind re-reads it
 between sessions, ignores files larger than 1 KB, and logs a warning like
 `⚠ .taskgrind-model too large (2048B > 1024B) — skipping` when the override is
 rejected.
+
+## 10. Same task keeps failing — the skip list takes over
+
+A grind has been running for a few hours and you notice the same task
+`refactor-auth-adapter` appears in the log session after session without
+shipping. Taskgrind is tracking per-task attempts and will cut the task from
+the prompt once it hits 3 unproductive sessions so the remaining queue can
+keep moving.
+
+Sample log showing the transition:
+```
+[pid=38291] [11:00] session=4 remaining=420m tasks=9 model=claude-opus-4-7-max
+[pid=38291] [11:45] session=4 ended exit=0 duration=2700s tasks_after=9 shipped=0
+[pid=38291] [11:50] session=5 remaining=375m tasks=9 model=claude-opus-4-7-max
+[pid=38291] [12:35] session=5 ended exit=0 duration=2700s tasks_after=9 shipped=0
+[pid=38291] [12:40] session=6 remaining=330m tasks=9 model=claude-opus-4-7-max
+[pid=38291] [13:25] session=6 ended exit=0 duration=2700s tasks_after=9 shipped=0
+[pid=38291] [13:25] task_skip_threshold ids=refactor-auth-adapter
+[pid=38291] [13:30] session=7 remaining=285m tasks=9 model=claude-opus-4-7-max
+```
+
+Session 7's prompt (shown by `taskgrind --dry-run` style expansion) now
+includes:
+```
+Run the next-task skill. Session 7, 285 minutes remaining, timeout 3600s.
+COMPLETION PROTOCOL: …
+AUTONOMY: …
+Previous session: session_exit=0 shipped=0 tasks_before=9 tasks_after=9.
+SKIP these stuck tasks (attempted 3+ times): refactor-auth-adapter. Work on
+other tasks instead. Commit before timeout. Do not exhaust context.
+```
+
+What happens:
+- Sessions 4–6 each incremented the counter for `refactor-auth-adapter` by 1 because the task ID stayed in `TASKS.md`
+- Session 6 crossed the 3-attempt threshold, so taskgrind logs `task_skip_threshold ids=refactor-auth-adapter` exactly once that session
+- Every following session prepends the `SKIP these stuck tasks…` line until the task is removed
+- Shipping the task (or deleting the block) clears its counter the next time taskgrind prunes the attempts file — the skip list does not carry across grinds or survive removal
+- The 3-attempt threshold is a built-in constant today, not an env var, so operators cannot raise the cap to paper over a runaway task
+
+Recovery options when you see this marker:
+- Split the task into 2–3 sub-tasks with different IDs so each starts with a fresh counter
+- Mark the task `**Blocked by**:` if it is genuinely waiting on an external event so the grind uses `blocked_wait` instead of retrying on top of the skip list
+- Remove the task block if the attempt was based on stale requirements — the next session will see the queue shrink and the counter disappears with it

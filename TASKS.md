@@ -1,13 +1,5 @@
 # Tasks
 
-## P0
-- [ ] Document the 3-attempt per-task retry cap and skip-list behavior so operators can predict when stuck tasks get skipped
-  **ID**: doc-per-task-retry-cap
-  **Tags**: docs, accuracy, operator-facing, task-attempts
-  **Details**: taskgrind tracks per-task attempt counts via task ID and, after 3 unsuccessful attempts (no ship), prepends a "SKIP these stuck tasks" list to the next session's prompt (`bin/taskgrind` around line 2200–2206). Shipping a task resets its counter. The architecture doc mentions the ID-based tracking but neither README nor man page explains the 3-attempt cap, the skip list, or the `task_attempt_cap_reached` log marker. An operator seeing the same task fail repeatedly cannot predict when taskgrind will start skipping it or understand the unfamiliar prompt injection. Add this to the Features list, the relevant env var description (there is no dedicated env var today — document whether the 3 is configurable or a constant), and a user story showing the skip-list appearing in a session prompt.
-  **Files**: `README.md`, `man/taskgrind.1`, `docs/architecture.md`, `docs/user-stories.md`
-  **Acceptance**: README + man page explain the 3-attempt cap, the skip-list injection, the counter-reset on ship, and the `task_attempt_cap_reached` log marker. If the cap is configurable via an env var, that var is documented alongside other `TG_` knobs; if it is a constant, the docs say so explicitly.
-
 ## P1
 
 - [ ] Fix stale `--model` help-output assertion so `tests/features.bats:265` passes

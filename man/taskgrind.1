@@ -259,6 +259,33 @@ overrides the startup model chosen by \-\-model or TG_MODEL for later sessions.
 This lets operators start with a stronger model, then switch to a faster one as
 the remaining work gets simpler. Delete the file to fall back to the startup
 model. If the file exceeds 1KB, taskgrind logs a warning and skips it.
+.SS PER-TASK RETRY CAP
+Taskgrind tracks per-task attempt counts by
+.B **ID**:
+value from
+.IR TASKS.md .
+After every session, each task ID still present in the queue has its counter
+incremented by one. When a task is removed from
+.I TASKS.md
+(the way shipping a task is recorded), its counter is cleared at the next
+prune cycle.
+.PP
+Once a task crosses 3 attempts, taskgrind logs
+.B task_skip_threshold ids=<id>
+once and prepends
+.RS
+.nf
+SKIP these stuck tasks (attempted 3+ times): <id>. Work on other tasks instead.
+.fi
+.RE
+to every subsequent session prompt until the task ships or is removed. The
+3-attempt threshold is a built-in constant today (not an environment
+variable). If the skip list keeps firing on the same task, split it into
+smaller IDs or mark it
+.B **Blocked by**:
+so the grind uses the
+.B blocked_wait
+path instead.
 .PP
 By default, taskgrind allows two concurrent grinds on the same repo. Set
 .B TG_MAX_INSTANCES
@@ -532,6 +559,19 @@ or
 .BR shipped_inferred .
 If the queue is changing under another worker, the session may still have
 shipped useful work. Otherwise split or unblock the task before resuming.
+.TP
+.B Same task failing repeatedly
+Look for
+.B task_skip_threshold ids=<id>
+in the log and a
+.B SKIP these stuck tasks (attempted 3+ times)
+line in the next session prompt. Taskgrind auto-skips tasks after 3
+unproductive attempts; shipping or removing the task clears its counter. If a
+task keeps hitting the cap, split it into smaller IDs or mark it
+.B **Blocked by**:
+so the grind waits in
+.B blocked_wait
+instead of chewing attempts.
 .TP
 .B Network wait
 Inspect
