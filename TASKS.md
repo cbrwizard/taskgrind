@@ -2,13 +2,6 @@
 
 ## P1
 
-- [ ] Investigate `--preflight runs health checks and exits 0 on healthy repo` test failure
-  **ID**: fix-preflight-healthy-repo-test
-  **Tags**: tests, bug, preflight
-  **Details**: `@test "--preflight runs health checks and exits 0 on healthy repo"` (tests/preflight.bats:43) fails on main with `[ "$status" -eq 0 ]` — the preflight run exits non-zero against a repo that should be healthy (git-init'd with `TASKS.md`, `DVB_GRIND_CMD` unset). This fails before any of my current doc work was touched, which means preflight now rejects something on a clean repo. Reproduce with `bats tests/preflight.bats` and capture the stderr from `--preflight`; likely one of the 8 preflight checks (backend binary, network, task queue, disk, slot state) is stricter than the fixture provides. Decide whether to fix the fixture (add missing prerequisites) or relax the check.
-  **Files**: `tests/preflight.bats`, possibly `bin/taskgrind`
-  **Acceptance**: `bats tests/preflight.bats` passes the "runs health checks and exits 0 on healthy repo" test. The root cause is noted in the commit so the next failure can be triaged faster.
-
 - [ ] Investigate `preflight validates models through claude-code backend resolution` test failure
   **ID**: fix-preflight-claude-code-model-test
   **Tags**: tests, bug, preflight, claude-code

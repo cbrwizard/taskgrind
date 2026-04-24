@@ -42,7 +42,13 @@ SCRIPT
 
 @test "--preflight runs health checks and exits 0 on healthy repo" {
   _preflight_git_init
+  # Drop the fake DVB_GRIND_CMD and install a fake 'devin' on PATH so the
+  # real binary-resolution + model-validation paths run, but against a
+  # deterministic fixture instead of the operator's installed devin CLI
+  # (which fails model validation under HOME=$TEST_HOME because the
+  # versioned install cannot be located).
   unset DVB_GRIND_CMD
+  _install_fake_backend_binary "devin"
   # Add TASKS.md
   echo "# Tasks" > "$TEST_REPO/TASKS.md"
   run "$DVB_GRIND" --preflight "$TEST_REPO"
