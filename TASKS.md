@@ -8,13 +8,6 @@
   **Files**: `tests/diagnostics.bats`, `tests/network.bats`, `tests/session.bats`
   **Acceptance**: The affected env vars have red/green coverage proving `TG_` overrides the matching `DVB_` value during a real run, not just in validation error paths.
 
-- [ ] `all_tasks_blocked()` has direct unit-style test coverage across TASKS.md edge cases
-  **ID**: test-all-tasks-blocked-coverage
-  **Tags**: tests, blocking, queue-state
-  **Details**: `all_tasks_blocked()` (`bin/taskgrind:1804`) decides whether every task has a `**Blocked by**:` and drives the blocked-wait path. Today it is only exercised indirectly through `session.bats` asserting log output. Direct coverage would catch regressions like a malformed `**Blocked by**:` being counted as a block or an unblocked task being missed. Add tests that call the function against fixture TASKS.md files: empty queue, single blocked task, mixed blocked/unblocked, malformed metadata, `**Blocked**:` (reason-only) vs. `**Blocked by**:` (dependency) — and verify return code plus counter output.
-  **Files**: `tests/session.bats`, `tests/features.bats`
-  **Acceptance**: New tests exercise six scenarios (empty, all-blocked, single-blocked, mixed, malformed, reason-vs-dependency) with clear expected return codes. `make check` passes.
-
 - [ ] `wait_for_network()` deadline-extension and timeout behavior is covered by focused tests
   **ID**: test-wait-for-network-coverage
   **Tags**: tests, network, resilience

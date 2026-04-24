@@ -1077,6 +1077,117 @@ TASKS
   [ -f "$DVB_GRIND_INVOKE_LOG" ]
 }
 
+# ── all_tasks_blocked() — direct unit-style coverage ──────────────────
+# Extract the function from bin/taskgrind and call it in a clean subshell
+# against fixture TASKS.md files. Catches regressions that integration tests
+# miss (malformed metadata classified as a block, the **Blocked**: reason-only
+# variant being confused with **Blocked by**:, etc.).
+
+_extract_all_tasks_blocked() {
+  awk '/^all_tasks_blocked\(\) \{/,/^}$/' "$BATS_TEST_DIRNAME/../bin/taskgrind"
+}
+
+_run_all_tasks_blocked() {
+  local tasks_file="$1"
+  local fn
+  fn=$(_extract_all_tasks_blocked)
+  # shellcheck disable=SC2016  # $fn contains the literal function definition
+  bash -c "$fn"$'\n'"all_tasks_blocked \"$tasks_file\""
+}
+
+@test "all_tasks_blocked: empty queue returns 1 (not-all-blocked)" {
+  echo "# Tasks" > "$TEST_REPO/TASKS.md"
+  run _run_all_tasks_blocked "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 1 ]
+}
+
+@test "all_tasks_blocked: single blocked task returns 0 (all-blocked)" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Waiting for OIDC
+  **ID**: oidc
+  **Blocked by**: eiam-team
+TASKS
+  run _run_all_tasks_blocked "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "all_tasks_blocked: single unblocked task returns 1" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Do the work
+  **ID**: the-work
+TASKS
+  run _run_all_tasks_blocked "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 1 ]
+}
+
+@test "all_tasks_blocked: mixed blocked + unblocked returns 1" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P1
+- [ ] Deploy to K8s
+  **ID**: deploy-k8s
+  **Blocked by**: jenkins-setup
+- [ ] Write docs
+  **ID**: write-docs
+TASKS
+  run _run_all_tasks_blocked "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 1 ]
+}
+
+@test "all_tasks_blocked: all-blocked multi-task returns 0" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P1
+- [ ] Deploy to K8s
+  **ID**: deploy-k8s
+  **Blocked by**: jenkins-setup
+- [ ] Configure DNS
+  **ID**: config-dns
+  **Blocked by**: k8s-namespace
+TASKS
+  run _run_all_tasks_blocked "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "all_tasks_blocked: malformed Blocked by (no **) is not counted as a block" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P1
+- [ ] Task with typo in metadata
+  **ID**: typo-task
+  Blocked by: something
+TASKS
+  # A raw 'Blocked by:' without bold markers is not the spec-compliant form
+  # and must NOT be counted as a block. The queue should therefore look
+  # runnable (not-all-blocked).
+  run _run_all_tasks_blocked "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 1 ]
+}
+
+@test "all_tasks_blocked: **Blocked**: (reason-only, not a dependency) is not a block" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P1
+- [ ] Task with a reason note
+  **ID**: reason-task
+  **Blocked**: Waiting for the team to decide direction
+TASKS
+  # The spec treats **Blocked by**: as a hard dependency that pauses the
+  # grind. **Blocked**: (no "by") is operator shorthand for a reason note
+  # and must NOT trigger blocked-wait.
+  run _run_all_tasks_blocked "$TEST_REPO/TASKS.md"
+  [ "$status" -eq 1 ]
+}
+
+@test "all_tasks_blocked: missing TASKS.md returns 1" {
+  run _run_all_tasks_blocked "$TEST_REPO/does-not-exist.md"
+  [ "$status" -eq 1 ]
+}
+
 @test "second session prompt includes previous session context" {
   export DVB_DEADLINE=$(( $(date +%s) + 8 ))
   run "$DVB_GRIND" 1 "$TEST_REPO"
