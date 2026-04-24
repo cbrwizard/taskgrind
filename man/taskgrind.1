@@ -139,7 +139,20 @@ Seconds to wait for current session on exit (default: 120).
 Seconds to wait after session SIGINT before SIGTERM (default: 15).
 .TP
 .B TG_EARLY_EXIT_ON_STALL
-Exit early on low throughput (default: 0, 1 to enable).
+Exit early on low throughput (default: 0, 1 to enable). Taskgrind tracks
+shipped counts in a 5\-session rolling window. Once session >= 5 and fewer
+than 2 tasks have shipped across the window, taskgrind logs
+.BR diminishing_returns
+.RB ( window=5\ shipped=N )
+and prints a low\-throughput warning. When
+.BR TG_EARLY_EXIT_ON_STALL=1 ,
+the grind also exits with an
+.BR early_exit_stall
+marker and sets the status phase to
+.BR failed .
+When the variable is unset or
+.BR 0 ,
+the warning fires but the grind keeps running.
 .SH BACKEND SETUP
 Run
 .B taskgrind \-\-preflight

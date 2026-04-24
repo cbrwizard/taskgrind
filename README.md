@@ -175,6 +175,7 @@ Use `**Blocked by**` only when another task or external dependency truly prevent
 - **Empty-queue sweep** — when `TASKS.md` is empty, launches a sweep session to find work, then waits for external task injection before exiting
 - **Network resilience** — pauses on network loss, extends deadline on recovery
 - **Stall detection** — bails after consecutive zero-ship sessions (configurable via `TG_MAX_ZERO_SHIP`)
+- **Diminishing-returns guard** — tracks shipped counts in a 5-session rolling window; once `session >= 5` and fewer than 2 tasks shipped across the window, logs `diminishing_returns window=5 shipped=N` and prints a low-throughput warning. Advisory by default; set `TG_EARLY_EXIT_ON_STALL=1` to also exit with an `early_exit_stall` log marker and the `failed` status phase.
 - **Per-task retry cap** — skips tasks attempted 3+ times without shipping
 - **Fast-failure backoff** — linear backoff with cap when sessions crash quickly
 - **Ship-rate tracking** — logs cumulative effectiveness in `grind_done` summary, including inferred shipped work when a session removes a completed task but concurrent queue churn keeps the raw task count flat
@@ -217,7 +218,7 @@ Before deploying, ensure:
 | `TG_GIT_SYNC_TIMEOUT` | `30` | Max seconds for between-session git sync |
 | `TG_SYNC_INTERVAL` | `5` | Git sync every N sessions (0=every) |
 | `TG_EMPTY_QUEUE_WAIT` | `600` | Seconds to wait after an empty sweep before giving up |
-| `TG_EARLY_EXIT_ON_STALL` | `0` | Exit on low throughput (1=enabled) |
+| `TG_EARLY_EXIT_ON_STALL` | `0` | Exit on low throughput. `0` keeps the advisory warning when fewer than 2 tasks ship across a 5-session rolling window (logged as `diminishing_returns`); `1` also exits the grind with `early_exit_stall`. |
 | `TG_MAX_INSTANCES` | `2` | Max concurrent instances per repo |
 | `TG_DEVIN_PATH` | auto | Override devin binary path |
 | `TG_LOG` | auto | Override log file path |

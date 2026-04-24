@@ -34,6 +34,38 @@ The counter is intentionally scoped to the live queue snapshot, not to raw histo
 
 The same principle now applies to shipped-work accounting. Raw queue deltas are still useful, but they miss real completions when a session removes a finished task and simultaneously rolls the queue forward, when another agent injects new tasks before the session ends, or when the completed task lives in a non-root `TASKS.md`. Taskgrind therefore treats explicit task-removal evidence as authoritative enough to infer shipped work even if the queue ends at the same size. That keeps stall detection focused on genuinely unproductive sessions instead of punishing healthy queue churn.
 
+## Why diminishing-returns uses a 5-session rolling window
+
+`TG_MAX_ZERO_SHIP` already covers the runaway case — many consecutive sessions
+with no work landed means something is structurally broken. But there is a
+separate, softer failure mode: a grind that ships just enough to look alive
+while the actual throughput has collapsed. Picture a 50-session overnight run
+where sessions 40 through 50 ship a single task between them. Zero-ship never
+trips (there was one ship in there), yet the grind is clearly not making its
+deadline. The diminishing-returns guard fills that gap.
+
+The guard maintains a rolling array of per-session shipped counts and, once at
+least 5 sessions have run, checks whether the last 5 added up to fewer than 2
+tasks. If the window is under-threshold, taskgrind logs
+`diminishing_returns window=5 shipped=N` and prints a stdout warning so
+operators tailing the log see the event. The `session >= 5` gate is why new
+grinds do not trigger the warning on session 1-4 even if those sessions all
+return zero — there simply is not enough history yet to call that a regression.
+
+`TG_EARLY_EXIT_ON_STALL` controls what happens next. Unset or `0` (the default)
+keeps the warning advisory so operators can investigate without losing the
+remainder of the marathon budget. Set to `1`, the grind also logs
+`early_exit_stall`, flips the status phase to `failed`, and exits the loop. The
+trade-off is that advisory mode wastes time if the queue really is broken, but
+early-exit mode can fire on a genuine lull (e.g., a few hard tasks that each
+need a full session to complete). The window parameters (5 sessions, 2-task
+threshold) are conservative on purpose so operators who enable `early_exit_stall`
+do not get false positives on architectural work that deserves the time.
+
+Rolling counts live only in memory for the current taskgrind process. Resuming
+a grind starts the window over — another reason the guard is deliberately slow
+to fire after restarts.
+
 ## Why productive-timeout sessions get a bigger budget next time
 
 The per-session timeout (`TG_MAX_SESSION`, default 3600 s) exists to stop runaway
