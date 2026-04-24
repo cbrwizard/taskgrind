@@ -269,6 +269,15 @@ fi
 if [[ -n "${DVB_DEADLINE:-}" ]] && ! [[ "${DVB_DEADLINE}" =~ ^[0-9]+$ ]]; then
   echo "Error: DVB_DEADLINE must be a Unix epoch integer, got '${DVB_DEADLINE}'" >&2; exit 1
 fi
+# Validate boolean TG_* env vars — silent coercion ('yes', 'true', 'on') used
+# to mean 'disabled' because only "1" was recognized. Reject anything that is
+# not 0 or 1 up front so operators see the typo at startup.
+if [[ -n "${DVB_EARLY_EXIT_ON_STALL:-}" ]] && ! [[ "${DVB_EARLY_EXIT_ON_STALL}" =~ ^[01]$ ]]; then
+  echo "Error: TG_EARLY_EXIT_ON_STALL must be 0 or 1, got '${DVB_EARLY_EXIT_ON_STALL}'" >&2; exit 1
+fi
+if [[ -n "${DVB_NOTIFY:-}" ]] && ! [[ "${DVB_NOTIFY}" =~ ^[01]$ ]]; then
+  echo "Error: TG_NOTIFY must be 0 or 1, got '${DVB_NOTIFY}'" >&2; exit 1
+fi
 
 # Validate backend
 case "$backend" in

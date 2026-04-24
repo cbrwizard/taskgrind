@@ -36,13 +36,6 @@
   **Files**: `tests/git-sync.bats`
   **Acceptance**: Four targeted tests exercise the auto-resolve path directly against fixture git repos.
 
-- [ ] Boolean `TG_*` env vars reject non-0/1 values with an actionable error message
-  **ID**: test-early-exit-stall-validation
-  **Tags**: tests, validation, error-messages
-  **Details**: Numeric `TG_*` vars like `TG_COOL` and `TG_MAX_SESSION` are validated with clear errors (`bin/taskgrind:216–240`). `TG_EARLY_EXIT_ON_STALL` is used as a boolean (`if [[ ... == "1" ]]`) with no up-front validation, so `TG_EARLY_EXIT_ON_STALL=yes` silently means "disabled". Add validation after line 240 rejecting non-0/1 with a clear error (`must be 0 or 1, got 'X'`), matching the existing pattern. Add tests in `tests/diagnostics.bats`.
-  **Files**: `bin/taskgrind`, `tests/diagnostics.bats`
-  **Acceptance**: (1) `TG_EARLY_EXIT_ON_STALL=yes taskgrind ~/repo` exits 1 with a clear error; (2) `0` and `1` still work; (3) same pattern applied to any other boolean `TG_*` knob that today accepts garbage. Tests pin the behavior.
-
 ## P3
 
 - [ ] Error messages for common failures include actionable next-step guidance

@@ -306,6 +306,73 @@ SCRIPT
   [[ "$output" == *"DVB_DEADLINE must be a Unix epoch integer"* ]]
 }
 
+# ── Boolean env var validation (0/1 only) ─────────────────────────────
+
+@test "DVB_EARLY_EXIT_ON_STALL=yes exits with must be 0 or 1 error" {
+  export DVB_EARLY_EXIT_ON_STALL=yes
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"TG_EARLY_EXIT_ON_STALL must be 0 or 1"* ]]
+  [[ "$output" == *"got 'yes'"* ]]
+}
+
+@test "DVB_EARLY_EXIT_ON_STALL=true exits with must be 0 or 1 error" {
+  export DVB_EARLY_EXIT_ON_STALL=true
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"TG_EARLY_EXIT_ON_STALL must be 0 or 1"* ]]
+}
+
+@test "DVB_EARLY_EXIT_ON_STALL=0 is accepted" {
+  export DVB_EARLY_EXIT_ON_STALL=0
+  export DVB_DEADLINE=$(( $(date +%s) - 1 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+}
+
+@test "DVB_EARLY_EXIT_ON_STALL=1 is accepted" {
+  export DVB_EARLY_EXIT_ON_STALL=1
+  export DVB_DEADLINE=$(( $(date +%s) - 1 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+}
+
+@test "TG_EARLY_EXIT_ON_STALL=yes exits with must be 0 or 1 error" {
+  export TG_EARLY_EXIT_ON_STALL=yes
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"TG_EARLY_EXIT_ON_STALL must be 0 or 1"* ]]
+}
+
+@test "DVB_NOTIFY=yes exits with must be 0 or 1 error" {
+  export DVB_NOTIFY=yes
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"TG_NOTIFY must be 0 or 1"* ]]
+  [[ "$output" == *"got 'yes'"* ]]
+}
+
+@test "DVB_NOTIFY=0 is accepted" {
+  export DVB_NOTIFY=0
+  export DVB_DEADLINE=$(( $(date +%s) - 1 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+}
+
+@test "DVB_NOTIFY=1 is accepted" {
+  export DVB_NOTIFY=1
+  export DVB_DEADLINE=$(( $(date +%s) - 1 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+}
+
+@test "TG_NOTIFY=on exits with must be 0 or 1 error" {
+  export TG_NOTIFY=on
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"TG_NOTIFY must be 0 or 1"* ]]
+}
+
 @test "numeric directory name treated as repo path not hours" {
   local num_dir="$TEST_DIR/42"
   mkdir -p "$num_dir"
