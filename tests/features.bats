@@ -265,7 +265,7 @@ DVB_GRIND="$BATS_TEST_DIRNAME/../bin/taskgrind"
 @test "--help shows --model in usage" {
   run "$DVB_GRIND" --help
   [[ "$output" == *"--model"* ]]
-  [[ "$output" == *'--model "gpt-5-4 XHigh thinking fast"'* ]]
+  [[ "$output" == *'--model "gpt-5.4 XHigh thinking fast"'* ]]
 }
 
 # ── Dynamic prompt file (prompt injection between sessions) ──────────

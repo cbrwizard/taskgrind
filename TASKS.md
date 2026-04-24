@@ -2,13 +2,6 @@
 
 ## P1
 
-- [ ] Fix stale `--model` help-output assertion so `tests/features.bats:265` passes
-  **ID**: fix-help-model-test-drift
-  **Tags**: tests, bug, drift, help-output
-  **Details**: `@test "--help shows --model in usage"` (tests/features.bats:265) asserts `--model "gpt-5-4 XHigh thinking fast"` appears in `taskgrind --help`, but the actual help text prints `--model "gpt-5.4 XHigh thinking fast"` (dotted version, matching the man page). The test string used hyphens but the code was updated to dots. `make test` reports this as a real failure so `make check` cannot pass cleanly. Either fix the test to match the dotted form that the help already prints, or change the help text — the man page uses dots, so the test is the one that drifted. Do NOT regenerate the help; just align the assertion string with the live output.
-  **Files**: `tests/features.bats`
-  **Acceptance**: `bats tests/features.bats` passes the `--help shows --model in usage` test without modifying `bin/taskgrind`. No other test regresses.
-
 - [ ] Fix stale `pre_session_recovery rebase_aborted` structural assertion in `tests/features.bats`
   **ID**: fix-pre-session-recovery-test-drift
   **Tags**: tests, bug, drift, git-recovery
