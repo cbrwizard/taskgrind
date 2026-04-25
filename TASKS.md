@@ -2,13 +2,6 @@
 
 ## P2
 
-- [ ] `format_conflict_paths_for_log()` and `emit_rebase_conflict_logs()` have direct unit-style test coverage
-  **ID**: test-rebase-conflict-log-formatters
-  **Tags**: tests, git, rebase, logging
-  **Details**: `format_conflict_paths_for_log()` (`bin/taskgrind:1723`) and `emit_rebase_conflict_logs()` (`bin/taskgrind:1741`) turn raw `git status --porcelain` conflict output into the structured `rebase_conflict paths=<...> class=<queue_only|repo|unknown>` log line the `grind-log-analyze` skill parses (`.devin/skills/grind-log-analyze/SKILL.md:104-117`). The only current coverage is a structural grep in `tests/features.bats:509`. A silent regression in the log format would break every downstream post-mortem without any bats failure. Add direct tests that source the function, feed conflict path fixtures (single queue path, multiple queue paths, mixed queue + repo file, CRLF line endings, binary-only conflict), and assert the exact log line shape.
-  **Files**: `tests/git-sync.bats`
-  **Acceptance**: New tests cover at least five fixture inputs for `format_conflict_paths_for_log` and three for `emit_rebase_conflict_logs`, asserting both the emitted log substring (`rebase_conflict paths=...`) and its category (`queue_only`, `repo`, `unknown`). The `grind-log-analyze` skill's parser expectations at `.devin/skills/grind-log-analyze/SKILL.md:104-117` keep matching the exercised formatter outputs.
-
 - [ ] `slot_lock_pid()` and `slot_lock_active()` have direct unit-style test coverage
   **ID**: test-slot-lock-helpers
   **Tags**: tests, multi-instance, locking

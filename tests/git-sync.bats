@@ -1160,3 +1160,145 @@ _setup_rebase_conflict() {
   [ "$status" -eq 0 ]
   [[ "$output" == "unknown" ]]
 }
+
+# ── format_conflict_paths_for_log() — direct coverage ─────────────────
+# Turns a newline-separated list of conflict paths into the comma-joined
+# `paths=A,B,C` fragment the grind-log-analyze skill parses. A silent
+# regression that changed the separator or stopped trimming empty lines
+# would break every post-mortem report without any structural test
+# catching it.
+
+_extract_format_conflict_paths() {
+  awk '/^format_conflict_paths_for_log\(\) \{/,/^}$/' "$BATS_TEST_DIRNAME/../bin/taskgrind"
+}
+
+_run_format_conflict_paths() {
+  local paths="$1"
+  local fn
+  fn=$(_extract_format_conflict_paths)
+  run bash -c "$fn"$'\n'"format_conflict_paths_for_log \"\$1\"" _ "$paths"
+}
+
+@test "format_conflict_paths_for_log: single queue path emits the literal path" {
+  _run_format_conflict_paths "TASKS.md"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "TASKS.md" ]]
+}
+
+@test "format_conflict_paths_for_log: multiple queue paths comma-joined in input order" {
+  local multi_line
+  multi_line=$'TASKS.md\npackages/foo/TASKS.md\npackages/bar/TASKS.md'
+  _run_format_conflict_paths "$multi_line"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "TASKS.md,packages/foo/TASKS.md,packages/bar/TASKS.md" ]]
+}
+
+@test "format_conflict_paths_for_log: mixed queue + repo files stay in input order" {
+  local multi_line
+  multi_line=$'TASKS.md\nREADME.md\nsrc/main.c'
+  _run_format_conflict_paths "$multi_line"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "TASKS.md,README.md,src/main.c" ]]
+}
+
+@test "format_conflict_paths_for_log: CRLF line endings trim cleanly" {
+  # Git on Windows can echo paths with trailing \r. The formatter doesn't
+  # explicitly strip them, so the resulting path token will still include
+  # the \r — but the output must still be non-empty and the first path
+  # must be recognizable.
+  local multi_line
+  multi_line=$'TASKS.md\r\nREADME.md\r'
+  _run_format_conflict_paths "$multi_line"
+  [ "$status" -eq 0 ]
+  [ -n "$output" ]
+  # First token starts with TASKS.md regardless of any trailing \r on it.
+  [[ "$output" == TASKS.md* ]]
+}
+
+@test "format_conflict_paths_for_log: empty input emits unknown sentinel" {
+  _run_format_conflict_paths ""
+  [ "$status" -eq 0 ]
+  [[ "$output" == "unknown" ]]
+}
+
+# ── emit_rebase_conflict_logs() — direct coverage ─────────────────────
+# Emits the structured `<scope> rebase_conflicts paths=<...> class=<c>`
+# + `<scope> rebase_aborted paths=<...> class=<c>` pair that the
+# grind-log-analyze skill uses to tell whether a rebase failure was
+# queue-only (auto-recoverable), touching repo code (needs a human), or
+# unknown (no conflict paths at all).
+
+_extract_emit_rebase_conflict_logs_with_deps() {
+  awk '/^extract_rebase_conflict_paths\(\) \{/,/^}$/' "$BATS_TEST_DIRNAME/../bin/taskgrind"
+  printf '\n'
+  awk '/^classify_rebase_conflicts\(\) \{/,/^}$/' "$BATS_TEST_DIRNAME/../bin/taskgrind"
+  printf '\n'
+  awk '/^format_conflict_paths_for_log\(\) \{/,/^}$/' "$BATS_TEST_DIRNAME/../bin/taskgrind"
+  printf '\n'
+  awk '/^emit_rebase_conflict_logs\(\) \{/,/^}$/' "$BATS_TEST_DIRNAME/../bin/taskgrind"
+}
+
+# Stub `log_write` to just echo the message so we can inspect every
+# emission as stdout (tests are run under `run`, which captures stdout).
+_emit_rebase_conflict_stub_script() {
+  cat <<'STUB'
+log_write() {
+  # drop the timestamp prefix, keep the marker body
+  local msg="$*"
+  msg="${msg#* }"
+  printf '%s\n' "$msg"
+}
+STUB
+}
+
+_run_emit_rebase_conflict_logs() {
+  local repo="$1"
+  local scope="$2"
+  local output_file="${3:-}"
+  local fns stub
+  fns=$(_extract_emit_rebase_conflict_logs_with_deps)
+  stub=$(_emit_rebase_conflict_stub_script)
+  run bash -c "$stub"$'\n'"$fns"$'\n'"emit_rebase_conflict_logs \"\$1\" \"\$2\" \"\$3\"" _ "$repo" "$scope" "$output_file"
+}
+
+@test "emit_rebase_conflict_logs: TASKS.md-only conflict emits queue_only class" {
+  local repo="$TEST_DIR/erc-queue-only"
+  _setup_rebase_conflict "$repo" "TASKS.md"
+
+  _run_emit_rebase_conflict_logs "$repo" "pre_session_recovery"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"pre_session_recovery rebase_conflicts class=queue_only"* ]]
+  [[ "$output" == *"pre_session_recovery rebase_aborted class=queue_only"* ]]
+  [[ "$output" == *"paths=TASKS.md"* ]]
+}
+
+@test "emit_rebase_conflict_logs: TASKS.md + README conflict emits repo class" {
+  local repo="$TEST_DIR/erc-repo"
+  _setup_rebase_conflict "$repo" "TASKS.md" "README.md"
+
+  _run_emit_rebase_conflict_logs "$repo" "git_sync"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"git_sync rebase_conflicts class=repo"* ]]
+  [[ "$output" == *"git_sync rebase_aborted class=repo"* ]]
+  # Both paths appear in the comma-joined list; order depends on git's
+  # status output but both must be present.
+  [[ "$output" == *"TASKS.md"* ]]
+  [[ "$output" == *"README.md"* ]]
+}
+
+@test "emit_rebase_conflict_logs: no conflict at all emits bare rebase_aborted" {
+  local repo="$TEST_DIR/erc-no-conflict"
+  # Fresh repo, no rebase in progress, no conflict files whatsoever. The
+  # function should still fire the bare `<scope> rebase_aborted` line so
+  # the grind-log-analyze parser sees the marker.
+  git init -q -b main "$repo"
+  git -C "$repo" config user.email "test@test.com"
+  git -C "$repo" config user.name "Test"
+  git -C "$repo" commit --allow-empty -q -m "empty init"
+
+  _run_emit_rebase_conflict_logs "$repo" "pre_session_recovery"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"pre_session_recovery rebase_aborted"* ]]
+  # No class= prefix when no conflict paths were found.
+  [[ "$output" != *"rebase_aborted class="* ]]
+}
