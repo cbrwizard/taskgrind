@@ -533,7 +533,12 @@ run_backend_probe() {
   probe_elapsed=$(( $(date +%s) - probe_start ))
   probe_output_clean=$(printf '%s\n' "$probe_output" | sed '/^[[:space:]]*$/d')
 
-  if [[ "$probe_status" -eq 0 && "$probe_elapsed" -lt 1 && -z "$probe_output_clean" ]]; then
+  # Stub detection: exit=0 with no output on --version means the binary
+  # is a no-op shim (the previous "… and probe took <1s" heuristic was
+  # removed because it produced false negatives under load — a genuinely
+  # broken stub can still take >=1s to start when the system is busy,
+  # making parallel-suite runs silently accept broken backends).
+  if [[ "$probe_status" -eq 0 && -z "$probe_output_clean" ]]; then
     _backend_probe_summary="backend_probe_failed exit=$probe_status duration=${probe_elapsed}s backend=$backend"
     _backend_probe_error="backend binary may be a stub or broken: '$backend' exited in ${probe_elapsed}s with no output when running --version. reinstall or roll back the backend CLI before starting another grind."
     return 1

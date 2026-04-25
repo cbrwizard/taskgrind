@@ -339,14 +339,23 @@ SCRIPT
   chmod +x "$stub_devin"
   export DVB_GRIND_CMD="$stub_devin"
   export DVB_VALIDATE_BACKEND_STARTUP=1
-  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  # 5s is too tight under TEST_JOBS=6 parallel load: the deadline can fire
+  # before the probe runs, so the script exits with 0
+  # (deadline_expired_before_session_loop) instead of 1
+  # (backend_probe_failed). 30s is plenty — the probe still fails
+  # immediately in the common case so the test stays fast.
+  export DVB_DEADLINE=$(( $(date +%s) + 30 ))
 
   run "$DVB_GRIND" 1 "$TEST_REPO"
 
   [ "$status" -eq 1 ]
   [[ "$output" == *"backend binary may be a stub or broken"* ]]
   [[ "$output" == *"reinstall or roll back"* ]]
-  grep -q 'backend_probe_failed exit=0 duration=0s backend=devin' "$TEST_LOG"
+  # Duration may be 0s, 1s, 2s, ... depending on parallel-test CPU
+  # pressure; the probe detection no longer depends on it (output
+  # emptiness is the authoritative stub signal). Assert everything else
+  # about the log line literally but let the duration float.
+  grep -qE 'backend_probe_failed exit=0 duration=[0-9]+s backend=devin' "$TEST_LOG"
 
   local invoke_count
   invoke_count=$(wc -l < "$DVB_GRIND_INVOKE_LOG" | tr -d ' ')
@@ -369,7 +378,10 @@ SCRIPT
   chmod +x "$versioned_devin"
   export DVB_GRIND_CMD="$versioned_devin"
   export DVB_VALIDATE_BACKEND_STARTUP=1
-  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  # 5s would be too tight under TEST_JOBS=6 — session 1 needs to actually
+  # run to completion here (we assert `session=1 ended`). 30s is plenty;
+  # the fake backend exits immediately so the test stays fast.
+  export DVB_DEADLINE=$(( $(date +%s) + 30 ))
 
   run "$DVB_GRIND" 1 "$TEST_REPO"
 

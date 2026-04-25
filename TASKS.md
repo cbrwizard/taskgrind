@@ -1,14 +1,5 @@
 # Tasks
 
-## P1
-
-- [ ] `startup probe aborts before session 1 when backend exits immediately with no output` is no longer flaky under parallel load
-  **ID**: stabilize-startup-probe-aborts-flake
-  **Tags**: tests, flakiness, ci, preflight
-  **Details**: Running `make test-force` with the auto-capped `TEST_JOBS=6` reports an intermittent failure: `not ok 472 startup probe aborts before session 1 when backend exits immediately with no output (in test file tests/preflight.bats, line 346) [ "$status" -eq 1 ]' failed`. The test sets `DVB_DEADLINE=$(date +%s) + 5` then expects the run to fail with status 1 because the stub backend has no `--version` output. Under parallel load, the deadline can fire before the backend probe runs, so the script exits with 0 (`deadline_expired_before_session_loop`) instead of 1 (`backend_probe_failed`). Bump the deadline to ~30s like the P1 stabilize-flaky-full-suite-tests fix did for `tests/logging.bats`, and verify the test still finishes fast in the common case (the probe should fail and exit immediately). 10 consecutive `make test-force TESTS=tests/preflight.bats` runs at the default `TEST_JOBS=6` should all pass.
-  **Files**: `tests/preflight.bats`
-  **Acceptance**: 10 consecutive `make test-force` runs at the default `TEST_JOBS=6` all pass with test 472 (`startup probe aborts before session 1 when backend exits immediately with no output`) green every time. Targeted reruns under `bats tests/preflight.bats -f "startup probe aborts"` also remain green.
-
 ## P2
 
 - [ ] `format_conflict_paths_for_log()` and `emit_rebase_conflict_logs()` have direct unit-style test coverage
