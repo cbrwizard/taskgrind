@@ -1,1 +1,224 @@
 # Tasks
+
+<!-- policy: keep runtime files /bin/bash 3.2 compatible (guarded by tests/bash-compat.bats) -->
+<!-- policy: run `make check` before claiming a task complete; remove the task block in the same commit that ships the fix -->
+
+## P1
+
+- [ ] Repair `TG_SESSION_GRACE overrides DVB_SESSION_GRACE` signal test broken by stricter backend probe
+  - **ID**: fix-tg-session-grace-signal-test
+  - **Tags**: bug, test, regression
+  - **Details**: `tests/signals.bats:1182-1200` ("TG_SESSION_GRACE overrides
+    DVB_SESSION_GRACE for timeout escalation") consistently fails on `main`
+    because its `stubborn_devin` fake binary emits no output — it only does
+    `trap '' INT; sleep 5`. Commit `6c090e9 fix: drop flaky <1s duration from
+    backend probe stub detection` (2026-04-24) tightened `run_backend_probe`
+    in `bin/taskgrind:541-544` to reject any `exit=0 + empty output` response
+    to `--version`, so the new probe (which runs ahead of the signal-handling
+    code path the test actually exercises) now fails first with
+    `backend_probe_failed exit=0 duration=5s backend=devin` and the session
+    loop never starts. The test therefore never prints `still alive after 0s
+    grace`, even though the underlying TG_→DVB_ alias logic still works
+    correctly (the alias table in `bin/taskgrind:126-131` includes
+    `SESSION_GRACE` and a manual rerun with a non-stub stubborn devin
+    confirms the grace path fires). Verified by checking out `bin/taskgrind`
+    at `6c090e9^` and re-running the single test — it passes. Fix: update
+    the test's `stubborn_devin` script to emit a one-line version string when
+    invoked with `--version` (for example, a `case "$1"` block that prints
+    `stubborn-1.0` and exits `0` for `--version`, then falls through to the
+    `trap '' INT; sleep 5` body for any other invocation). Do **not** relax
+    the probe — the probe tightening is the right behavior for real backends.
+    Keep the fix local to `tests/signals.bats`.
+  - **Files**: `tests/signals.bats`
+  - **Acceptance**: `bats --filter "TG_SESSION_GRACE overrides
+    DVB_SESSION_GRACE" tests/signals.bats` passes on three consecutive runs;
+    `make check` passes; the fix does not touch `bin/taskgrind` or any other
+    production file; no new tests are marked as known-flaky in
+    `CONTRIBUTING.md`.
+
+## P2
+
+- [ ] Direct unit coverage for `json_escape()` protects the status-file JSON contract
+  - **ID**: json-escape-direct-coverage
+  - **Tags**: test, status-file, reliability
+  - **Details**: `json_escape()` at `bin/taskgrind:1029-1037` powers every string
+    field in the JSON payload written by `write_status_file()` — `repo`,
+    `backend`, `skill`, `model`, `current_phase`, `terminal_reason`, and
+    `last_session.{result,completed_at}` — but there is no direct unit-style
+    test for it. The helper is currently covered only through integration-level
+    status-file assertions in `tests/logging.bats`, which means a subtle
+    regression in backslash/quote/newline/tab escaping (for example, repo paths
+    that contain a literal `\"`, a CR, or a stray tab) would show up as a
+    downstream JSON parse failure in a supervisor rather than as a focused
+    helper failure. Add a direct bats suite using the established
+    awk-extraction pattern (see `extract_first_task_context` coverage in
+    `tests/task-attempts.bats:173-249` and `format_conflict_paths_for_log`
+    coverage in `tests/git-sync.bats:1164+`): extract the function body with
+    `awk '/^json_escape\(\) \{/,/^}$/'`, source it in a subshell, and assert on
+    exact outputs. Cover at minimum: empty input, plain ASCII passthrough,
+    embedded double quote, literal backslash, embedded newline, embedded
+    carriage return, embedded tab, and a realistic combined payload such as a
+    repo path with quotes plus a newline. The suite should not require
+    `DVB_GRIND_CMD` or a full session stub.
+  - **Files**: `tests/logging.bats` (or a new focused file such as
+    `tests/json-escape.bats`), `bin/taskgrind`
+  - **Acceptance**: New `@test` cases exercise `json_escape` directly (without
+    launching a grind); each test asserts on the exact escaped output for one
+    of the cases listed above; running `make test` plus the targeted
+    `make test TESTS=tests/<new-file>.bats` both pass locally and keep the
+    existing `make check` gate green.
+
+- [ ] Direct unit coverage for `resolve_script_path()` locks the symlink-resolution contract for `make install`
+  - **ID**: resolve-script-path-direct-coverage
+  - **Tags**: test, install, symlink
+  - **Details**: `resolve_script_path()` at `bin/taskgrind:67-82` runs before
+    any constants are sourced, walks symlink chains to resolve the real script
+    path, and is what lets `make install` symlink `/usr/local/bin/taskgrind` →
+    `bin/taskgrind` while still letting the executable resolve
+    `$TASKGRIND_DIR/lib/constants.sh` correctly. A regression here breaks
+    `make install`, brew packaging, and every caller that runs taskgrind via a
+    wrapper symlink — but there is no direct unit-style coverage today. Add a
+    bats suite that extracts the function via the awk pattern already used for
+    `extract_first_task_context` and `format_conflict_paths_for_log`, sources
+    it in a subshell, and asserts the resolver handles: plain file (no
+    symlink), single-hop relative symlink, single-hop absolute symlink, nested
+    symlink chains two and three hops deep, a symlink whose target is in a
+    parent directory (`../bin/taskgrind`), and a symlink whose target is in a
+    sibling directory. Use `mktemp -d` per test and clean up in `teardown()`.
+    The goal is to pin behavior so a future edit to the `while [[ -L ]]` loop
+    can't silently break packaging.
+  - **Files**: `tests/install.bats` (or a new focused
+    `tests/resolve-script-path.bats`), `bin/taskgrind`
+  - **Acceptance**: New `@test` cases exercise `resolve_script_path` directly
+    without spawning a grind; each supported topology above has at least one
+    assertion on the resolved absolute path; `make test TESTS=tests/<file>.bats`
+    plus `make check` both pass.
+
+- [ ] Direct unit coverage for `dvb_resolve_model_alias()` guards the `opus`/`sonnet`/`codex` shortcuts
+  - **ID**: model-alias-direct-coverage
+  - **Tags**: test, constants, model-selection
+  - **Details**: `dvb_resolve_model_alias()` in `lib/constants.sh:15-28` reads
+    the newline-separated `DVB_MODEL_ALIASES` table and powers every alias
+    shortcut the docs promise — `opus`, `sonnet`, `haiku`, `swe`, `codex`,
+    `gpt`. The only coverage today is implicit integration tests such as
+    `tests/features.bats:233` ("--model alias resolves before backend
+    invocation"), which means a future edit to the alias table or the parsing
+    loop could silently change which concrete model ID `sonnet` resolves to
+    without a focused failure. Add a direct bats suite for the constants file:
+    source `lib/constants.sh` in each test (see
+    `tests/logging.bats:485+` for the established `source
+    "$BATS_TEST_DIRNAME/../lib/constants.sh"` pattern) and assert that every
+    documented alias in the README ("Live model switching" section) plus
+    "unknown values pass through unchanged" behaves as promised. Include a
+    regression test that the alias table contains exactly the aliases the
+    README documents so a future addition to one file forces the other to
+    follow.
+  - **Files**: `tests/features.bats` (or a new
+    `tests/model-alias.bats`), `lib/constants.sh`, `README.md`
+  - **Acceptance**: Each documented alias gets a focused test that asserts the
+    resolved model ID; a "pass-through unchanged" test covers unknown input; a
+    doc-drift test fails if `DVB_MODEL_ALIASES` and the README alias list
+    disagree on the set of aliases; `make check` passes.
+
+- [ ] Document the exported `TG_INSTANCE_ID` contract for child sessions and wrapper scripts
+  - **ID**: document-tg-instance-id
+  - **Tags**: docs, multi-instance, env-var
+  - **Details**: `bin/taskgrind:1404` does
+    `export TG_INSTANCE_ID="$_dvb_slot"` so any AI session, skill, or
+    supervisor that inspects its own environment can tell which slot claimed
+    the lock (slot 0 owns git sync; higher slots should defer). There is a
+    structural test guarding the export in
+    `tests/multi-instance.bats:227-236`, but no user-facing doc mentions the
+    variable at all — `README.md` shows only `TG_MAX_INSTANCES`, the Env table
+    stops at `TG_SESSION_GRACE`, and `taskgrind --help` / `man taskgrind`
+    never name it. That makes the contract agent-only tribal knowledge,
+    exactly the kind of doc drift the repo policy flags. Add a short
+    subsection (or one row in the env var table) that states: (a) `TG_INSTANCE_ID`
+    is taskgrind-set, not user-set; (b) its value equals the claimed slot
+    (`0` owns between-session git sync, `1+` skip it); (c) skills and wrapper
+    scripts can read it to coordinate. Mirror the same wording in `man/taskgrind.1`
+    under the multi-instance section and in `README.md` under "Concurrent
+    instances on one repo". Do **not** promise it as a user-settable input —
+    only as a read-only export.
+  - **Files**: `README.md`, `man/taskgrind.1`, `docs/architecture.md`
+  - **Acceptance**: `README.md` and the man page both mention `TG_INSTANCE_ID`
+    with the read-only / slot-tied contract wording; a new `tests/basics.bats`
+    assertion (or extension to `tests/multi-instance.bats`) greps for the
+    string in both docs so future edits can't silently drop it; `make check`
+    passes.
+
+- [ ] Document the log-file retention policy alongside the cleanup routine
+  - **ID**: document-log-retention-policy
+  - **Tags**: docs, logs, ops
+  - **Details**: The temp-file cleanup block at
+    `bin/taskgrind:871-881` purges orphaned `taskgrind-exec.*`,
+    `taskgrind-lock-*`, `taskgrind-ses-*`, `taskgrind-gsy-*`,
+    `taskgrind-att-*`, `taskgrind-*.session.out`, `taskgrind-*.git-sync`, and
+    `taskgrind-*.task-attempts*` files older than one day, but deliberately
+    leaves the primary `taskgrind-<date>-<repo>-<pid>.log` files so the
+    `grind-log-analyze` skill can run post-mortems. On macOS `TMPDIR` is
+    usually swept by the OS, but on Linux and in long-lived CI containers
+    those log files accumulate — and today `$TMPDIR/taskgrind-*.log` already
+    shows nine logs on this host dating back a day. The policy is intentional
+    but undocumented, so operators reading
+    `README.md#Monitoring` or `SECURITY.md` can't tell whether to add their
+    own logrotate, a cron sweep, or just trust the OS. Add a short
+    "Log file retention" note under `README.md#Monitoring` that (a) names the
+    filename pattern, (b) says cleanup explicitly skips `.log` files, (c)
+    recommends a user-owned rotation on Linux / long-lived hosts, and (d)
+    reminds that the `grind-log-analyze` skill consumes these files. Mirror
+    the retention bullet in `SECURITY.md` near the existing `600` permissions
+    note.
+  - **Files**: `README.md`, `SECURITY.md`, `bin/taskgrind` (comment near the
+    cleanup block so the rationale doesn't drift)
+  - **Acceptance**: README and SECURITY.md each contain a paragraph or bullet
+    explicitly naming the retention policy and the reason (post-mortem
+    analysis); a new doc-drift test (pattern like
+    `tests/basics.bats` "README documents …") greps for the policy wording so
+    future edits can't silently drop it; `make check` passes.
+
+## P3
+
+- [ ] CI test cache key invalidates when `tests/verify-bash32-compat.sh` changes
+  - **ID**: ci-cache-include-bash32-helper
+  - **Tags**: ci, cache, correctness
+  - **Details**: `.github/workflows/check.yml:51` computes the test cache key
+    from `Makefile`, `bin/taskgrind`, `lib/*.sh`, `tests/*.bats`, and
+    `tests/test_helper.bash`, but **not** `tests/verify-bash32-compat.sh` —
+    even though `tests/bash-compat.bats` is the guard that actually sources /
+    runs that helper to enforce the Bash 3.2 contract documented in
+    `AGENTS.md` and `README.md`. An edit to `verify-bash32-compat.sh`
+    therefore leaves the cached green status in place, so a regression in the
+    compatibility guard can be missed by CI. Extend the `hashFiles(...)`
+    tuple in `check.yml` to include `tests/verify-bash32-compat.sh` (and,
+    while there, `install.sh` which `make lint` also shellchecks). Keep the
+    key single-line / copy-pasteable — this is purely a correctness fix, not
+    a refactor.
+  - **Files**: `.github/workflows/check.yml`
+  - **Acceptance**: The `hashFiles(...)` call in the `test` job includes
+    `tests/verify-bash32-compat.sh` and `install.sh`; a grep-style test in
+    `tests/basics.bats` (or a new `tests/ci-cache.bats`) asserts both paths
+    appear in the cache key so future edits can't silently drop them;
+    `make check` passes.
+
+- [ ] `--dry-run` surfaces the resolved log-file path without substitution placeholders
+  - **ID**: dry-run-resolved-log-path
+  - **Tags**: dx, dry-run, observability
+  - **Details**: `bin/taskgrind:897` prints the log path for `--dry-run` as
+    `"$_dvb_tmp/taskgrind-\$(date '+%Y-%m-%d-%H%M')-$(basename "$repo")-\$\$.log"`
+    — literally showing `$(date …)` and `$$` tokens instead of a concrete
+    example, which makes the dry-run output awkward to copy-paste into a
+    supervisor config or tailed command. The startup banner and actual log
+    header already resolve those expansions (see `bin/taskgrind:941` and
+    `bin/taskgrind:1383`). Change the `--dry-run` line to either (a) evaluate
+    the same expansion the real run would use, so operators see a concrete
+    `/var/folders/.../taskgrind-2026-04-24-2235-myrepo-12345.log` path, or
+    (b) add an explicit `(placeholders expanded at launch)` annotation. Add a
+    bats assertion that the emitted path is either concrete (matches
+    `taskgrind-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{4}-.*-[0-9]+\.log`) or
+    contains the annotation text, so the UX stays pinned in either direction.
+  - **Files**: `bin/taskgrind`, `tests/basics.bats` (the existing
+    `--dry-run` tests at lines ~148-184 are the natural home)
+  - **Acceptance**: Running `bin/taskgrind --dry-run 1 .` prints a log-file
+    line that is either fully expanded or annotated; the new bats test
+    enforces that contract; `make check` passes.
