@@ -589,3 +589,155 @@ SCRIPT
   [ "$status" -eq 0 ]
   [[ "$output" == *"Pick tasks from TASKS.md that relate to this focus"* ]]
 }
+
+# ── grind-log-analyze skill marker drift guard ────────────────────────
+
+@test "grind-log-analyze skill mentions every log marker bin/taskgrind emits today" {
+  # Every event the script writes must be discoverable in the
+  # grind-log-analyze skill's parser tables. If the script gains a new
+  # marker, the skill must be updated in the same change set or this
+  # test fails — preventing silent drift between emitter and parser.
+  #
+  # The canonical marker list below is the contract. Adding a new
+  # marker to bin/taskgrind requires: (1) emit it from the script,
+  # (2) document it in `.devin/skills/grind-log-analyze/SKILL.md`,
+  # (3) append the token here. All three guarantees are mechanically
+  # checked: each marker is grep'd in both files.
+  local script="$BATS_TEST_DIRNAME/../bin/taskgrind"
+  local skill="$BATS_TEST_DIRNAME/../.devin/skills/grind-log-analyze/SKILL.md"
+  [ -f "$script" ]
+  [ -f "$skill" ]
+
+  # Static markers emitted directly by `log_write "..."` calls. Most are
+  # the bare event token; a few include a leading space-or-suffix to
+  # disambiguate (e.g. `final_sync push_failed` vs the wider `final_sync`
+  # prefix).
+  local -a static_markers=(
+    # Session lifecycle
+    "session_timeout"
+    "remaining="         # session=N remaining=Mm tasks=N model= ...
+    " ended exit="       # session=N ended exit=N duration=Ns ...
+    "live_model="
+    "tasks_added="
+    "tasks_appeared"
+    "tasks_unblocked"
+    "all_tasks_blocked"
+
+    # Sweep / queue
+    "queue_empty"
+    "sweep_done"
+    "sweep_found"
+    "sweep_empty"
+
+    # Failures and stalls
+    "fast_fail"
+    "bail_out"
+    "stall_warning"
+    "stall_bail"
+    "early_exit_stall"
+    "diminishing_returns"
+    "productive_timeout"
+    "productive_zero_ship"
+    "shipped_inferred"
+    "zero_ship_stall_ignored"
+    "task_skip_threshold"
+    "attempt_write_failed"
+    "audit_focus_without_task"
+
+    # Network
+    "network_down"
+    "network_restored"
+    "network_timeout"
+
+    # Lifecycle bookends
+    "preflight_failed"
+    "deadline_expired_before_session_loop"
+    "deadline_expired_before_session_start"
+    "graceful_shutdown waiting"
+    "graceful_shutdown timeout"
+    "graceful_shutdown session_finished"
+    "graceful_shutdown duplicate_signal"
+
+    # Pre-session recovery
+    "pre_session_recovery merge_aborted"
+    "repo_missing"
+
+    # Final sync
+    "final_sync skipped"
+    "final_sync nothing_to_push"
+    "final_sync skipped_duplicate"
+    "final_sync pushing"
+    "final_sync push_ok"
+    "final_sync push_failed"
+    "final_sync push_stderr"
+
+    # Git sync
+    "git_sync ok"
+    "git_sync skipped"
+    "git_sync rebase_conflicts"
+    "git_sync timeout_rebase_aborted"
+    "git_sync timeout_merge_aborted"
+    "git_sync stash_pop_failed"
+    "git_sync failed"
+    "branch_cleanup pruned"
+    "branch_cleanup done"
+
+    # Wrap-up
+    "grind_done"
+  )
+
+  # Dynamic markers emitted via helper variables (e.g. `_backend_probe_summary`,
+  # `_git_fail`). Each is constructed in a helper rather than passed as a
+  # literal to log_write, so we grep the helper site instead of the log_write
+  # call site.
+  local -a dynamic_markers=(
+    "backend_probe_ok"
+    "backend_probe_failed"
+    "git_sync selected_branch"
+    "git_sync stash_failed"
+    "git_sync fetch_failed"
+    "git_sync checkout_failed"
+    "git_sync rebase_aborted"
+    "git_sync rebase_autoresolved"
+    "git_sync rebase_failed"
+  )
+
+  # Scope-templated markers emitted via `emit_rebase_conflict_logs <repo>
+  # <scope>` — the helper writes `${scope} rebase_conflicts ...` and
+  # `${scope} rebase_aborted ...`. Verify both that the call site exists
+  # (so the marker can fire) and that the skill documents the resulting
+  # line.
+  local -a scope_markers=(
+    "pre_session_recovery rebase_aborted"
+    "pre_session_recovery rebase_conflicts"
+  )
+
+  local marker missing=()
+  for marker in "${static_markers[@]}" "${dynamic_markers[@]}"; do
+    if ! grep -qF "$marker" "$script"; then
+      missing+=("script: $marker")
+    fi
+    if ! grep -qF "$marker" "$skill"; then
+      missing+=("skill: $marker")
+    fi
+  done
+
+  # Scope markers — script side: just verify the emit_rebase_conflict_logs
+  # call passes the scope; skill side: literal grep.
+  for marker in "${scope_markers[@]}"; do
+    local scope="${marker%% *}"
+    if ! grep -qF "emit_rebase_conflict_logs " "$script" \
+      || ! grep -qF "\"${scope}\"" "$script"; then
+      missing+=("script: $marker (no emit_rebase_conflict_logs call with scope ${scope})")
+    fi
+    if ! grep -qF "$marker" "$skill"; then
+      missing+=("skill: $marker")
+    fi
+  done
+
+  if [ "${#missing[@]}" -gt 0 ]; then
+    printf 'Marker drift detected:\n' >&2
+    printf '  - %s\n' "${missing[@]}" >&2
+    return 1
+  fi
+}

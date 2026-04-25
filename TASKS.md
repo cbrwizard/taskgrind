@@ -23,13 +23,6 @@
   **Files**: `tests/multi-instance.bats`
   **Acceptance**: (1) A test proves `slot_lock_pid` prints the pid from a valid lock file and returns 1 on a missing/empty file. (2) A test proves `slot_lock_active` returns 0 for a live pid and 1 for a clearly-dead pid (use a fixture pid that is guaranteed not to exist, e.g. the highest unused value on Linux/macOS). (3) Tests source the functions via `awk` extract, matching the existing pattern.
 
-- [ ] `grind-log-analyze` skill parses every log marker `bin/taskgrind` actually emits today
-  **ID**: audit-grind-log-analyze-markers
-  **Tags**: docs, skills, grind-log, log-format
-  **Details**: `.devin/skills/grind-log-analyze/SKILL.md` lists the log events the parser should extract (Phase 2.2 / 2.3 / 2.4). Recently added markers — `task_skip_threshold ids=<id>`, `productive_timeout session=N shipped=X timeout=Ys new_timeout=Zs (at cap)`, `auto_resolve_tasks_conflicts`, `live_model=...`, `live_prompt=...`, `graceful_shutdown duplicate_signal`, `final_sync push_ok`/`push_failed`, and the `blocked_wait`/`audit_focus_blocked`/`queue_refilled` phase markers — are all referenced by docs but the skill's parse table may be stale. Grep the script and the user stories for every `log_write`/status `set_phase` marker, cross-check against the skill, and either expand the parser tables so the skill matches reality or add a regression guard (bats test that lists every known marker and asserts the skill mentions each one).
-  **Files**: `.devin/skills/grind-log-analyze/SKILL.md`, `tests/basics.bats`, `tests/features.bats`
-  **Acceptance**: (1) The skill's Phase 2 parser tables mention every `log_write` marker currently emitted by `bin/taskgrind`, including the `task_skip_threshold`, `productive_timeout … (at cap)`, `auto_resolve_tasks_conflicts`, `live_model`/`live_prompt`, `graceful_shutdown duplicate_signal`, `final_sync push_*`, and `queue_refilled` / `blocked_wait` / `audit_focus_blocked` phase markers. (2) A bats test extracts the set of marker tokens from `bin/taskgrind` and fails when one is missing from the skill's markdown tables, so future additions can't drift again.
-
 ## P3
 
 - [ ] Repo ships a `.editorconfig` so contributors get consistent indentation in shell, bats, and markdown files

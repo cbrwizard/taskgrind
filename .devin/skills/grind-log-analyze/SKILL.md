@@ -82,7 +82,7 @@ For each session, build a record:
 | `was_timeout` | presence of `session_timeout session=N` |
 | `was_sweep` | presence of `sweep_done` instead of session ended |
 
-### 2.3 — Failure events
+### 2.3 — Failure and stall events
 
 Collect every occurrence of:
 
@@ -98,22 +98,50 @@ Collect every occurrence of:
 | Diminishing returns | `diminishing_returns window=N shipped=N` | window, shipped |
 | Early exit stall | `early_exit_stall` | — |
 | Repo missing | `repo_missing path=<path>` | path |
-| Productive timeout | `productive_timeout session=N shipped=N timeout=Ns` | session, shipped, timeout |
+| Productive timeout (raised) | `productive_timeout session=N shipped=N timeout=Ns new_timeout=Zs` | session, shipped, timeout, new_timeout |
+| Productive timeout (at cap) | `productive_timeout session=N shipped=N timeout=Ns (at cap)` | session, shipped, timeout |
 | Task skip threshold | `task_skip_threshold ids=<id1> <id2>` | task IDs |
+| Attempt write failed | `attempt_write_failed: could not update task attempts file` | — |
+| Productive zero-ship | `productive_zero_ship session=N commits=N reason=<r>` (multiple variants) | session, commits, reason |
+| Shipped inferred | `shipped_inferred session=N count=N reason=<r>` | session, count, reason |
+| Zero-ship stall ignored | `zero_ship_stall_ignored session=N reason=<r>` | session, reason |
+| Audit-focus blocked | `audit_focus_without_task session=N skill=<s> refusing_session=1` | session, skill |
+| Tasks added (during) | `tasks_added=N (ids added during session)` | added count |
+| Tasks added (external) | `tasks_added=N (external injection: A→B)` | added count, before, after |
+| Tasks appeared | `tasks_appeared tasks=N — resuming` | tasks count |
+| Tasks unblocked | `tasks_unblocked tasks=N — resuming` | tasks count |
+| All tasks blocked | `all_tasks_blocked tasks=N <state>` (`waiting`, `still_blocked`, `deadline_reached`) | tasks, state |
+| Queue empty (sweep variants) | `queue_empty tasks=0` (variants: `— launching sweep session`, `sweep=done`, `sweep=exhausted`, `sweep=skipped_for_test`) | sweep result |
+| Sweep done | `sweep_done exit=N elapsed=Ns` | exit, elapsed |
+| Sweep found | `sweep_found tasks=N` | tasks |
+| Sweep empty | `sweep_empty tasks=0` | — |
 
 ### 2.4 — Git sync events
 
 | Event | Pattern |
 |-------|---------|
+| Selected branch | `git_sync selected_branch branch=<b> source=<src>` |
 | Sync OK | `git_sync ok` |
-| Sync stashed | `git_sync ok (stashed dirty tree)` |
-| Stash pop failed | `git_sync stash_pop_failed` |
+| Sync OK (stashed) | `git_sync ok (stashed dirty tree)` |
+| Sync OK (auto-resolved) | `git_sync ok (auto-resolved TASKS.md rebase conflict)` |
+| Stash failed | `git_sync stash_failed: <reason>` |
+| Stash pop failed | `git_sync stash_pop_failed (stash preserved)` |
+| Fetch failed | `git_sync fetch_failed: <reason>` |
+| Checkout failed | `git_sync checkout_failed: <reason>` |
 | Rebase aborted | `git_sync rebase_aborted` |
+| Rebase auto-resolved | `git_sync rebase_autoresolved class=<c> paths=<...> strategy=local_theirs` |
+| Rebase failed | `git_sync rebase_failed: <reason>` |
+| Rebase conflicts | `git_sync rebase_conflicts class=<queue_only\|repo\|unknown> paths=<...>` |
 | Timeout rebase abort | `git_sync timeout_rebase_aborted` |
 | Timeout merge abort | `git_sync timeout_merge_aborted` |
 | Sync failed | `git_sync failed: <reason>` |
-| Sync skipped | `git_sync skipped (interval=N, session=N)` |
-| Branch cleanup | `branch_cleanup done` |
+| Sync skipped (interval) | `git_sync skipped (interval=N, session=N)` |
+| Sync skipped (slot) | `git_sync skipped (slot=N, only slot 0 syncs)` |
+| Branch cleanup pruned | `branch_cleanup pruned=N stale branches` |
+| Branch cleanup done | `branch_cleanup done` |
+| Pre-session merge aborted | `pre_session_recovery merge_aborted` |
+| Pre-session rebase conflicts | `pre_session_recovery rebase_conflicts class=<c> paths=<...>` |
+| Pre-session rebase aborted | `pre_session_recovery rebase_aborted [class=<c> paths=<...>]` |
 
 ### 2.5 — Session output blocks
 
@@ -136,7 +164,35 @@ and
 These are the most valuable diagnostic data — they show what the agent actually tried and
 where it got stuck. Extract every block and associate it with the session number.
 
-### 2.6 — Grind summary
+### 2.6 — Lifecycle markers
+
+These wrap every grind run. They tell you when taskgrind started, why it
+refused to start, when it was Ctrl+C'd, and whether the final push to
+origin actually shipped:
+
+| Event | Pattern | Notes |
+|-------|---------|-------|
+| Backend probe ok | `backend_probe_ok exit=N duration=Ns backend=<b>` | Pre-loop check that backend is reachable |
+| Backend probe failed | `backend_probe_failed exit=N duration=Ns backend=<b>` | Pre-loop refusal — no sessions launched |
+| Preflight failed | `preflight_failed` | Aborted before session 1 |
+| Deadline pre-loop | `deadline_expired_before_session_loop deadline=N now=N` | Hours arg expired before any session ran |
+| Deadline pre-session | `deadline_expired_before_session_start deadline=N now=N` | Sets `terminal_reason=deadline_expired` and exits cleanly |
+| Live model | `live_model=<m> [(alias=A, startup=S)] [(startup=S)]` | Mid-run model override applied |
+| Session start | `session=N remaining=Mm tasks=N model=<m>` | First line of every session |
+| Session end | `session=N ended exit=N duration=Ns tasks_after=N shipped=N` | Last line of every session |
+| Graceful shutdown wait | `graceful_shutdown waiting pid=N grace=Ns` | First Ctrl+C — waits for backend to finish |
+| Graceful shutdown timeout | `graceful_shutdown timeout — killing pid=N` | Backend ignored Ctrl+C past grace; SIGKILL |
+| Graceful shutdown finished | `graceful_shutdown session_finished after=Ns` | Backend shut down cleanly within grace |
+| Graceful shutdown duplicate | `graceful_shutdown duplicate_signal exit=N ignored` | Second Ctrl+C arrived during shutdown — coalesced |
+| Final sync skipped | `final_sync skipped — detached HEAD` | Push refused on detached HEAD |
+| Final sync nothing | `final_sync nothing_to_push` | No new commits after last sync |
+| Final sync duplicate | `final_sync skipped_duplicate commits=N head=<sha>` | Already pushed this HEAD this run |
+| Final sync pushing | `final_sync pushing commits=N` | Attempting push at shutdown |
+| Final sync ok | `final_sync push_ok` | Push succeeded |
+| Final sync failed | `final_sync push_failed [error=<msg>]` | Push refused — work may be unshipped |
+| Final sync stderr | `final_sync push_stderr <line>` | Captured stderr line per failed push |
+
+### 2.7 — Grind summary
 
 ```
 [pid=N] [HH:MM] grind_done sessions=N shipped=N remaining=N ship_rate=N% avg_session=Nm elapsed=Ns duration=<human> rate=N/h sessions_zero_ship=N [prompt=<text>]
