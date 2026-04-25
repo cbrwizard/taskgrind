@@ -3,39 +3,6 @@
 <!-- policy: keep runtime files /bin/bash 3.2 compatible (guarded by tests/bash-compat.bats) -->
 <!-- policy: run `make check` before claiming a task complete; remove the task block in the same commit that ships the fix -->
 
-## P1
-
-- [ ] Repair `TG_SESSION_GRACE overrides DVB_SESSION_GRACE` signal test broken by stricter backend probe
-  - **ID**: fix-tg-session-grace-signal-test
-  - **Tags**: bug, test, regression
-  - **Details**: `tests/signals.bats:1182-1200` ("TG_SESSION_GRACE overrides
-    DVB_SESSION_GRACE for timeout escalation") consistently fails on `main`
-    because its `stubborn_devin` fake binary emits no output — it only does
-    `trap '' INT; sleep 5`. Commit `6c090e9 fix: drop flaky <1s duration from
-    backend probe stub detection` (2026-04-24) tightened `run_backend_probe`
-    in `bin/taskgrind:541-544` to reject any `exit=0 + empty output` response
-    to `--version`, so the new probe (which runs ahead of the signal-handling
-    code path the test actually exercises) now fails first with
-    `backend_probe_failed exit=0 duration=5s backend=devin` and the session
-    loop never starts. The test therefore never prints `still alive after 0s
-    grace`, even though the underlying TG_→DVB_ alias logic still works
-    correctly (the alias table in `bin/taskgrind:126-131` includes
-    `SESSION_GRACE` and a manual rerun with a non-stub stubborn devin
-    confirms the grace path fires). Verified by checking out `bin/taskgrind`
-    at `6c090e9^` and re-running the single test — it passes. Fix: update
-    the test's `stubborn_devin` script to emit a one-line version string when
-    invoked with `--version` (for example, a `case "$1"` block that prints
-    `stubborn-1.0` and exits `0` for `--version`, then falls through to the
-    `trap '' INT; sleep 5` body for any other invocation). Do **not** relax
-    the probe — the probe tightening is the right behavior for real backends.
-    Keep the fix local to `tests/signals.bats`.
-  - **Files**: `tests/signals.bats`
-  - **Acceptance**: `bats --filter "TG_SESSION_GRACE overrides
-    DVB_SESSION_GRACE" tests/signals.bats` passes on three consecutive runs;
-    `make check` passes; the fix does not touch `bin/taskgrind` or any other
-    production file; no new tests are marked as known-flaky in
-    `CONTRIBUTING.md`.
-
 ## P2
 
 - [ ] Direct unit coverage for `json_escape()` protects the status-file JSON contract

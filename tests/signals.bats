@@ -1180,9 +1180,18 @@ SCRIPT
 }
 
 @test "TG_SESSION_GRACE overrides DVB_SESSION_GRACE for timeout escalation" {
+  # The stub must answer `--version` with non-empty output, otherwise
+  # run_backend_probe (bin/taskgrind:524) rejects it as a broken shim before
+  # the session loop (and the TG_/DVB_ precedence we want to verify) ever
+  # runs. Any other invocation — including `-p <prompt>` — falls through to
+  # the real stubborn-session behaviour: trap SIGINT and sleep long enough
+  # that the DVB_MAX_SESSION=1 watchdog has to escalate through grace.
   local stubborn_devin="$TEST_DIR/stubborn-devin"
   cat > "$stubborn_devin" <<'SCRIPT'
 #!/bin/bash
+case "$1" in
+  --version) echo "stubborn-devin 1.0"; exit 0 ;;
+esac
 trap '' INT
 sleep 5
 SCRIPT
