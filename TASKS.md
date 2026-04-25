@@ -5,36 +5,6 @@
 
 ## P2
 
-- [ ] Direct unit coverage for `json_escape()` protects the status-file JSON contract
-  - **ID**: json-escape-direct-coverage
-  - **Tags**: test, status-file, reliability
-  - **Details**: `json_escape()` at `bin/taskgrind:1029-1037` powers every string
-    field in the JSON payload written by `write_status_file()` — `repo`,
-    `backend`, `skill`, `model`, `current_phase`, `terminal_reason`, and
-    `last_session.{result,completed_at}` — but there is no direct unit-style
-    test for it. The helper is currently covered only through integration-level
-    status-file assertions in `tests/logging.bats`, which means a subtle
-    regression in backslash/quote/newline/tab escaping (for example, repo paths
-    that contain a literal `\"`, a CR, or a stray tab) would show up as a
-    downstream JSON parse failure in a supervisor rather than as a focused
-    helper failure. Add a direct bats suite using the established
-    awk-extraction pattern (see `extract_first_task_context` coverage in
-    `tests/task-attempts.bats:173-249` and `format_conflict_paths_for_log`
-    coverage in `tests/git-sync.bats:1164+`): extract the function body with
-    `awk '/^json_escape\(\) \{/,/^}$/'`, source it in a subshell, and assert on
-    exact outputs. Cover at minimum: empty input, plain ASCII passthrough,
-    embedded double quote, literal backslash, embedded newline, embedded
-    carriage return, embedded tab, and a realistic combined payload such as a
-    repo path with quotes plus a newline. The suite should not require
-    `DVB_GRIND_CMD` or a full session stub.
-  - **Files**: `tests/logging.bats` (or a new focused file such as
-    `tests/json-escape.bats`), `bin/taskgrind`
-  - **Acceptance**: New `@test` cases exercise `json_escape` directly (without
-    launching a grind); each test asserts on the exact escaped output for one
-    of the cases listed above; running `make test` plus the targeted
-    `make test TESTS=tests/<new-file>.bats` both pass locally and keep the
-    existing `make check` gate green.
-
 - [ ] Direct unit coverage for `resolve_script_path()` locks the symlink-resolution contract for `make install`
   - **ID**: resolve-script-path-direct-coverage
   - **Tags**: test, install, symlink
