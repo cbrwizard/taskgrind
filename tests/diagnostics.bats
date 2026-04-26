@@ -1020,3 +1020,58 @@ TASKS
   grep -q 'sweeps=N sweep_seconds=N' "$skill"
   grep -q 'sweep_seconds \* 100 / elapsed' "$skill"
 }
+
+# ── Arc classification (7-pattern taxonomy + Sweep) ──────────────────
+#
+# The post-mortem skill must classify every session/sweep into one of
+# eight arc categories so the operator can see Roth's power-law signal
+# (5 % of arcs / Release-pattern produces 48 % of autonomous hours).
+# A future refactor that drops the taxonomy table, the aggregate
+# distribution / hours lines in the report template, or the inline
+# credit to Roth's open-source analyzer fails this guard.
+
+@test "grind-log-analyze skill names all eight arc categories" {
+  local skill="$BATS_TEST_DIRNAME/../.devin/skills/grind-log-analyze/SKILL.md"
+  # Seven from Roth's "543 Hours" study plus the taskgrind-specific
+  # Sweep and Idle categories. Each must appear in the Phase 3.5 rule
+  # table.
+  grep -q '\*\*Sweep\*\*' "$skill"
+  grep -q '\*\*Release\*\*' "$skill"
+  grep -q '\*\*Feature\*\*' "$skill"
+  grep -q '\*\*Build\*\*' "$skill"
+  grep -q '\*\*Quick\*\*' "$skill"
+  grep -q '\*\*Debug\*\*' "$skill"
+  grep -q '\*\*Idle\*\*' "$skill"
+  grep -q '\*\*Review\*\*' "$skill"
+  grep -q '\*\*Interactive\*\*' "$skill"
+}
+
+@test "grind-log-analyze report template surfaces arc_distribution and arc_hours" {
+  local skill="$BATS_TEST_DIRNAME/../.devin/skills/grind-log-analyze/SKILL.md"
+  # The aggregate lines are the only place Roth's power-law signal
+  # surfaces — drop them and the leverage gap is invisible.
+  grep -q 'arc_distribution: ' "$skill"
+  grep -q 'arc_hours:' "$skill"
+  grep -q 'Leverage signal:' "$skill"
+  grep -qF '| Arc      |' "$skill"
+}
+
+@test "grind-log-analyze skill credits Roth's 543 Hours study and analyzer repo" {
+  local skill="$BATS_TEST_DIRNAME/../.devin/skills/grind-log-analyze/SKILL.md"
+  # The 7-pattern taxonomy is borrowed work; the credit + URLs must
+  # stay inline with the rules so a future contributor can find the
+  # source heuristic if they need to re-tune thresholds.
+  grep -q '## References' "$skill"
+  grep -q 'michael.roth.rocks/research/543-hours' "$skill"
+  grep -q 'github.com/mrothroc/claude-code-log-analyzer' "$skill"
+  grep -q '5 % of arcs' "$skill"
+}
+
+@test "grind-log-analyze skill rules block requires arc classification on every session" {
+  local skill="$BATS_TEST_DIRNAME/../.devin/skills/grind-log-analyze/SKILL.md"
+  # Rule #9 is the contract: every arc must end up in exactly one
+  # category. A skill rewrite that drops the rule silently turns the
+  # arc-mix section into best-effort — fail the suite instead.
+  grep -q 'Classify every arc' "$skill"
+  grep -q 'Phase 7 report' "$skill"
+}

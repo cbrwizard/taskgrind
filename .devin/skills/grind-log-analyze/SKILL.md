@@ -262,6 +262,100 @@ Sessions 3-7: 1 shipped (0.2/session) ← stalling
 
 Identify the inflection point where throughput drops below 0.5/session.
 
+### 3.5 — Arc classification (7-pattern taxonomy + Sweep)
+
+Classify every session and sweep into one of eight named arcs so the
+post-mortem can surface where the run's hours actually went. The seven
+named patterns (Release, Feature, Build, Review, Interactive, Quick,
+Debug) are taken from Michael Roth's "543 Hours" study (see
+[References](#references)) where they cover 650 work arcs across 543
+autonomous hours. Roth's headline finding — *5 % of arcs (Release) produce
+48 % of autonomous hours* — is exactly the kind of signal a marathon
+post-mortem should expose so the operator can tell whether the run was
+dominated by long, high-leverage Release-pattern arcs or by short,
+low-leverage Quick / Idle noise.
+
+Two of Roth's patterns (Review, Interactive) describe human-in-the-loop
+sessions and almost never appear in taskgrind's autonomous regime — they
+are kept in the table for completeness but expect them to score ≈ 0 % on
+most grinds. A taskgrind-specific **Sweep** category covers the
+backlog-discovery sweeps the harness runs when the queue empties.
+**Idle** absorbs short zero-ship sessions that finished without doing
+visible work (fast failures, context-exhaustion crashes, dead queues).
+
+| Pattern | Roth avg duration | taskgrind classification rule (in priority order) |
+|---------|-------------------|----------------------------------------------------|
+| **Sweep** | n/a (taskgrind-specific) | Any session whose end is logged as `sweep_done`, regardless of `tasks_found`. |
+| **Release** | 10.3 h | `shipped >= 3` (high ship count is the dominant signal — duration is allowed to be short for densely batched releases). |
+| **Feature** | 112 min | `shipped >= 1` AND `duration >= 90 min`. Slow but eventually shipped — the ≥ 90 min cutoff matches Roth's Feature avg and separates this from Build, which avg 33 min. |
+| **Build** | 33 min | `shipped == 1` AND `8 min < duration < 90 min`. The fix-test-fix-ship pattern. Also tag here when the session has `productive_zero_ship reason=local_task_churn` markers (real edits, queue churn obscured the ship). |
+| **Quick** | 5 min | `shipped == 1` AND `duration <= 8 min`. Fast single-task ships — branch-fixes, doc-tweaks, one-line fixes. |
+| **Debug** | 118 min | `shipped == 0` AND `duration >= 60 min`. Long zero-ship sessions usually mean the agent is grinding on a hard task — investigate the session-output block for hypothesis testing or the productive_zero_ship reason for committed-but-not-removed evidence. |
+| **Idle** | n/a (taskgrind-specific) | `shipped == 0` AND `duration < 60 min`. Short zero-ship sessions: fast failures, context-exhaustion crashes, dead-queue holds. Distinguish by exit code and `fast_fail` markers. |
+| **Review** | 23 min | Roth's pattern for "review this code" — taskgrind does not run review-only sessions, so this category should score ≈ 0 % on most logs. Tag here only if the session output reads as a review pass (no edits, many reads, recommendation language). |
+| **Interactive** | 33 min | Roth's pattern for discussion / questions / no agents — taskgrind sessions are non-interactive, so this category should score ≈ 0 % on most logs. Tag here only as a last resort when no other pattern fits. |
+
+Apply the rules in priority order (top to bottom). The first match wins.
+The intent is that any session with `shipped >= 3` is a Release no matter
+how short, any session with `shipped == 1` is classified by duration, and
+zero-ship sessions split between Debug (long) and Idle (short).
+
+For each session, record `arc=<Pattern>` next to the existing duration /
+shipped fields and roll the result into the timeline output (Phase 7).
+
+#### Worked example (taskgrind-2026-04-24-1534-taskgrind-8750.log)
+
+Real 10 h grind on the taskgrind repo itself:
+
+| # | Duration | Shipped | Pattern (rule that matched) |
+|---|----------|---------|------------------------------|
+| 1 | 60 min | 1 | **Build** — 1 ship, 8 < 60 < 90 |
+| 2 | 90 min | 16 | **Release** — `shipped >= 3` |
+| sweep | 30 min | n/a | **Sweep** — `sweep_done` marker |
+| 4 | 120 min | 5 | **Release** — `shipped >= 3` |
+| 5 | 120 min | 7 | **Release** — `shipped >= 3` |
+| sweep | 82 min | n/a | **Sweep** — `sweep_done` marker (also a leverage gap — this one sweep cost 14 % of the 10 h budget) |
+| 7 | 120 min | 4 | **Release** — `shipped >= 3` |
+
+`arc_distribution: Release=57% Sweep=29% Build=14%` (n=7 sessions+sweeps,
+duration=10h23m). `arc_hours: Release=72% Sweep=18% Build=10%`. The hours
+breakdown matches Roth's power-law expectation — a few Release arcs
+absorbed most of the wall time. The 82 min sweep is flagged as a
+leverage-gap warning despite Sweep itself being a useful arc, because it
+exceeded the new `TG_SWEEP_MAX` ceiling on later versions.
+
+#### Sources for the per-session signals
+
+Most fields the heuristic needs are already in the structured grind log:
+
+| Signal | Source field |
+|--------|--------------|
+| `duration` | `session=N ended exit=N duration=Ns` (regular sessions) or `sweep_done elapsed=Ns` (sweeps) |
+| `shipped` | `session=N ended … shipped=N` |
+| Sweep-or-not | presence of `sweep_done` instead of `session=N ended` |
+| Productive-zero-ship reason | `productive_zero_ship session=N commits=N reason=<r>` |
+| Fast-fail signal for Idle | `fast_fail` markers |
+| Tasks added (Release / scout signal) | `tasks_added=N` and `sweep_found tasks=N` |
+
+Tool-call mix (the original Roth heuristic uses test-tool fraction,
+read-only-tool fraction, edit count) is **not** captured in taskgrind's
+structured fields today. The rules above are intentionally
+duration-and-ship-driven so they work against existing logs without
+requiring backend-specific log mining. If a future change adds a
+`session=N tools=read=N edit=N test=N` marker to `bin/taskgrind`, this
+section can adopt the original tool-mix tie-breakers verbatim.
+
+#### Hand-validation budget
+
+The heuristic above was hand-scored against three real grind logs from
+`$TMPDIR/taskgrind-*.log` (taskgrind / agentbrew / oncall-hub-api,
+2026-04-24, 7+13+22 sessions = 42 arcs total) and matched intuition on
+≥80 % of them. The remaining mismatches were on borderline cases (1 ship
+at exactly 8 min — Quick or Build? 0 ships at exactly 60 min — Idle or
+Debug?). Treat the boundaries as advisory. When re-tuning, run against
+≥3 fresh logs and aim for the same 80 % bar before locking new
+thresholds.
+
 ## Phase 4: Diagnose root causes
 
 Analyze the parsed data to identify WHY things went wrong. Check each pattern:
@@ -430,11 +524,18 @@ Output a structured report to stdout with these sections:
   Network downtime: Nm
   Verdict:          PERFECT | GOOD | POOR | STALL
 
+## Arc Mix (7-pattern taxonomy + Sweep)
+  arc_distribution: Release=N% Feature=N% Build=N% Quick=N% Debug=N% Sweep=N% Idle=N% Review=N% Interactive=N%
+  arc_hours:        Release=N% Feature=N% Build=N% Quick=N% Debug=N% Sweep=N% Idle=N% Review=N% Interactive=N%
+  Leverage signal:  <one of "high-leverage (Release ≥ 30 % of hours)" |
+                            "balanced (Release 5–30 % of hours)" |
+                            "leverage gap (Release < 5 % of hours, Quick + Idle > 40 %)">
+
 ## Session Timeline
-  | # | Duration | Shipped | Queue    | Exit | Notes           |
-  |---|----------|---------|----------|------|-----------------|
-  | 1 | 45m      | 2       | 10 → 8  | 0    |                 |
-  | 2 | 3s       | 0       | 8 → 8   | 1    | fast_fail       |
+  | # | Duration | Shipped | Queue    | Exit | Arc      | Notes           |
+  |---|----------|---------|----------|------|----------|-----------------|
+  | 1 | 45m      | 2       | 10 → 8  | 0    | Feature  |                 |
+  | 2 | 3s       | 0       | 8 → 8   | 1    | Idle     | fast_fail       |
   ...
 
 ## Throughput Trend
@@ -495,3 +596,25 @@ This ensures the next invocation picks up the next unanalyzed log.
 8. **Session output is gold.** The `--- session N output ---` blocks contain the agent's
    actual terminal output. Mine them for error messages, permission denials, and behavioral
    patterns that explain zero-ship sessions.
+9. **Classify every arc.** Every session and sweep must end up in exactly one of the eight
+   arc categories from Phase 3.5 (the seven-pattern taxonomy plus Sweep, with Idle as the
+   short-zero-ship catch-all). The aggregate distribution and aggregate hours lines in the
+   Phase 7 report are how the operator sees Roth's power-law signal — drop them and the
+   leverage gap is invisible. Borderline cases (1 ship at exactly 8 min, 0 ships at exactly
+   60 min) should still pick a category; note the boundary in the Notes column instead of
+   skipping the row.
+
+## References
+
+- Michael Roth, **543 Hours**, Oct 2025 – Jan 2026: <https://michael.roth.rocks/research/543-hours/>.
+  The seven-pattern arc taxonomy, the headline finding that 5 % of arcs (Release) produce
+  48 % of autonomous hours, and the cluster averages this skill quotes are all from §10
+  "Pattern Analysis" of that study (650 work arcs, 14,926 prompts, 2,314 sessions, 543
+  autonomous hours from one practitioner). The pattern names and avg-duration columns in
+  the Phase 3.5 table are direct quotations.
+- Roth's **claude-code-log-analyzer**, MIT, 2026: <https://github.com/mrothroc/claude-code-log-analyzer>.
+  The open-source clustering implementation behind the study. taskgrind does **not** depend
+  on it at runtime — the Phase 3.5 heuristic is a duration-and-ship-count port that works
+  against taskgrind's own structured grind-log fields. If you re-tune the thresholds, read
+  Roth's analyzer for the original tool-call-mix tie-breakers; if `bin/taskgrind` ever gains
+  per-session tool-mix counters, the Phase 3.5 table can adopt those tie-breakers verbatim.
