@@ -206,6 +206,7 @@ Before deploying, ensure:
 | `TG_PROMPT` | (none) | Focus prompt for every session |
 | `TG_COOL` | `5` | Seconds between sessions |
 | `TG_MAX_SESSION` | `3600` | Max seconds per session. Auto-increases by 1800 s (cap 7200 s) after a session that shipped but hit the timeout; see the "Productive timeout auto-increase" feature. |
+| `TG_SWEEP_MAX` | `1800` | Max seconds for a backlog-discovery sweep session. Independent of `TG_MAX_SESSION` so the productive-timeout escalation cannot lengthen sweeps. Each completed sweep emits `sweep_efficiency tasks=N elapsed=Ns tasks_per_min=N.NN` for trend analysis. |
 | `TG_MIN_SESSION` | `30` | Fast-failure threshold in seconds |
 | `TG_MAX_FAST` | `20` | Max consecutive fast failures before bail |
 | `TG_MAX_ZERO_SHIP` | `50` | Consecutive zero-ship sessions before bail |

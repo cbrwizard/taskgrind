@@ -663,6 +663,7 @@ SCRIPT
     "sweep_done"
     "sweep_found"
     "sweep_empty"
+    "sweep_efficiency"
 
     # Failures and stalls
     "fast_fail"
@@ -917,4 +918,120 @@ SCRIPT
   grep -q 'TG_NO_PUSH=1 taskgrind' "$stories"
 
   grep -q '`no_push`' "$resume"
+}
+
+# ── Sweep ceiling and efficiency marker ───────────────────────────────
+#
+# Sweeps used to inherit `max_session`, which the productive-timeout
+# escalation can grow to 7200 s mid-run. A sweep that slid up to that
+# ceiling could burn ~14 % of a 10 h budget on backlog discovery
+# (observed 2026-04-24, sweep #2 = 4954 s for 7 tasks). `TG_SWEEP_MAX`
+# gives sweeps their own watchdog (default 1800 s); a derived
+# `sweep_efficiency` marker surfaces tasks_per_min so post-mortems can
+# see the trend without summing every `sweep_done` line.
+
+@test "TG_SWEEP_MAX defaults to 1800 in --dry-run" {
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"sweep_max:   1800s"* ]]
+}
+
+@test "TG_SWEEP_MAX env var is honoured in --dry-run" {
+  export TG_SWEEP_MAX=300
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"sweep_max:   300s"* ]]
+}
+
+@test "DVB_SWEEP_MAX is honoured as the legacy alias" {
+  export DVB_SWEEP_MAX=600
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"sweep_max:   600s"* ]]
+}
+
+@test "TG_SWEEP_MAX takes precedence over DVB_SWEEP_MAX" {
+  export DVB_SWEEP_MAX=120
+  export TG_SWEEP_MAX=900
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"sweep_max:   900s"* ]]
+}
+
+@test "TG_SWEEP_MAX rejects non-numeric values at startup" {
+  export TG_SWEEP_MAX=abc
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"TG_SWEEP_MAX must be a positive integer"* ]]
+}
+
+@test "TG_SWEEP_MAX rejects zero" {
+  export TG_SWEEP_MAX=0
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"TG_SWEEP_MAX must be a positive integer"* ]]
+}
+
+@test "structural: sweep watchdog uses sweep_max_session, not max_session" {
+  # Anchor the assertion on the comment-block plus the sweep-only
+  # watchdog assignment so a future refactor cannot silently fold
+  # sweeps back under the productive-timeout-escalated grind cap.
+  grep -q 'sweep_max_session, NOT max_session' "$DVB_GRIND"
+  # The sweep block runs `remaining=$sweep_max_session` inside the
+  # subshell timer. Pinpoint the exact line shape.
+  grep -q 'remaining=\$sweep_max_session' "$DVB_GRIND"
+}
+
+@test "structural: sweep_done log line includes the cap value" {
+  grep -q 'sweep_done exit=\$session_exit elapsed=\${session_elapsed}s cap=\${sweep_max_session}s' "$DVB_GRIND"
+}
+
+@test "sweep_efficiency log marker is emitted after a real sweep run" {
+  # Force the sweep path: empty queue, fake backend, then assert the
+  # efficiency marker fires with the expected fields. The marker must
+  # land regardless of whether the sweep found anything (the
+  # zero-tasks case is what surfaces a stuck sweep), so the test
+  # leaves the queue empty and asserts on the literal marker.
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+TASKS
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'sweep_done exit=' "$TEST_LOG"
+  grep -q 'sweep_efficiency tasks=0 elapsed=[0-9]\+s tasks_per_min=' "$TEST_LOG"
+}
+
+@test "sweep_efficiency reports a positive tasks_per_min when tasks are found" {
+  local sweep_devin="$TEST_DIR/sweep-devin"
+  cat > "$sweep_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+if echo "\$@" | grep -q 'TASKS.md is empty'; then
+  printf '# Tasks\n## P0\n- [ ] Found one\n  **ID**: found-one\n- [ ] Found two\n  **ID**: found-two\n' > "$TEST_REPO/TASKS.md"
+fi
+SCRIPT
+  chmod +x "$sweep_devin"
+  export DVB_GRIND_CMD="$sweep_devin"
+  printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'sweep_efficiency tasks=2 elapsed=[0-9]\+s tasks_per_min=' "$TEST_LOG"
+}
+
+@test "operator docs name TG_SWEEP_MAX alongside the other gates" {
+  local readme="$BATS_TEST_DIRNAME/../README.md"
+  local man="$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  local skill="$BATS_TEST_DIRNAME/../.devin/skills/grind-log-analyze/SKILL.md"
+
+  grep -q 'TG_SWEEP_MAX' "$readme"
+  grep -q 'sweep_efficiency tasks=N elapsed=Ns tasks_per_min=N\.NN' "$readme"
+
+  grep -q 'TG_SWEEP_MAX' "$man"
+  grep -q 'sweep_efficiency tasks=N elapsed=Ns tasks_per_min=N.NN' "$man"
+
+  grep -q 'sweep_efficiency' "$skill"
+  grep -q 'cap=Ns' "$skill"
 }

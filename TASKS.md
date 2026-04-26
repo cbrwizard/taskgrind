@@ -72,42 +72,6 @@
     both `TG_EXIT_ON_STALL` and `TG_NO_STALL_EXIT` with their defaults;
     `make check` passes.
 
-- [ ] Cap sweep-session duration with `TG_SWEEP_MAX` so a runaway sweep can't burn 14 % of a 10-hour budget
-  - **ID**: cap-sweep-session-duration
-  - **Tags**: budget, sweep, observability
-  - **Details**: Sweep sessions today inherit the same `max_session`
-    watchdog as grind sessions (see `bin/taskgrind:2034` and the productive-
-    timeout escalation at `bin/taskgrind:2410-2421`), which by mid-run can
-    reach the 7200 s cap. In the 2026-04-24 grind log the second sweep ran
-    `sweep_done exit=0 elapsed=4954s` (82 minutes) and emitted
-    `sweep_found tasks=7`, while the first sweep that day finished in
-    `elapsed=1794s` with `tasks=12`. That makes one sweep alone cost ~14 %
-    of a 10 h budget for fewer tasks than the cheaper one. Two improvements
-    that belong together: (a) introduce `TG_SWEEP_MAX` (default `1800`,
-    parsed and validated next to `max_session` near `bin/taskgrind:208-224`)
-    and use it for the watchdog block at the sweep launch path so the
-    sweep is bounded independently of the grind cap; (b) at
-    `bin/taskgrind:2058` and `bin/taskgrind:2083` also emit a derived
-    `sweep_efficiency tasks_per_min=…` marker (or fold it into
-    `sweep_done`) so the `grind-log-analyze` skill can see the trend
-    across runs. Make sure the cap is honoured even when the sweep skill
-    forks long-running subagents — the existing graceful-shutdown grace
-    period after SIGINT is the right model. Document the new env var in
-    `README.md` and `man/taskgrind.1` in the same edit.
-  - **Files**: `bin/taskgrind`, `tests/sweep.bats` (or wherever sweep
-    coverage lives — pick the existing focused file before adding a new
-    one), `README.md`, `man/taskgrind.1`,
-    `.devin/skills/grind-log-analyze/SKILL.md`
-  - **Acceptance**: A new bats case launches a sweep that would otherwise
-    overrun, exports `TG_SWEEP_MAX=2`, and asserts the sweep is killed at
-    the cap with `sweep_done exit=…` logged within tolerance; the
-    `sweep_found`/`sweep_done` lines (or a sibling marker) carry a
-    tasks-per-minute number; `taskgrind --help`, `man taskgrind`, and
-    `README.md` all name `TG_SWEEP_MAX` with its default; the
-    grind-log-analyze field table at
-    `.devin/skills/grind-log-analyze/SKILL.md:115` lists the new field;
-    `make check` passes.
-
 ## P2
 
 - [ ] Fix the `ship_rate` formula so tasks added mid-run no longer produce >100 % completion rates

@@ -38,6 +38,8 @@
 #        TG_STATUS_FILE — write machine-readable runtime status JSON to this path
 #        TG_NOTIFY      — desktop notification on completion (default: 1, set 0 to disable)
 #        TG_MAX_SESSION — max seconds per session before timeout (default: 3600)
+#        TG_SWEEP_MAX   — max seconds for a backlog-discovery sweep session,
+#                         independent of max_session (default: 1800)
 #        TG_MAX_FAST    — max consecutive fast failures before bail out (default: 20)
 #        TG_MAX_ZERO_SHIP — max consecutive zero-ship sessions before bail (default: 50)
 #        TG_BACKOFF_BASE — base seconds for fast-failure backoff (default: 15)
@@ -130,7 +132,7 @@ for _tg_var in BACKEND BACKOFF_BASE BACKOFF_MAX COOL DEVIN_PATH \
                EARLY_EXIT_ON_STALL EMPTY_QUEUE_WAIT GIT_SYNC_TIMEOUT LOG MAX_FAST MAX_INSTANCES \
                MAX_SESSION MAX_ZERO_SHIP MIN_SESSION MODEL NET_CHECK_URL NET_MAX_WAIT \
                NET_RETRIES NET_RETRY_DELAY NET_WAIT NO_PUSH NOTIFY PROMPT \
-               SESSION_GRACE SHUTDOWN_GRACE SKILL STATUS_FILE SYNC_INTERVAL; do
+               SESSION_GRACE SHUTDOWN_GRACE SKILL STATUS_FILE SWEEP_MAX SYNC_INTERVAL; do
   _tg_ref="TG_${_tg_var}"
   if [[ -n "${!_tg_ref:-}" ]]; then
     export "DVB_${_tg_var}"="${!_tg_ref}"
@@ -213,6 +215,13 @@ cooldown="${DVB_COOL:-5}"
 max_hours=24
 max_fast="${DVB_MAX_FAST:-20}"
 max_session="${DVB_MAX_SESSION:-3600}"
+# Sweep sessions get their own ceiling so a runaway sweep cannot inherit
+# the productive-timeout-escalated grind cap (which can climb to 7200 s)
+# and burn an entire chunk of the budget on backlog discovery. Default
+# 1800 s matches the cheaper "healthy" sweep observed in the 2026-04-24
+# run; a sweep that needs longer should be split into smaller audit
+# passes rather than allowed to expand without bound.
+sweep_max_session="${DVB_SWEEP_MAX:-1800}"
 max_zero_ship="${DVB_MAX_ZERO_SHIP:-50}"
 sync_interval="${DVB_SYNC_INTERVAL:-5}"
 max_instances="${DVB_MAX_INSTANCES:-2}"
@@ -226,6 +235,9 @@ if ! [[ "$max_fast" =~ ^[0-9]+$ ]]; then
 fi
 if ! [[ "$max_session" =~ ^[0-9]+$ ]]; then
   echo "Error: TG_MAX_SESSION must be numeric, got '$max_session'" >&2; exit 1
+fi
+if ! [[ "$sweep_max_session" =~ ^[0-9]+$ ]] || [[ "$sweep_max_session" -lt 1 ]]; then
+  echo "Error: TG_SWEEP_MAX must be a positive integer (seconds), got '$sweep_max_session'" >&2; exit 1
 fi
 if ! [[ "$max_zero_ship" =~ ^[0-9]+$ ]]; then
   echo "Error: TG_MAX_ZERO_SHIP must be numeric, got '$max_zero_ship'" >&2; exit 1
@@ -928,6 +940,7 @@ if [[ "$dry_run" -eq 1 ]]; then
   echo "  status:   ${DVB_STATUS_FILE:-disabled}"
   echo "  notify:   ${DVB_NOTIFY:-1}"
   echo "  max_session: ${max_session}s"
+  echo "  sweep_max:   ${sweep_max_session}s"
   echo "  early_exit_on_stall: ${DVB_EARLY_EXIT_ON_STALL:-0}"
   echo "  no_push:  $no_push"
   if [[ "$max_instances" -gt 1 ]]; then
@@ -2103,7 +2116,12 @@ while [[ $(date +%s) -lt $deadline ]]; do
       _dvb_pid=$!
       (
         trap 'kill $! 2>/dev/null; exit 0' TERM
-        remaining=$max_session
+        # Sweep watchdog uses sweep_max_session, NOT max_session — a
+        # productive-timeout-escalated grind cap must not lengthen the
+        # backlog-discovery budget. Without this, mid-run sweeps could
+        # inherit a 7200 s ceiling and burn ~14 % of a 10 h grind on
+        # backlog discovery (observed 2026-04-24).
+        remaining=$sweep_max_session
         while (( remaining > 0 )); do
           s=$(( remaining > 10 ? 10 : remaining ))
           sleep "$s" &
@@ -2127,7 +2145,7 @@ while [[ $(date +%s) -lt $deadline ]]; do
     fi
     _dvb_pid=0
     session_elapsed=$(( $(date +%s) - session_start ))
-    log_write "[$(date '+%H:%M')] sweep_done exit=$session_exit elapsed=${session_elapsed}s"
+    log_write "[$(date '+%H:%M')] sweep_done exit=$session_exit elapsed=${session_elapsed}s cap=${sweep_max_session}s"
     last_session_exit="$session_exit"
     last_session_shipped=0
     last_session_duration="$session_elapsed"
@@ -2159,6 +2177,20 @@ while [[ $(date +%s) -lt $deadline ]]; do
       log_write "[$(date '+%H:%M')] sweep_empty tasks=0"
       set_phase "queue_empty_wait"
     fi
+    # Sweep efficiency marker — surfaces tasks_per_min so post-mortems
+    # can spot a degrading sweep without grepping every sweep_done line.
+    # Computed with bc when available so the integer divide loses no
+    # precision when sweeps complete in seconds; falls back to a
+    # whole-minute approximation when bc is missing. Multiplied by 60
+    # against elapsed seconds rather than dividing the tasks first to
+    # avoid the 0-tasks-found degenerate case truncating to 0.0.
+    if [[ "$session_elapsed" -gt 0 ]]; then
+      _sweep_tasks_per_min=$(echo "scale=2; $tasks_found * 60 / $session_elapsed" | bc 2>/dev/null) \
+        || _sweep_tasks_per_min=$(( tasks_found * 60 / session_elapsed ))
+    else
+      _sweep_tasks_per_min="0.00"
+    fi
+    log_write "[$(date '+%H:%M')] sweep_efficiency tasks=$tasks_found elapsed=${session_elapsed}s tasks_per_min=$_sweep_tasks_per_min"
     # Re-enter loop — next iteration will pick up the new tasks.
     # Sweeps claim a session slot only once they are actually about to start.
     continue

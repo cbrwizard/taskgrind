@@ -113,9 +113,10 @@ Collect every occurrence of:
 | Tasks unblocked | `tasks_unblocked tasks=N — resuming` | tasks count |
 | All tasks blocked | `all_tasks_blocked tasks=N <state>` (`waiting`, `still_blocked`, `deadline_reached`) | tasks, state |
 | Queue empty (sweep variants) | `queue_empty tasks=0` (variants: `— launching sweep session`, `sweep=done`, `sweep=exhausted`, `sweep=skipped_for_test`) | sweep result |
-| Sweep done | `sweep_done exit=N elapsed=Ns` | exit, elapsed |
+| Sweep done | `sweep_done exit=N elapsed=Ns cap=Ns` | exit, elapsed, cap (the `TG_SWEEP_MAX` ceiling that bounded this sweep — `cap` was added when sweeps got their own watchdog separate from `max_session`) |
 | Sweep found | `sweep_found tasks=N` | tasks |
 | Sweep empty | `sweep_empty tasks=0` | — |
+| Sweep efficiency | `sweep_efficiency tasks=N elapsed=Ns tasks_per_min=N.NN` | tasks, elapsed, tasks_per_min (always emitted after `sweep_found`/`sweep_empty`; lets post-mortems compare sweep yields without summing per-line) |
 
 ### 2.4 — Git sync events
 

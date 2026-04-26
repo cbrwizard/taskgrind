@@ -90,6 +90,18 @@ marker and adds 1800 seconds (30 minutes) to the next session's budget, up to
 a hard cap of 7200 seconds (2 hours). Operators who need a strict time budget
 should plan around the 7200 s cap rather than the initial value.
 .TP
+.B TG_SWEEP_MAX
+Max seconds for a backlog-discovery sweep session (default: 1800).
+Independent of
+.BR TG_MAX_SESSION
+so the productive-timeout escalation cannot lengthen sweeps; a sweep that
+needs more than 30 minutes should be split into smaller audit passes.
+Each completed sweep emits
+.BR "sweep_efficiency tasks=N elapsed=Ns tasks_per_min=N.NN"
+so post-mortems can spot a degrading sweep without summing every
+.BR sweep_done
+line by hand.
+.TP
 .B TG_MIN_SESSION
 Fast\-failure threshold in seconds (default: 30).
 .TP
