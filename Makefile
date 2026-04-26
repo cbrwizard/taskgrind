@@ -3,7 +3,14 @@
 PREFIX ?= /usr/local
 TESTS ?= tests/*.bats
 TASKS_MD ?= TASKS.md
-AUTO_TEST_JOBS = $(shell jobs=$$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4); expr "$$jobs" + 0 >/dev/null 2>&1 || jobs=4; if [ "$$jobs" -gt 6 ]; then jobs=6; fi; if [ "$$jobs" -lt 2 ]; then jobs=2; fi; echo "$$jobs")
+# Default parallelism: cap at 8 to balance throughput against the macOS per-user
+# process limit. bats --jobs 9+ historically hit signal 15 terminations on
+# macOS at this suite's size; 8 stays inside the safe envelope while leveraging
+# Apple Silicon's 8+ performance cores. The RUN_BATS recipe also bumps the
+# soft process limit (`ulimit -Su unlimited`) so the headroom is real, not
+# theoretical — without that, even --jobs 8 can hit the default 709-process
+# soft cap during burst spawning at test teardown + next-test dispatch overlap.
+AUTO_TEST_JOBS = $(shell jobs=$$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4); expr "$$jobs" + 0 >/dev/null 2>&1 || jobs=4; if [ "$$jobs" -gt 8 ]; then jobs=8; fi; if [ "$$jobs" -lt 2 ]; then jobs=2; fi; echo "$$jobs")
 TEST_JOBS ?= $(AUTO_TEST_JOBS)
 TEST_CACHE_BASENAME = .test-cache
 
@@ -11,7 +18,7 @@ TEST_CACHE_BASENAME = .test-cache
 TEST_SHARED_DEPS = bin/taskgrind lib/constants.sh lib/fullpower.sh tests/test_helper.bash
 TEST_TARGET_KEY = $(subst /,_,$(subst *,_all_,$(TESTS)))
 TEST_CACHE = $(TEST_CACHE_BASENAME)-$(TEST_TARGET_KEY)
-RUN_BATS = run_tmp=$$(mktemp -d "$${TMPDIR:-/tmp}/taskgrind-bats.XXXXXX") || exit 1; trap '. ./tests/test_helper.bash; remove_with_retries "$$run_tmp"' EXIT INT TERM; TMPDIR="$$run_tmp" bats --jobs $(TEST_JOBS) $(TESTS)
+RUN_BATS = ulimit -Su unlimited 2>/dev/null || true; run_tmp=$$(mktemp -d "$${TMPDIR:-/tmp}/taskgrind-bats.XXXXXX") || exit 1; trap '. ./tests/test_helper.bash; remove_with_retries "$$run_tmp"' EXIT INT TERM; TMPDIR="$$run_tmp" bats --jobs $(TEST_JOBS) $(TESTS)
 
 help:
 	@echo "Available targets:"
