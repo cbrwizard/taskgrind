@@ -555,6 +555,46 @@ SCRIPT
   grep -q 'final_sync skipped.*detached HEAD' "$DVB_GRIND"
 }
 
+# ── Notification spam guard ───────────────────────────────────────────
+#
+# The desktop-notification block in cleanup() must skip in test mode
+# (`DVB_GRIND_CMD` set) so `make check` does not fire a real macOS
+# Notification Center alert from every bats invocation that reaches
+# the cleanup path. Without this, running the full suite spammed the
+# operator with hundreds of "taskgrind complete" banners.
+
+@test "structural: notification block gates on DVB_GRIND_CMD test-mode marker" {
+  # The condition must include both `DVB_NOTIFY != 0` AND `-z
+  # DVB_GRIND_CMD` so a fake-backend test cannot leak a notification
+  # even if it forgot to clear DVB_NOTIFY.
+  grep -q 'DVB_NOTIFY:-1.*!= "0".*-z "${DVB_GRIND_CMD' "$DVB_GRIND"
+}
+
+@test "structural: osascript notification call is reachable from cleanup() only" {
+  # A regression that hoists the osascript / notify-send call outside
+  # the gated block (or removes the test-mode short-circuit) would
+  # silently re-enable the spam. Anchor on both calls living inside
+  # the gated `if` and the comment that documents the test-mode skip.
+  grep -q 'Skip in test mode' "$DVB_GRIND"
+  local osascript_line notify_send_line gate_line
+  osascript_line=$(awk '/osascript .* "taskgrind complete"/{print NR; exit}' "$DVB_GRIND")
+  notify_send_line=$(awk '/notify-send "taskgrind complete"/{print NR; exit}' "$DVB_GRIND")
+  gate_line=$(awk '/-z "\${DVB_GRIND_CMD/{print NR; exit}' "$DVB_GRIND")
+  [ -n "$osascript_line" ]
+  [ -n "$notify_send_line" ]
+  [ -n "$gate_line" ]
+  [ "$gate_line" -lt "$osascript_line" ]
+  [ "$gate_line" -lt "$notify_send_line" ]
+}
+
+@test "test_helper.bash sets DVB_NOTIFY=0 as a defensive belt against notification spam" {
+  # Bats test-mode already gates via DVB_GRIND_CMD inside the script,
+  # but the helper also exports DVB_NOTIFY=0 so a future test that
+  # forgets the script-level guard (or runs taskgrind without the
+  # fake backend) still cannot fire a real macOS notification.
+  grep -q '^  export DVB_NOTIFY=0$' "$BATS_TEST_DIRNAME/test_helper.bash"
+}
+
 # ── Stability: process substitution tee flush ─────────────────────────
 
 @test "structural: production mode pauses for tee flush after session" {

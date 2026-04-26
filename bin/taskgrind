@@ -1440,9 +1440,14 @@ cleanup() {
     _done_line+=" prompt=$extra_prompt"
   fi
   echo "$_done_line" >> "$log_file" 2>/dev/null || true
-  # Desktop notification — on by default, DVB_NOTIFY=0 to disable
-  # macOS: osascript, Linux: notify-send
-  if [[ "${DVB_NOTIFY:-1}" != "0" ]]; then
+  # Desktop notification — on by default, DVB_NOTIFY=0 to disable.
+  # macOS: osascript, Linux: notify-send.
+  # Skip in test mode (`DVB_GRIND_CMD` set): each bats invocation reaches
+  # cleanup() and would otherwise fire a real macOS Notification Center
+  # alert, spamming the operator with hundreds of "taskgrind complete"
+  # banners on every `make check`. Same pattern as the test-mode bypass
+  # in final_sync().
+  if [[ "${DVB_NOTIFY:-1}" != "0" && -z "${DVB_GRIND_CMD:-}" ]]; then
     _notify_msg="$session sessions, ${tasks_shipped}+ tasks shipped in $duration"
     if [[ "$(uname)" == "Darwin" ]]; then
       osascript -e 'on run argv' -e 'display notification (item 1 of argv) with title "taskgrind complete"' -e 'end run' -- "$_notify_msg" 2>/dev/null || true

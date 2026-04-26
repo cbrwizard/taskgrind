@@ -41,6 +41,11 @@ TASKS
   export TASKGRIND_DIR="$TEST_DOTFILES"
   export DVB_LOG="$TEST_LOG"
   export DVB_COOL=0
+  # Belt-and-suspenders against macOS Notification Center spam during
+  # `make check`: bin/taskgrind already skips notifications when
+  # DVB_GRIND_CMD is set, but this also covers callers that source the
+  # helper without going through the bats runner.
+  export DVB_NOTIFY=0
 
   # Create a fake devin that just exits immediately
   FAKE_DEVIN="$TEST_DIR/fake-devin"
