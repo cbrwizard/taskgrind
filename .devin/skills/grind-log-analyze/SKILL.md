@@ -199,7 +199,7 @@ origin actually shipped:
 ### 2.7 — Grind summary
 
 ```
-[pid=N] [HH:MM] grind_done sessions=N shipped=N remaining=N ship_rate=N% avg_session=Nm elapsed=Ns duration=<human> rate=N/h sessions_zero_ship=N tasks_starting=N tasks_added=N [prompt=<text>]
+[pid=N] [HH:MM] grind_done sessions=N shipped=N remaining=N ship_rate=N% avg_session=Nm elapsed=Ns duration=<human> rate=N/h sessions_zero_ship=N tasks_starting=N tasks_added=N sweeps=N sweep_seconds=N [prompt=<text>]
 ```
 
 `ship_rate` is `shipped * 100 / (tasks_starting + tasks_added)` capped at
@@ -208,6 +208,14 @@ origin actually shipped:
 above 100 % when sweeps or in-session injections inflated the queue past
 the starting count — treat any pre-change `ship_rate > 100 %` as
 `shipped / starting`, not as a true completion rate.
+
+`sweeps` and `sweep_seconds` aggregate every backlog-discovery sweep
+session: `sweeps` is the count of `sweep_done` markers across the run,
+`sweep_seconds` sums their `elapsed=Ns` values. Compute the sweep cost
+share as `sweep_seconds * 100 / elapsed` to spot sweep-heavy grinds
+without summing per-line. Older logs (before this accounting was added)
+lack both fields — fall back to manually grepping every `sweep_done`
+line and adding their `elapsed=Ns` values when analysing legacy runs.
 
 ## Phase 3: Compute metrics
 

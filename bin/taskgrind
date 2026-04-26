@@ -1036,6 +1036,15 @@ tasks_starting=0
 # >100 % number cannot result from sweeps and concurrent injections
 # adding work after the starting count was captured.
 tasks_added_total=0
+# Aggregate sweep accounting — every backlog-discovery sweep contributes
+# its elapsed seconds (and a +1 to the session-shape count). Surfaced in
+# the grind_done summary so post-mortems can see the sweep cost share
+# without grepping every `sweep_done` line and adding by hand. The
+# 2026-04-24 grind spent 1794 + 4954 = 6748 s on sweeps (18 % of the
+# 10 h budget); without these counters, that share is invisible from
+# the summary.
+_sweep_count=0
+_sweep_seconds=0
 tasks_remaining_snapshot=0
 sessions_zero_ship=0
 _recent_shipped=()  # rolling window of per-session shipped counts
@@ -1422,10 +1431,11 @@ cleanup() {
   echo "  Grind complete: $session sessions, ${tasks_shipped}+ tasks, ${duration}"
   echo "  Rate: ${rate}/h  Avg session: ${avg_session}  Zero-ship: ${sessions_zero_ship}"
   echo "  Ship rate: ${ship_rate} (${tasks_shipped}/${_ship_rate_denom}, started=${tasks_starting} added=${tasks_added_total})  Remaining: ${tasks_remaining_snapshot}"
+  echo "  Sweeps: ${_sweep_count} (${_sweep_seconds}s of ${elapsed}s)"
   echo "  Log: $log_file"
   echo "──────────────────────────────────────────"
   local _done_line
-  _done_line="[pid=$$] [$(date '+%H:%M')] grind_done sessions=$session shipped=$tasks_shipped remaining=$tasks_remaining_snapshot ship_rate=$ship_rate avg_session=$avg_session elapsed=${elapsed}s duration=$duration rate=${rate}/h sessions_zero_ship=$sessions_zero_ship tasks_starting=$tasks_starting tasks_added=$tasks_added_total"
+  _done_line="[pid=$$] [$(date '+%H:%M')] grind_done sessions=$session shipped=$tasks_shipped remaining=$tasks_remaining_snapshot ship_rate=$ship_rate avg_session=$avg_session elapsed=${elapsed}s duration=$duration rate=${rate}/h sessions_zero_ship=$sessions_zero_ship tasks_starting=$tasks_starting tasks_added=$tasks_added_total sweeps=$_sweep_count sweep_seconds=$_sweep_seconds"
   if [[ -n "${extra_prompt:-}" ]]; then
     _done_line+=" prompt=$extra_prompt"
   fi
@@ -2189,6 +2199,11 @@ while [[ $(date +%s) -lt $deadline ]]; do
     _dvb_pid=0
     session_elapsed=$(( $(date +%s) - session_start ))
     log_write "[$(date '+%H:%M')] sweep_done exit=$session_exit elapsed=${session_elapsed}s cap=${sweep_max_session}s"
+    # Aggregate sweep accounting for the grind_done summary (see the
+    # `_sweep_count` / `_sweep_seconds` declarations near the other
+    # counters at the top of the script).
+    _sweep_count=$((_sweep_count + 1))
+    _sweep_seconds=$((_sweep_seconds + session_elapsed))
     last_session_exit="$session_exit"
     last_session_shipped=0
     last_session_duration="$session_elapsed"

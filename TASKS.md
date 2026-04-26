@@ -5,36 +5,6 @@
 
 ## P2
 
-- [ ] Surface aggregate sweep cost in the `grind_done` summary line so post-mortems don't have to manually sum elapsed values
-  - **ID**: grind-done-sweep-accounting
-  - **Tags**: observability, log-analysis
-  - **Details**: The grind summary at `bin/taskgrind:1328-1334` reports
-    sessions, shipped, remaining, ship_rate, avg_session, elapsed,
-    duration, rate, and sessions_zero_ship — but no breakdown of how
-    much wall time went into sweep sessions versus productive grind
-    sessions. In the 2026-04-24 log the two sweeps consumed
-    `1794s + 4954s = 6748s` out of `elapsed=37434s` (18 % of budget),
-    and the only way to see that today is to grep every `sweep_done`
-    line and add them by hand. Introduce two counters initialised
-    alongside the existing `tasks_shipped`/`tasks_starting` block at
-    `bin/taskgrind:967-970` (`_sweep_count=0`, `_sweep_seconds=0`),
-    increment them at the existing `sweep_done` log site at
-    `bin/taskgrind:2058`, and emit `sweeps=N sweep_seconds=Ns` in both
-    the human-readable summary at `bin/taskgrind:1330` and the
-    `grind_done` log marker at `bin/taskgrind:1334`. Keep the field
-    order stable and append the new fields at the end so existing
-    parsers stay forward-compatible. The grind-log-analyze field table
-    at `.devin/skills/grind-log-analyze/SKILL.md:198` must list both
-    new fields in the same edit so the skill knows about them.
-  - **Files**: `bin/taskgrind`,
-    `.devin/skills/grind-log-analyze/SKILL.md`, the bats suite that
-    asserts on the `grind_done` line (reuse the same file picked for
-    `ship-rate-include-added-tasks` if the suites overlap)
-  - **Acceptance**: A bats case runs a fake-backend grind with two
-    sweeps and asserts the summary contains `sweeps=2` and a non-zero
-    `sweep_seconds`; the analyze skill's field table lists both new
-    fields with their meaning; `make check` passes.
-
 - [ ] Direct unit coverage for `resolve_script_path()` locks the symlink-resolution contract for `make install`
   - **ID**: resolve-script-path-direct-coverage
   - **Tags**: test, install, symlink

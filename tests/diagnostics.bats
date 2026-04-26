@@ -950,3 +950,73 @@ TASKS
   grep -q 'shipped \* 100 / (tasks_starting + tasks_added)' "$skill"
   grep -q 'capped at' "$skill"
 }
+
+# ── Aggregate sweep accounting (sweeps=N sweep_seconds=N) ─────────────
+#
+# Without these fields, the only way to see how much wall time went
+# into backlog-discovery sweeps versus real grind sessions is to grep
+# every `sweep_done` line and sum the elapsed values by hand. The
+# 2026-04-24 grind spent 6748 s on sweeps out of a 10 h budget (18 %)
+# and that share was invisible from the grind_done summary.
+
+@test "grind_done log line surfaces sweeps and sweep_seconds even when zero" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export TG_NO_STALL_EXIT=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -qE 'grind_done .* sweeps=0 sweep_seconds=0' "$TEST_LOG"
+}
+
+@test "human summary reports sweep count and seconds-of-elapsed" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export TG_NO_STALL_EXIT=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Sweeps: 0"* ]]
+  [[ "$output" == *"of "* ]]
+  [[ "$output" == *"s)"* ]]
+}
+
+@test "sweeps counter and sweep_seconds accumulate across a real sweep" {
+  # Empty-queue grind triggers a sweep. The fake backend returns
+  # immediately without populating TASKS.md, so the sweep records a
+  # `sweep_done` marker with `elapsed=0s` and the grind ends via the
+  # empty-queue wait + deadline. The aggregate counters must reflect
+  # at least one sweep.
+  printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
+  export TG_NO_STALL_EXIT=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -qE 'grind_done .* sweeps=[1-9][0-9]*' "$TEST_LOG"
+  grep -qE 'grind_done .* sweep_seconds=[0-9]+' "$TEST_LOG"
+}
+
+@test "sweep_seconds accumulator stays consistent with sweep_done elapsed sum" {
+  # Trigger a sweep and assert that the grind_done `sweep_seconds`
+  # field equals the sum of the `elapsed=Ns` fields on every
+  # `sweep_done` line. This is the contract the analyze skill relies
+  # on when it computes sweep cost share without re-grepping.
+  printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
+  export TG_NO_STALL_EXIT=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  local summed
+  summed=$(grep -oE 'sweep_done .* elapsed=[0-9]+s' "$TEST_LOG" \
+    | sed -E 's/.*elapsed=([0-9]+)s.*/\1/' \
+    | awk '{s+=$1} END {print s+0}')
+  local reported
+  reported=$(grep -oE 'grind_done .* sweep_seconds=[0-9]+' "$TEST_LOG" \
+    | tail -1 \
+    | sed -E 's/.*sweep_seconds=([0-9]+).*/\1/')
+  [ -n "$summed" ]
+  [ -n "$reported" ]
+  [ "$summed" -eq "$reported" ]
+}
+
+@test "grind-log-analyze skill documents sweeps and sweep_seconds in the summary template" {
+  local skill="$BATS_TEST_DIRNAME/../.devin/skills/grind-log-analyze/SKILL.md"
+  grep -q 'sweeps=N sweep_seconds=N' "$skill"
+  grep -q 'sweep_seconds \* 100 / elapsed' "$skill"
+}
