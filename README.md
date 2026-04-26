@@ -240,6 +240,8 @@ tail -f "${TMPDIR:-/tmp}"/taskgrind-*.log   # watch live progress
 cat "${TMPDIR:-/tmp}"/taskgrind-*.log       # review completed sessions
 ```
 
+**Log file retention.** Each grind writes a primary log to `${TMPDIR:-/tmp}/taskgrind-<date>-<repo>-<pid>.log` plus short-lived sidecars (`taskgrind-exec.*`, `taskgrind-lock-*`, `taskgrind-ses-*`, `taskgrind-att-*`, `taskgrind-gsy-*`, `taskgrind-*.session.out`, `taskgrind-*.git-sync`, `taskgrind-*.task-attempts*`). On startup, taskgrind sweeps every sidecar older than one day from `$TMPDIR` but **explicitly leaves the primary `*.log` files in place** so the [`grind-log-analyze`](.devin/skills/grind-log-analyze/SKILL.md) skill can run post-mortems against them. On macOS the OS rotates `$TMPDIR` periodically; on Linux and inside long-lived CI containers these logs accumulate, so point a `logrotate` rule, a periodic cron sweep, or `systemd-tmpfiles` at `${TMPDIR:-/tmp}/taskgrind-*.log` if you need bounded growth.
+
 Each session logs: start time, remaining minutes, task count, exit code, duration, and shipped count. When a session removes a completed task but concurrent additions, rollover, or non-local queue churn hide that work from the raw before/after task count, taskgrind logs both `productive_zero_ship` and `shipped_inferred` so operators can see why the session still counted as shipped. The `grind_done` summary includes ship rate, remaining tasks, and average session duration.
 
 For machine-readable monitoring, set `TG_STATUS_FILE` to a JSON file path:

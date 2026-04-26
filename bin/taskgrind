@@ -921,6 +921,12 @@ if [[ -z "${DVB_GRIND_CMD:-}" ]]; then
 
   # Clean up orphaned temp files from previous runs (older than 1 day).
   # Only runs in production mode (test mode skips locking entirely).
+  # Retention policy: this sweep deliberately omits primary `taskgrind-*.log`
+  # files. The `grind-log-analyze` skill consumes them to post-mortem
+  # completed grinds, so they must outlive a single run. macOS rotates
+  # $TMPDIR periodically; Linux/long-lived CI hosts should add a logrotate
+  # or systemd-tmpfiles rule. See README.md "Log file retention" and
+  # SECURITY.md for operator guidance.
   if command -v fd >/dev/null 2>&1; then
     fd --no-ignore --changed-before 1d \
       'taskgrind-(exec\.|lock-|ses-|att-|gsy-|.*\.(session\.out|git-sync|task-attempts))' "$_dvb_tmp" \

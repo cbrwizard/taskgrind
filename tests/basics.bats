@@ -284,6 +284,23 @@ EOF
   [ "$status" -eq 0 ]
 }
 
+@test "README, SECURITY.md, and bin/taskgrind document the log retention policy" {
+  # The startup sweep deliberately omits primary *.log files so the
+  # grind-log-analyze skill can post-mortem completed grinds. This is an
+  # intentional, operator-facing contract — if any of these doc anchors
+  # disappear, operators no longer know whether to add their own logrotate
+  # rule on long-lived Linux hosts. Treat any failure here as a doc-drift
+  # bug, not a flaky test.
+  run grep -nF 'Log file retention' "$BATS_TEST_DIRNAME/../README.md"
+  [ "$status" -eq 0 ]
+  run grep -nF 'grind-log-analyze' "$BATS_TEST_DIRNAME/../README.md"
+  [ "$status" -eq 0 ]
+  run grep -nF 'Log files persist across grinds' "$BATS_TEST_DIRNAME/../SECURITY.md"
+  [ "$status" -eq 0 ]
+  run grep -nF 'Retention policy' "$BATS_TEST_DIRNAME/../bin/taskgrind"
+  [ "$status" -eq 0 ]
+}
+
 @test "man page example block stays aligned with current CLI help examples" {
   run grep -nF 'taskgrind ~/apps/myrepo 10         # 10h grind in specific repo' "$BATS_TEST_DIRNAME/../man/taskgrind.1"
   [ "$status" -eq 0 ]
