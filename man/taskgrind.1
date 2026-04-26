@@ -375,6 +375,27 @@ removable work while its own definition stays in the queue for the next pass.
 Use
 .B taskgrind \-\-preflight
 to see how many slots are currently active before starting another grind.
+.PP
+Taskgrind exports \fBTG_INSTANCE_ID=\fR\fIslot\fR into every child process
+(the AI backend, skills, hooks, wrapper scripts) so they can branch on the
+running slot. The variable is \fBtaskgrind\-set, not user\-set\fR \(em
+assigning it on the command line has no effect; taskgrind overwrites it
+after the slot is claimed. Its value equals the lowest free slot the run
+claimed (\fB0\fR, \fB1\fR, \fI...\fR); slot \fB0\fR owns the
+between\-session git sync, slots \fB1\fR and above skip that sync and
+prefer non\-overlapping work. Skills, hooks, and supervisor scripts can
+read it to coordinate without re\-running
+.BR \-\-preflight ;
+for example, a discovery skill can gate extra
+.BR "git pull \-\-rebase"
+calls on
+.BR "[ \\"${TG_INSTANCE_ID:-0}\\" \-ge 1 ]" .
+The variable is intentionally absent from the
+.B ENVIRONMENT
+section and from
+.BR "taskgrind \-\-help"
+because it is not a knob \(em listing it there would imply users can set
+it, which would race with the slot\-locking logic.
 .TP
 .I ${TMPDIR:\-/tmp}/taskgrind\-*.log
 Session logs (one per grind invocation).

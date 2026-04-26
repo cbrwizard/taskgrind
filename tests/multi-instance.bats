@@ -235,6 +235,43 @@ TASKS
   grep -q 'TG_INSTANCE_ID="$_dvb_slot"' "$DVB_GRIND"
 }
 
+@test "TG_INSTANCE_ID contract is documented in README, man page, and architecture doc" {
+  # The export at bin/taskgrind:1512 is read-only from the child's
+  # perspective: assigning it on the command line has no effect because
+  # taskgrind overwrites it after the slot is claimed. The contract is
+  # documented in the prose sections of README and man (NOT in the
+  # env-var tables, since surfacing it as user-settable would race
+  # with the slot-locking logic). This doc-drift guard fails the suite
+  # if a future edit silently drops any of those mentions, leaving
+  # skill authors and wrapper-script writers without a documented
+  # source of truth for the variable.
+  local readme="$BATS_TEST_DIRNAME/../README.md"
+  local man="$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  local arch="$BATS_TEST_DIRNAME/../docs/architecture.md"
+
+  # README — concurrent-instances section names the variable plus its
+  # read-only contract and the slot-0 sync ownership rule.
+  grep -q 'TG_INSTANCE_ID' "$readme"
+  grep -q 'TG_INSTANCE_ID.*read-only export' "$readme"
+  grep -q 'taskgrind-set, not user-set' "$readme"
+  grep -q 'absent from the.*Environment Variables.*table' "$readme"
+
+  # Man page — same contract in the multi-instance prose. The variable
+  # must NOT appear on its own `.B TG_INSTANCE_ID` line in the
+  # ENVIRONMENT section because the CLI-docs parity test would then
+  # require it in --help and the README env table too. The roff
+  # `\fBtaskgrind\-set, not user\-set\fR` markup needs literal
+  # backslash matching, so the grep pattern uses the file's exact
+  # bytes via `grep -F`.
+  grep -q 'TG_INSTANCE_ID' "$man"
+  grep -F 'taskgrind\-set, not user\-set' "$man"
+  ! grep -qE '^\.B TG_INSTANCE_ID$' "$man"
+
+  # Architecture doc — design rationale for the export.
+  grep -q 'TG_INSTANCE_ID' "$arch"
+  grep -q 'read-only from the child' "$arch"
+}
+
 # ── Dry run with multi-instance ──────────────────────────────────────
 
 @test "--dry-run shows max_instances when set" {

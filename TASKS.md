@@ -5,33 +5,6 @@
 
 ## P2
 
-- [ ] Document the exported `TG_INSTANCE_ID` contract for child sessions and wrapper scripts
-  - **ID**: document-tg-instance-id
-  - **Tags**: docs, multi-instance, env-var
-  - **Details**: `bin/taskgrind:1404` does
-    `export TG_INSTANCE_ID="$_dvb_slot"` so any AI session, skill, or
-    supervisor that inspects its own environment can tell which slot claimed
-    the lock (slot 0 owns git sync; higher slots should defer). There is a
-    structural test guarding the export in
-    `tests/multi-instance.bats:227-236`, but no user-facing doc mentions the
-    variable at all — `README.md` shows only `TG_MAX_INSTANCES`, the Env table
-    stops at `TG_SESSION_GRACE`, and `taskgrind --help` / `man taskgrind`
-    never name it. That makes the contract agent-only tribal knowledge,
-    exactly the kind of doc drift the repo policy flags. Add a short
-    subsection (or one row in the env var table) that states: (a) `TG_INSTANCE_ID`
-    is taskgrind-set, not user-set; (b) its value equals the claimed slot
-    (`0` owns between-session git sync, `1+` skip it); (c) skills and wrapper
-    scripts can read it to coordinate. Mirror the same wording in `man/taskgrind.1`
-    under the multi-instance section and in `README.md` under "Concurrent
-    instances on one repo". Do **not** promise it as a user-settable input —
-    only as a read-only export.
-  - **Files**: `README.md`, `man/taskgrind.1`, `docs/architecture.md`
-  - **Acceptance**: `README.md` and the man page both mention `TG_INSTANCE_ID`
-    with the read-only / slot-tied contract wording; a new `tests/basics.bats`
-    assertion (or extension to `tests/multi-instance.bats`) greps for the
-    string in both docs so future edits can't silently drop it; `make check`
-    passes.
-
 - [ ] Classify each session/sweep arc in `grind-log-analyze` output using the 7-pattern taxonomy from Roth's "543 Hours" study
   - **ID**: grind-log-analyze-arc-taxonomy
   - **Tags**: post-mortem, observability, grind-log-analyze, classification, methodology

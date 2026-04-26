@@ -724,7 +724,7 @@ if not readme_usage:
     raise SystemExit("README usage block not found")
 readme_flags = set(re.findall(r"--[a-z0-9][a-z0-9-]*", readme_usage.group(1)))
 
-readme_env = re.search(r"## Environment Variables\n\n.*?\n((?:\| `TG_[A-Z0-9_]+`.*\n)+)", readme, re.S)
+readme_env = re.search(r"## Environment Variables\n\n.*?\n((?:\| `TG_[A-Z0-9_]+`[^\n]*\n)+)", readme, re.S)
 if not readme_env:
     raise SystemExit("README environment table not found")
 readme_vars = set(re.findall(r"TG_[A-Z0-9_]+", readme_env.group(1)))

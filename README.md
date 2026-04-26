@@ -503,6 +503,15 @@ Conflict-avoidance expectations by slot:
 - `slot 1+` skips that sync, rebases just before committing, and should prefer `TASKS.md` updates, audits, docs, or other non-overlapping files when slot 0 is editing code
 - If all slots are occupied, taskgrind prints which process owns each slot and tells you to raise `TG_MAX_INSTANCES` before starting another grind
 
+#### `TG_INSTANCE_ID` (read-only export)
+
+Taskgrind exports `TG_INSTANCE_ID=<slot>` into every child process (the AI backend, skills, hooks, wrapper scripts) so they can branch on the running slot:
+
+- The variable is **taskgrind-set, not user-set** — assigning it on the command line has no effect; taskgrind overwrites it after the slot is claimed.
+- Its value equals the lowest free slot the run claimed (`0`, `1`, `…`). Slot `0` owns the between-session git sync; slots `1+` must skip that sync and prefer non-overlapping work.
+- Skills, hooks, and supervisor scripts can read it to coordinate without re-running `--preflight`. For example, a discovery skill can branch on `[ "${TG_INSTANCE_ID:-0}" -ge 1 ]` to enable extra `git pull --rebase` calls before each commit on higher slots.
+- It is intentionally absent from the `## Environment Variables` table above and from `taskgrind --help` because it is not a knob — surfacing it there would imply users can set it, which would race with the slot-locking logic.
+
 Supported two-stream workflow for one repo:
 
 - Keep `slot 0` on the normal `next-task` lane so it keeps shipping removable work from `TASKS.md`
