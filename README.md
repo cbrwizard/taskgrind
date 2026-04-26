@@ -176,7 +176,7 @@ Use `**Blocked by**` only when another task or external dependency truly prevent
 - **Empty-queue sweep** — when `TASKS.md` is empty, launches a sweep session to find work, then waits for external task injection before exiting
 - **Network resilience** — pauses on network loss, extends deadline on recovery
 - **Stall detection** — bails after consecutive zero-ship sessions (configurable via `TG_MAX_ZERO_SHIP`)
-- **Diminishing-returns guard** — tracks shipped counts in a 5-session rolling window; once `session >= 5` and fewer than 2 tasks shipped across the window, logs `diminishing_returns window=5 shipped=N` and prints a low-throughput warning. Advisory by default; set `TG_EARLY_EXIT_ON_STALL=1` to also exit with an `early_exit_stall` log marker and the `failed` status phase.
+- **Diminishing-returns guard** — tracks shipped counts in a 5-session rolling window; once `session >= 5` and fewer than 2 tasks shipped across the window, logs `diminishing_returns window=5 shipped=N consecutive=N` and prints a low-throughput warning. Two trips in a row cause an automatic exit with `diminishing_returns_exit consecutive=2 reason=default-2x` and the `failed` status phase. A single productive session resets the consecutive counter. Set `TG_NO_STALL_EXIT=1` to disable the auto-exit (advisory only). Set `TG_EXIT_ON_STALL=1` (or its alias `TG_EARLY_EXIT_ON_STALL=1`) for the stricter "exit on the first trip" behavior with the `early_exit_stall` marker.
 - **Per-task retry cap** — each `**ID**:` in `TASKS.md` has a per-session attempt counter. A task removed from `TASKS.md` clears its counter (that is how shipping a task resets it). Once a task hits 3 attempts without being removed, taskgrind logs `task_skip_threshold ids=<id>` once and prepends `SKIP these stuck tasks (attempted 3+ times): <id>. Work on other tasks instead.` to every following session prompt until the task ships or is deleted. The 3-attempt threshold is a built-in constant today — not an env var
 - **Fast-failure backoff** — linear backoff with cap when sessions crash quickly
 - **Ship-rate tracking** — logs cumulative effectiveness in `grind_done` summary, including inferred shipped work when a session removes a completed task but concurrent queue churn keeps the raw task count flat
@@ -220,7 +220,9 @@ Before deploying, ensure:
 | `TG_GIT_SYNC_TIMEOUT` | `30` | Max seconds for between-session git sync |
 | `TG_SYNC_INTERVAL` | `5` | Git sync every N sessions (0=every) |
 | `TG_EMPTY_QUEUE_WAIT` | `600` | Seconds to wait after an empty sweep before giving up |
-| `TG_EARLY_EXIT_ON_STALL` | `0` | Exit on low throughput. `0` keeps the advisory warning when fewer than 2 tasks ship across a 5-session rolling window (logged as `diminishing_returns`); `1` also exits the grind with `early_exit_stall`. |
+| `TG_EARLY_EXIT_ON_STALL` | `0` | Strict-mode alias for `TG_EXIT_ON_STALL`. Set `1` to exit on the **first** `diminishing_returns` trip with `early_exit_stall`. Kept as a backward-compat name. |
+| `TG_EXIT_ON_STALL` | `0` | Set `1` to exit on the **first** `diminishing_returns` trip (window=5, shipped<2). Same effect as `TG_EARLY_EXIT_ON_STALL=1`. |
+| `TG_NO_STALL_EXIT` | `0` | Set `1` to disable the default auto-exit on consecutive `diminishing_returns` trips; the detector still logs but the grind keeps running. Useful for audit/discovery lanes where low ship rates are expected. |
 | `TG_MAX_INSTANCES` | `2` | Max concurrent instances per repo |
 | `TG_DEVIN_PATH` | auto | Override devin binary path |
 | `TG_LOG` | auto | Override log file path |

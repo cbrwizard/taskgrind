@@ -95,8 +95,9 @@ Collect every occurrence of:
 | Network timeout | `network_timeout waited=Ns` | wait_duration |
 | Stall warning | `stall_warning consecutive_zero_ship=N` | count |
 | Stall bail | `stall_bail consecutive_zero_ship=N` | count |
-| Diminishing returns | `diminishing_returns window=N shipped=N` | window, shipped |
-| Early exit stall | `early_exit_stall` | — |
+| Diminishing returns | `diminishing_returns window=N shipped=N consecutive=N` | window, shipped, consecutive (the `consecutive` field counts consecutive trips of this detector across sessions, resets to 0 on any session with shipped >= 1) |
+| Early exit stall | `early_exit_stall` | — (fired only when `TG_EXIT_ON_STALL=1` / `TG_EARLY_EXIT_ON_STALL=1` causes a first-trip exit) |
+| Diminishing returns exit | `diminishing_returns_exit consecutive=N reason=default-2x` | consecutive, reason (default exit policy: fires when the consecutive counter reaches 2 — the second back-to-back diminishing_returns trip — and `TG_NO_STALL_EXIT` is unset) |
 | Repo missing | `repo_missing path=<path>` | path |
 | Productive timeout (raised) | `productive_timeout session=N shipped=N timeout=Ns new_timeout=Zs` | session, shipped, timeout, new_timeout |
 | Productive timeout (at cap) | `productive_timeout session=N shipped=N timeout=Ns (at cap)` | session, shipped, timeout |

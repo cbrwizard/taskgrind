@@ -74,7 +74,19 @@ PY
 @test "status file captures startup and completion states" {
   local status_file="$TEST_DIR/status.json"
   export DVB_STATUS_FILE="$status_file"
-  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  # 5 s was historically enough for one session to land before the
+  # deadline expired, but parallel bats load (TEST_JOBS=6) can eat most
+  # of that budget on fixture setup. Match the longer 30 s deadline
+  # used by the sibling TG_STATUS_FILE tests so the assertion on
+  # `last_session.result == "success"` always has a session to record.
+  export DVB_DEADLINE=$(( $(date +%s) + 30 ))
+  # The default test fixture has one no-ship task; over a 30 s window
+  # the grind churns through enough zero-ship sessions to trip the new
+  # diminishing-returns default exit, which would set current_phase to
+  # "failed". This test is about the status-file mechanism, not the
+  # exit reason, so opt out of the stall-exit policy and let the
+  # deadline drive the clean shutdown.
+  export TG_NO_STALL_EXIT=1
 
   run "$DVB_GRIND" 1 "$TEST_REPO"
 
@@ -89,7 +101,17 @@ with open(path, "r", encoding="utf-8") as handle:
 
 assert data["repo"] == expected_repo
 assert data["current_phase"] == "complete"
-assert data["terminal_reason"] is None
+# A finite-hour grind can exit via two clean paths:
+#   1. The while-loop condition `date +%s -lt deadline` evaluates false
+#      at the top of the next iteration — terminal_reason stays empty
+#      (None in JSON).
+#   2. `prepare_next_session_start` sees `now >= deadline` and explicitly
+#      calls `set_phase "deadline_expired"`, which cleanup propagates to
+#      `terminal_reason="deadline_expired"`.
+# Both paths are healthy stops; which one wins depends on whether the
+# deadline lands between iterations or inside the pre-session prep
+# window. Accept either so the test cannot flake on that race.
+assert data["terminal_reason"] in (None, "deadline_expired"), data["terminal_reason"]
 assert data["session"] >= 1
 assert data["backend"] == "devin"
 assert data["skill"] == "next-task"
@@ -109,6 +131,10 @@ PY
   # of that budget) — bump to 30s so session 1 always lands well inside the
   # deadline.
   export DVB_DEADLINE=$(( $(date +%s) + 30 ))
+  # 30 s is also long enough for the new diminishing-returns default exit
+  # to trigger after ~6 zero-ship sessions, which would set current_phase
+  # to "failed". This test asserts the deadline path, so opt out.
+  export TG_NO_STALL_EXIT=1
 
   run "$DVB_GRIND" 1 "$TEST_REPO"
 
@@ -146,6 +172,10 @@ PY
   export TG_STATUS_FILE="$tg_status_file"
   export DVB_STATUS_FILE="$legacy_status_file"
   export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  # See `status file captures startup and completion states` for the
+  # rationale behind disabling the new diminishing-returns default exit
+  # in this test.
+  export TG_NO_STALL_EXIT=1
 
   run "$DVB_GRIND" 1 "$TEST_REPO"
 

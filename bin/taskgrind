@@ -56,7 +56,13 @@
 #        TG_EMPTY_QUEUE_WAIT — seconds to wait after an empty sweep (default: 600)
 #        TG_SHUTDOWN_GRACE — seconds to wait for current session on exit (default: 120)
 #        TG_SESSION_GRACE — seconds to wait after session SIGINT before SIGTERM (default: 15)
-#        TG_EARLY_EXIT_ON_STALL — exit early on low throughput (default: 0)
+#        TG_EARLY_EXIT_ON_STALL — exit on the FIRST diminishing_returns trip
+#                         (default: 0; backward-compat alias for TG_EXIT_ON_STALL)
+#        TG_EXIT_ON_STALL — exit on the FIRST diminishing_returns trip
+#                         (default: 0; default behavior is to exit on the
+#                         SECOND consecutive trip without any flag set)
+#        TG_NO_STALL_EXIT — never auto-exit on diminishing_returns; log
+#                         advisory only (default: 0)
 #        TG_MAX_INSTANCES — max concurrent instances per repo (default: 2)
 #        TG_NO_PUSH     — 1 = never auto-push commits to origin; agent prompt
 #                         also forbids `git push` / `gh pr merge` (default: 0)
@@ -129,9 +135,10 @@ _dvb_is_tty="${_dvb_is_tty:-0}"
 # If TG_X is set, it takes precedence over DVB_X. Internal/test-only vars
 # (DVB_GRIND_CMD, DVB_DEADLINE, DVB_NET_FILE, DVB_CAFFEINATED) stay as DVB_.
 for _tg_var in BACKEND BACKOFF_BASE BACKOFF_MAX COOL DEVIN_PATH \
-               EARLY_EXIT_ON_STALL EMPTY_QUEUE_WAIT GIT_SYNC_TIMEOUT LOG MAX_FAST MAX_INSTANCES \
+               EARLY_EXIT_ON_STALL EMPTY_QUEUE_WAIT EXIT_ON_STALL GIT_SYNC_TIMEOUT \
+               LOG MAX_FAST MAX_INSTANCES \
                MAX_SESSION MAX_ZERO_SHIP MIN_SESSION MODEL NET_CHECK_URL NET_MAX_WAIT \
-               NET_RETRIES NET_RETRY_DELAY NET_WAIT NO_PUSH NOTIFY PROMPT \
+               NET_RETRIES NET_RETRY_DELAY NET_WAIT NO_PUSH NO_STALL_EXIT NOTIFY PROMPT \
                SESSION_GRACE SHUTDOWN_GRACE SKILL STATUS_FILE SWEEP_MAX SYNC_INTERVAL; do
   _tg_ref="TG_${_tg_var}"
   if [[ -n "${!_tg_ref:-}" ]]; then
@@ -291,6 +298,12 @@ fi
 # not 0 or 1 up front so operators see the typo at startup.
 if [[ -n "${DVB_EARLY_EXIT_ON_STALL:-}" ]] && ! [[ "${DVB_EARLY_EXIT_ON_STALL}" =~ ^[01]$ ]]; then
   echo "Error: TG_EARLY_EXIT_ON_STALL must be 0 or 1, got '${DVB_EARLY_EXIT_ON_STALL}'" >&2; exit 1
+fi
+if [[ -n "${DVB_EXIT_ON_STALL:-}" ]] && ! [[ "${DVB_EXIT_ON_STALL}" =~ ^[01]$ ]]; then
+  echo "Error: TG_EXIT_ON_STALL must be 0 or 1, got '${DVB_EXIT_ON_STALL}'" >&2; exit 1
+fi
+if [[ -n "${DVB_NO_STALL_EXIT:-}" ]] && ! [[ "${DVB_NO_STALL_EXIT}" =~ ^[01]$ ]]; then
+  echo "Error: TG_NO_STALL_EXIT must be 0 or 1, got '${DVB_NO_STALL_EXIT}'" >&2; exit 1
 fi
 if [[ -n "${DVB_NOTIFY:-}" ]] && ! [[ "${DVB_NOTIFY}" =~ ^[01]$ ]]; then
   echo "Error: TG_NOTIFY must be 0 or 1, got '${DVB_NOTIFY}'" >&2; exit 1
@@ -942,6 +955,13 @@ if [[ "$dry_run" -eq 1 ]]; then
   echo "  max_session: ${max_session}s"
   echo "  sweep_max:   ${sweep_max_session}s"
   echo "  early_exit_on_stall: ${DVB_EARLY_EXIT_ON_STALL:-0}"
+  if [[ "${DVB_NO_STALL_EXIT:-0}" == "1" ]]; then
+    echo "  stall_exit_policy: advisory_only (TG_NO_STALL_EXIT=1)"
+  elif [[ "${DVB_EARLY_EXIT_ON_STALL:-0}" == "1" ]] || [[ "${DVB_EXIT_ON_STALL:-0}" == "1" ]]; then
+    echo "  stall_exit_policy: strict_first_trip (TG_EXIT_ON_STALL=1)"
+  else
+    echo "  stall_exit_policy: default_2x_consecutive"
+  fi
   echo "  no_push:  $no_push"
   if [[ "$max_instances" -gt 1 ]]; then
     echo "  max_instances: $max_instances (slot=$_dvb_slot)"
@@ -1013,6 +1033,10 @@ tasks_starting=0
 tasks_remaining_snapshot=0
 sessions_zero_ship=0
 _recent_shipped=()  # rolling window of per-session shipped counts
+# Consecutive trips of the diminishing-returns detector. Reset to 0 on
+# any session that ships >= 1 task; incremented every time the detector
+# fires. The default exit policy bails when this counter reaches 2.
+_consecutive_diminishing_returns=0
 _dvb_finalizing=0
 _dvb_skip_exit_final_sync=0
 _dvb_shutting_down=0
@@ -2726,8 +2750,28 @@ while [[ $(date +%s) -lt $deadline ]]; do
   fi
 
   # ── Diminishing returns detection ──────────────────────────────────
-  # Track shipped counts in a rolling window. If throughput drops below
-  # threshold, warn (and optionally exit if DVB_EARLY_EXIT_ON_STALL=1).
+  # Track shipped counts in a rolling window. When the window total
+  # drops below 2 (and we have a full window), the detector fires.
+  #
+  # Exit policy is three-tier:
+  #   1. TG_NO_STALL_EXIT=1 → log advisory only, never auto-exit. Useful
+  #      for audit/discovery lanes that legitimately have low ship rates.
+  #   2. (default) → exit on the SECOND consecutive trip with
+  #      `diminishing_returns_exit consecutive=N reason=default-2x`.
+  #      One trip might be a slow patch in a long marathon; two
+  #      consecutive trips means the queue is dead. Exiting after the
+  #      second trip protects the budget without over-reacting to a
+  #      single bad window.
+  #   3. TG_EXIT_ON_STALL=1 (or TG_EARLY_EXIT_ON_STALL=1, kept as a
+  #      backward-compat alias) → exit on the FIRST trip with the
+  #      historical `early_exit_stall` log line.
+  #
+  # The consecutive counter resets to zero whenever a session ships >= 1
+  # task, so a single productive session unwinds prior trips and the
+  # default-2x clock starts over.
+  if [[ "$session_shipped" -ge 1 ]]; then
+    _consecutive_diminishing_returns=0
+  fi
   _recent_shipped+=("$session_shipped")
   _window=5
   if [[ ${#_recent_shipped[@]} -ge $_window ]]; then
@@ -2736,11 +2780,19 @@ while [[ $(date +%s) -lt $deadline ]]; do
       _window_total=$((_window_total + _ws))
     done
     if [[ $_window_total -lt 2 && $session -ge $_window ]]; then
-      echo "   ⚠ Low throughput: ${_window_total} tasks shipped in last ${_window} sessions."
-      log_write "[$(date '+%H:%M')] diminishing_returns window=$_window shipped=$_window_total"
-      if [[ "${DVB_EARLY_EXIT_ON_STALL:-0}" == "1" ]]; then
+      _consecutive_diminishing_returns=$((_consecutive_diminishing_returns + 1))
+      echo "   ⚠ Low throughput: ${_window_total} tasks shipped in last ${_window} sessions (consecutive_trips=${_consecutive_diminishing_returns})."
+      log_write "[$(date '+%H:%M')] diminishing_returns window=$_window shipped=$_window_total consecutive=$_consecutive_diminishing_returns"
+      if [[ "${DVB_NO_STALL_EXIT:-0}" == "1" ]]; then
+        : # Advisory only — operator opted out of any auto-exit.
+      elif [[ "${DVB_EARLY_EXIT_ON_STALL:-0}" == "1" ]] || [[ "${DVB_EXIT_ON_STALL:-0}" == "1" ]]; then
         echo "   ⚠ TG_EARLY_EXIT_ON_STALL=1 — exiting early to save time budget."
         log_write "[$(date '+%H:%M')] early_exit_stall"
+        set_phase "failed"
+        break
+      elif [[ "$_consecutive_diminishing_returns" -ge 2 ]]; then
+        echo "   ⚠ Diminishing returns detector tripped ${_consecutive_diminishing_returns} sessions in a row — exiting to save time budget. Set TG_NO_STALL_EXIT=1 to disable."
+        log_write "[$(date '+%H:%M')] diminishing_returns_exit consecutive=$_consecutive_diminishing_returns reason=default-2x"
         set_phase "failed"
         break
       fi

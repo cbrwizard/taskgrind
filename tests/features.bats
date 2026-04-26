@@ -672,6 +672,7 @@ SCRIPT
     "stall_bail"
     "early_exit_stall"
     "diminishing_returns"
+    "diminishing_returns_exit"
     "productive_timeout"
     "productive_zero_ship"
     "shipped_inferred"
@@ -1034,4 +1035,191 @@ SCRIPT
 
   grep -q 'sweep_efficiency' "$skill"
   grep -q 'cap=Ns' "$skill"
+}
+
+# ── Diminishing-returns default exit ──────────────────────────────────
+#
+# The diminishing-returns detector tracks shipped counts in a 5-session
+# rolling window. Default behavior used to be advisory-only — agentbrew
+# logs (2026-04-24) show the detector firing at session 8 followed by
+# 3.5h of further low-throughput sessions before a separate stall path
+# eventually bailed. ~30 % of a 10 h budget burned after the signal
+# fired. The new default exits on the SECOND consecutive trip with a
+# distinct `diminishing_returns_exit` log marker so the trigger can be
+# disambiguated from the "exit on first trip" `early_exit_stall` path.
+#
+# Three env vars compose the policy:
+#   - TG_NO_STALL_EXIT=1 disables auto-exit entirely (advisory only).
+#   - TG_EXIT_ON_STALL=1 (and the legacy TG_EARLY_EXIT_ON_STALL=1 alias)
+#     exits on the FIRST trip with `early_exit_stall`.
+#   - default-2x exit is the new fallback when neither of the above is
+#     set: bail when the consecutive trips counter reaches 2.
+
+@test "--dry-run shows stall_exit_policy default_2x_consecutive by default" {
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"stall_exit_policy: default_2x_consecutive"* ]]
+}
+
+@test "--dry-run shows stall_exit_policy advisory_only when TG_NO_STALL_EXIT=1" {
+  export TG_NO_STALL_EXIT=1
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"stall_exit_policy: advisory_only"* ]]
+}
+
+@test "--dry-run shows stall_exit_policy strict_first_trip when TG_EXIT_ON_STALL=1" {
+  export TG_EXIT_ON_STALL=1
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"stall_exit_policy: strict_first_trip"* ]]
+}
+
+@test "TG_EXIT_ON_STALL=1 and TG_EARLY_EXIT_ON_STALL=1 both flip strict mode" {
+  export TG_EARLY_EXIT_ON_STALL=1
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"stall_exit_policy: strict_first_trip"* ]]
+}
+
+@test "TG_NO_STALL_EXIT rejects non-boolean values at startup" {
+  export TG_NO_STALL_EXIT=yes
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"TG_NO_STALL_EXIT must be 0 or 1"* ]]
+}
+
+@test "TG_EXIT_ON_STALL rejects non-boolean values at startup" {
+  export TG_EXIT_ON_STALL=yes
+  run "$DVB_GRIND" --dry-run 8 "$TEST_REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"TG_EXIT_ON_STALL must be 0 or 1"* ]]
+}
+
+@test "diminishing_returns log line carries the consecutive trip counter" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Stubborn task
+TASKS
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
+  export DVB_MAX_ZERO_SHIP=20
+  export TG_NO_STALL_EXIT=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'diminishing_returns window=5 shipped=[01] consecutive=[0-9]\+' "$TEST_LOG"
+}
+
+@test "default 2x exit fires diminishing_returns_exit on the second consecutive trip" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Stubborn task
+TASKS
+  export DVB_DEADLINE=$(( $(date +%s) + 30 ))
+  # Keep DVB_MAX_ZERO_SHIP higher than the diminishing-returns trip
+  # window so the stall_bail path does not fire first.
+  export DVB_MAX_ZERO_SHIP=20
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'diminishing_returns_exit consecutive=2 reason=default-2x' "$TEST_LOG"
+  ! grep -q 'early_exit_stall' "$TEST_LOG"
+}
+
+@test "TG_NO_STALL_EXIT=1 keeps the grind running past consecutive trips" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Stubborn task
+TASKS
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
+  export DVB_MAX_ZERO_SHIP=20
+  export TG_NO_STALL_EXIT=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  ! grep -q 'diminishing_returns_exit' "$TEST_LOG"
+  ! grep -q 'early_exit_stall' "$TEST_LOG"
+  grep -q 'diminishing_returns window=5' "$TEST_LOG"
+}
+
+@test "TG_EXIT_ON_STALL=1 exits on the first trip with early_exit_stall" {
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Stubborn task
+TASKS
+  export DVB_DEADLINE=$(( $(date +%s) + 15 ))
+  export DVB_MAX_ZERO_SHIP=20
+  export TG_EXIT_ON_STALL=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -q 'early_exit_stall' "$TEST_LOG"
+  ! grep -q 'diminishing_returns_exit' "$TEST_LOG"
+}
+
+@test "consecutive trip counter resets after a session that ships >= 1 task" {
+  # Fake backend ships exactly one task on the 6th invocation, then
+  # stops touching TASKS.md again. The counter must reset on the
+  # productive session, so subsequent zero-ship sessions cannot land a
+  # second consecutive trip until the window-of-5 is once again all
+  # zero.
+  local toggle_devin="$TEST_DIR/toggle-devin"
+  local counter_file="$TEST_DIR/dim-counter"
+  echo "0" > "$counter_file"
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] First task
+  **ID**: first-task
+- [ ] Second task
+  **ID**: second-task
+- [ ] Third task
+  **ID**: third-task
+TASKS
+  create_fake_devin "$toggle_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "${DVB_GRIND_INVOKE_LOG}"
+n=\$(cat "$counter_file")
+n=\$((n + 1))
+echo "\$n" > "$counter_file"
+if [[ "\$n" -eq 6 ]]; then
+  cat > "$TEST_REPO/TASKS.md" <<'EOF'
+# Tasks
+## P0
+- [ ] Second task
+  **ID**: second-task
+- [ ] Third task
+  **ID**: third-task
+EOF
+fi
+SCRIPT
+  export DVB_GRIND_CMD="$toggle_devin"
+  export DVB_DEADLINE=$(( $(date +%s) + 30 ))
+  export DVB_MAX_ZERO_SHIP=20
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # Detector fires across the run because plenty of sessions ship 0,
+  # but the counter must hit 0 once on session 6, and ride back up
+  # only after subsequent zero-ship sessions rebuild a full zero
+  # window.
+  grep -q 'diminishing_returns window=5 shipped=[0-9]\+ consecutive=' "$TEST_LOG"
+  grep -q 'consecutive=0' "$TEST_LOG" \
+    || grep -q 'diminishing_returns window=5 shipped=1' "$TEST_LOG"
+}
+
+@test "operator docs name TG_NO_STALL_EXIT and TG_EXIT_ON_STALL alongside the existing gates" {
+  local readme="$BATS_TEST_DIRNAME/../README.md"
+  local man="$BATS_TEST_DIRNAME/../man/taskgrind.1"
+  local skill="$BATS_TEST_DIRNAME/../.devin/skills/grind-log-analyze/SKILL.md"
+
+  grep -q 'TG_NO_STALL_EXIT' "$readme"
+  grep -q 'TG_EXIT_ON_STALL' "$readme"
+  grep -q 'diminishing_returns_exit consecutive=2 reason=default-2x' "$readme"
+
+  grep -q 'TG_NO_STALL_EXIT' "$man"
+  grep -q 'TG_EXIT_ON_STALL' "$man"
+  grep -q 'diminishing_returns_exit consecutive=2 reason=default-2x' "$man"
+
+  grep -q 'diminishing_returns_exit' "$skill"
+  grep -q 'consecutive=N reason=default-2x' "$skill"
 }
