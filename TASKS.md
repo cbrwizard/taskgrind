@@ -5,37 +5,6 @@
 
 ## P2
 
-- [ ] Fix the `ship_rate` formula so tasks added mid-run no longer produce >100 % completion rates
-  - **ID**: ship-rate-include-added-tasks
-  - **Tags**: metric, accuracy, observability
-  - **Details**: `bin/taskgrind:1321-1323` computes
-    `ship_rate = tasks_shipped * 100 / tasks_starting`, where
-    `tasks_starting` is captured exactly once on the first iteration at
-    `bin/taskgrind:1929`. In the 2026-04-24 grind that produced the
-    summary line `ship_rate=253% (33/13)` because two sweeps and an
-    in-session injection added 19 net tasks that the denominator never
-    saw — making the headline metric mathematically vacuous. Track a
-    cumulative `tasks_added_total` across the loop (sum of every
-    `_tasks_added_during_session` at `bin/taskgrind:2389-2396` plus the
-    `tasks_found` reported at `bin/taskgrind:2083`) and divide by
-    `tasks_starting + tasks_added_total`, capped at 100 %. Update both
-    the human-readable summary at `bin/taskgrind:1330` and the
-    `grind_done` log marker at `bin/taskgrind:1334` so the analyze skill
-    keeps working. Keep `tasks_shipped`/`tasks_starting` visible in the
-    summary for transparency, but the percentage label must reflect the
-    full denominator. The grind-log-analyze field table that names
-    `ship_rate` at `.devin/skills/grind-log-analyze/SKILL.md:198` must be
-    updated in the same edit.
-  - **Files**: `bin/taskgrind`,
-    `.devin/skills/grind-log-analyze/SKILL.md`, the bats suite that
-    asserts on the `grind_done` line (search for `grind_done` under
-    `tests/` and pick the closest existing file before adding a new one)
-  - **Acceptance**: A bats case simulates a run where
-    `tasks_starting=10` and 5 tasks are added mid-run, ships 12 of 15,
-    and asserts `ship_rate=80%` (not >100 %); the human summary shows
-    the same percentage with `12/15` (not `12/10`); the analyze skill
-    documents the new denominator; `make check` passes.
-
 - [ ] Surface aggregate sweep cost in the `grind_done` summary line so post-mortems don't have to manually sum elapsed values
   - **ID**: grind-done-sweep-accounting
   - **Tags**: observability, log-analysis

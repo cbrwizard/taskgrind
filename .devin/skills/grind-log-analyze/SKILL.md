@@ -199,8 +199,15 @@ origin actually shipped:
 ### 2.7 — Grind summary
 
 ```
-[pid=N] [HH:MM] grind_done sessions=N shipped=N remaining=N ship_rate=N% avg_session=Nm elapsed=Ns duration=<human> rate=N/h sessions_zero_ship=N [prompt=<text>]
+[pid=N] [HH:MM] grind_done sessions=N shipped=N remaining=N ship_rate=N% avg_session=Nm elapsed=Ns duration=<human> rate=N/h sessions_zero_ship=N tasks_starting=N tasks_added=N [prompt=<text>]
 ```
+
+`ship_rate` is `shipped * 100 / (tasks_starting + tasks_added)` capped at
+100 %. Older logs (before this denominator change) lack the
+`tasks_starting` and `tasks_added` fields and may show `ship_rate` values
+above 100 % when sweeps or in-session injections inflated the queue past
+the starting count — treat any pre-change `ship_rate > 100 %` as
+`shipped / starting`, not as a true completion rate.
 
 ## Phase 3: Compute metrics
 
@@ -208,7 +215,7 @@ origin actually shipped:
 
 | Metric | Formula |
 |--------|---------|
-| **Ship rate** | `shipped / queue_start * 100`% |
+| **Ship rate** | `shipped / (tasks_starting + tasks_added) * 100`%, capped at 100 % (legacy logs without the `tasks_added` field were `shipped / queue_start * 100`%) |
 | **Throughput** | `shipped / (elapsed / 3600)` tasks/hour |
 | **Session efficiency** | `sessions_with_ships / total_sessions * 100`% |
 | **Avg session duration** | `total_elapsed / total_sessions` |

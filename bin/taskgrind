@@ -1030,6 +1030,12 @@ fi
 session=0
 tasks_shipped=0
 tasks_starting=0
+# Cumulative tasks added during the run — sum of every
+# `_tasks_added_during_session` (post-session block) plus every sweep's
+# `tasks_found`. Used as the denominator for `ship_rate` so an inflated
+# >100 % number cannot result from sweeps and concurrent injections
+# adding work after the starting count was captured.
+tasks_added_total=0
 tasks_remaining_snapshot=0
 sessions_zero_ship=0
 _recent_shipped=()  # rolling window of per-session shipped counts
@@ -1393,8 +1399,21 @@ cleanup() {
     # rate = tasks_shipped / hours — use bc for decimal, fall back to integer
     rate=$(echo "scale=1; $tasks_shipped * 3600 / $elapsed" | bc 2>/dev/null || echo "$((tasks_shipped * 3600 / elapsed))")
   fi
-  if [[ $tasks_starting -gt 0 ]]; then
-    ship_rate=$(echo "scale=0; $tasks_shipped * 100 / $tasks_starting" | bc 2>/dev/null || echo "$((tasks_shipped * 100 / tasks_starting))")
+  # Ship rate denominator = starting tasks + every task added during the
+  # run (in-session injections plus sweep discoveries). The previous
+  # formula divided shipped by `tasks_starting` only, which produced
+  # nonsensical >100 % numbers whenever sweeps or concurrent agents
+  # padded the queue mid-run (the 2026-04-24 grind logged
+  # `ship_rate=253% (33/13)` despite ~36 real tasks ever existing).
+  # Cap at 100 % defensively — the new denominator can still under-count
+  # in pathological churn cases (a task added then shipped within a
+  # single window that only saw the removal half of the diff).
+  local _ship_rate_denom=$(( tasks_starting + tasks_added_total ))
+  if [[ $_ship_rate_denom -gt 0 ]]; then
+    ship_rate=$(echo "scale=0; $tasks_shipped * 100 / $_ship_rate_denom" | bc 2>/dev/null || echo "$((tasks_shipped * 100 / _ship_rate_denom))")
+    if [[ "$ship_rate" -gt 100 ]] 2>/dev/null; then
+      ship_rate=100
+    fi
     ship_rate="${ship_rate}%"
   fi
 
@@ -1402,11 +1421,11 @@ cleanup() {
   echo "──────────────────────────────────────────"
   echo "  Grind complete: $session sessions, ${tasks_shipped}+ tasks, ${duration}"
   echo "  Rate: ${rate}/h  Avg session: ${avg_session}  Zero-ship: ${sessions_zero_ship}"
-  echo "  Ship rate: ${ship_rate} (${tasks_shipped}/${tasks_starting})  Remaining: ${tasks_remaining_snapshot}"
+  echo "  Ship rate: ${ship_rate} (${tasks_shipped}/${_ship_rate_denom}, started=${tasks_starting} added=${tasks_added_total})  Remaining: ${tasks_remaining_snapshot}"
   echo "  Log: $log_file"
   echo "──────────────────────────────────────────"
   local _done_line
-  _done_line="[pid=$$] [$(date '+%H:%M')] grind_done sessions=$session shipped=$tasks_shipped remaining=$tasks_remaining_snapshot ship_rate=$ship_rate avg_session=$avg_session elapsed=${elapsed}s duration=$duration rate=${rate}/h sessions_zero_ship=$sessions_zero_ship"
+  _done_line="[pid=$$] [$(date '+%H:%M')] grind_done sessions=$session shipped=$tasks_shipped remaining=$tasks_remaining_snapshot ship_rate=$ship_rate avg_session=$avg_session elapsed=${elapsed}s duration=$duration rate=${rate}/h sessions_zero_ship=$sessions_zero_ship tasks_starting=$tasks_starting tasks_added=$tasks_added_total"
   if [[ -n "${extra_prompt:-}" ]]; then
     _done_line+=" prompt=$extra_prompt"
   fi
@@ -2195,6 +2214,10 @@ while [[ $(date +%s) -lt $deadline ]]; do
     if [[ "$tasks_found" -gt 0 ]]; then
       echo "   ✓ Sweep found $tasks_found tasks — continuing grind."
       log_write "[$(date '+%H:%M')] sweep_found tasks=$tasks_found"
+      # Sweep additions feed the same `tasks_added_total` counter that
+      # the post-session block uses, so `ship_rate` accounts for backlog
+      # discovery as well as in-session injections.
+      tasks_added_total=$((tasks_added_total + tasks_found))
       set_phase "queue_refilled"
     else
       echo "   ✓ Sweep found no tasks — waiting for external task injection."
@@ -2517,7 +2540,10 @@ while [[ $(date +%s) -lt $deadline ]]; do
   _local_task_signatures_removed=0
   _local_task_signatures_added=0
 
-  # Log when new tasks were injected during the session (ID-based detection)
+  # Log when new tasks were injected during the session (ID-based detection).
+  # Both the ID-based and the count-based fallback feed `tasks_added_total`
+  # so the `ship_rate` denominator covers every task the run actually had
+  # to work on, not just the starting count.
   if [[ -n "$_ids_after" && -n "${_ids_before:-}" ]]; then
     _ids_added=$(comm -13 <(echo "$_ids_before") <(echo "$_ids_after") | wc -l)
     _ids_added=$(( _ids_added + 0 ))
@@ -2530,6 +2556,9 @@ while [[ $(date +%s) -lt $deadline ]]; do
     _tasks_added=$(( tasks_after - tasks_before ))
     _tasks_added_during_session=$_tasks_added
     log_write "[$(date '+%H:%M')] tasks_added=$_tasks_added (external injection: ${tasks_before}→${tasks_after})"
+  fi
+  if [[ "$_tasks_added_during_session" -gt 0 ]]; then
+    tasks_added_total=$((tasks_added_total + _tasks_added_during_session))
   fi
 
   if [[ -n "${_task_signatures_before:-}" ]]; then

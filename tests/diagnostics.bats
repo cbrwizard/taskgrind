@@ -845,3 +845,108 @@ SCRIPT
   [[ "$output" == *"Test backend command is not executable"* ]]
   [[ "$output" == *"$missing_backend"* ]]
 }
+
+# ── Ship rate denominator (tasks_starting + tasks_added) ──────────────
+#
+# Prior to this denominator change, `ship_rate` divided shipped tasks
+# by the count captured on the first iteration only. Sweeps and
+# concurrent agents that injected work mid-run inflated the numerator
+# past 100 % — the 2026-04-24 grind logged `ship_rate=253% (33/13)`
+# despite ~36 real tasks ever existing. The new denominator is
+# `tasks_starting + tasks_added_total` (sum of `_tasks_added_during_session`
+# plus every sweep's `tasks_found`), capped at 100 %.
+
+@test "grind_done log line surfaces tasks_starting and tasks_added" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  # Disable the new diminishing-returns default exit so the grind ends
+  # via deadline rather than `failed`. The grind_done line is emitted
+  # on every clean exit path, so the test only needs the new fields to
+  # be present, not any specific completion phase.
+  export TG_NO_STALL_EXIT=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  grep -qE 'grind_done .* tasks_starting=[0-9]+ tasks_added=[0-9]+' "$TEST_LOG"
+}
+
+@test "ship_rate human summary shows started=N added=N alongside the percent" {
+  export DVB_DEADLINE=$(( $(date +%s) + 5 ))
+  export TG_NO_STALL_EXIT=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Ship rate:"* ]]
+  [[ "$output" == *"started="* ]]
+  [[ "$output" == *"added="* ]]
+}
+
+@test "ship_rate denominator includes tasks added by a sweep" {
+  # Fake backend populates an empty queue when it sees the sweep prompt
+  # so the run gets a real `tasks_added_total` increment from the
+  # sweep block, even though `tasks_starting` was 0.
+  local sweep_devin="$TEST_DIR/sweep-devin"
+  cat > "$sweep_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+if echo "\$@" | grep -q 'TASKS.md is empty'; then
+  printf '# Tasks\n## P0\n- [ ] Found one\n  **ID**: found-one\n- [ ] Found two\n  **ID**: found-two\n- [ ] Found three\n  **ID**: found-three\n' > "$TEST_REPO/TASKS.md"
+fi
+SCRIPT
+  chmod +x "$sweep_devin"
+  export DVB_GRIND_CMD="$sweep_devin"
+  printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md"
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
+  export TG_NO_STALL_EXIT=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # Sweep added 3 tasks; the grind_done line must report `tasks_added=3`
+  # (or higher if subsequent injections also counted) instead of 0.
+  grep -qE 'grind_done .* tasks_added=[1-9][0-9]*' "$TEST_LOG"
+  ! grep -qE 'grind_done .* tasks_added=0\b' "$TEST_LOG"
+}
+
+@test "ship_rate caps at 100 % even when shipped briefly exceeds the denominator" {
+  # Construct a denominator-busting scenario: start with 2 tasks, ship
+  # both, then have a session add 1 task and ship 1 — the run can
+  # legitimately end with shipped > (starting + added) because the
+  # before/after diff misses the add+remove pair. The cap must hold.
+  local shipping_devin="$TEST_DIR/shipping-devin"
+  local counter_file="$TEST_DIR/ship-counter"
+  echo "0" > "$counter_file"
+  cat > "$shipping_devin" <<SCRIPT
+#!/bin/bash
+echo "\$@" >> "$DVB_GRIND_INVOKE_LOG"
+n=\$(cat "$counter_file")
+n=\$((n + 1))
+echo "\$n" > "$counter_file"
+case "\$n" in
+  1) printf '# Tasks\n## P0\n- [ ] Beta\n  **ID**: beta\n' > "$TEST_REPO/TASKS.md" ;;
+  2) printf '# Tasks\n## P0\n' > "$TEST_REPO/TASKS.md" ;;
+esac
+SCRIPT
+  chmod +x "$shipping_devin"
+  cat > "$TEST_REPO/TASKS.md" <<'TASKS'
+# Tasks
+## P0
+- [ ] Alpha
+  **ID**: alpha
+- [ ] Beta
+  **ID**: beta
+TASKS
+  export DVB_GRIND_CMD="$shipping_devin"
+  export DVB_DEADLINE=$(( $(date +%s) + 8 ))
+  export TG_NO_STALL_EXIT=1
+  run "$DVB_GRIND" 1 "$TEST_REPO"
+  [ "$status" -eq 0 ]
+  # ship_rate must be a percentage between 0 and 100 (inclusive), never
+  # a 3-digit value like the historical 253 %.
+  local ship_rate
+  ship_rate=$(grep -E 'grind_done .* ship_rate=[0-9]+%' "$TEST_LOG" | tail -1 | sed -E 's/.*ship_rate=([0-9]+)%.*/\1/')
+  [ -n "$ship_rate" ]
+  [ "$ship_rate" -le 100 ]
+}
+
+@test "grind-log-analyze skill documents the new denominator" {
+  local skill="$BATS_TEST_DIRNAME/../.devin/skills/grind-log-analyze/SKILL.md"
+  grep -q 'tasks_starting=N tasks_added=N' "$skill"
+  grep -q 'shipped \* 100 / (tasks_starting + tasks_added)' "$skill"
+  grep -q 'capped at' "$skill"
+}
